@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use argon2::hash_encoded;
 
@@ -18,7 +18,7 @@ use rocket_contrib::templates::Template;
 
 use serde_json::value::{Value, to_value};
 
-use crate::{Error, Result, BannerList};
+use crate::{Error, Result, config::Config};
 use crate::models::{ThreadId, Database, Post, NewPost, NewThread};
 
 /// Convert a post into a 'Value' which can be rendered by a template.
@@ -44,8 +44,8 @@ fn post_to_value(post: Post) -> Result<Value> {
 }
 
 #[get("/static/<file..>", rank = 0)]
-pub fn static_file(file: PathBuf) -> Result<NamedFile> {
-    Ok(NamedFile::open(Path::new("res/static").join(file))?)
+pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+    Ok(NamedFile::open(config.static_dir.join(file))?)
 }
 
 #[get("/", rank = 0)]
@@ -65,7 +65,7 @@ pub fn home(db: State<Database>) -> Result<Template> {
 #[get("/<board_name>", rank = 1)]
 pub fn board(
     board_name: String,
-    banners: State<BannerList>,
+    config: State<Config>,
     db: State<Database>
 ) -> Result<Template> {
     let data = hashmap!{
@@ -73,7 +73,7 @@ pub fn board(
         "version" => to_value(env!("CARGO_PKG_VERSION"))?,
         "new_thread_form" => to_value(true)?,
         "board" => to_value(db.board(&board_name)?)?,
-        "banner_href" => to_value(banners.choose())?,
+        "banner_href" => to_value(config.choose_banner().to_string())?,
         "threads" => to_value(db.threads_on_board(&board_name)?
             .into_iter()
             .map(|thread| {
@@ -100,16 +100,14 @@ pub fn board(
 pub fn thread(
     board_name: String,
     thread_id: ThreadId,
-    banners: State<BannerList>,
+    config: State<Config>,
     db: State<Database>
-)
-    -> Result<Template>
-{
+) -> Result<Template> {
     let data = hashmap!{
         "all_boards" => to_value(db.all_boards()?)?,
         "version" => to_value(env!("CARGO_PKG_VERSION"))?,
         "board" => to_value(db.board(&board_name)?)?,
-        "banner_href" => to_value(banners.choose())?,
+        "banner_href" => to_value(config.choose_banner().to_string())?,
         "thread" => to_value(db.thread(&board_name, thread_id)?)?,
         "thread_href" => {
             let uri = uri!(thread: &board_name, thread_id);

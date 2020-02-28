@@ -8,14 +8,13 @@ use derive_more::{Display, From};
 
 use maplit::hashmap;
 
-use rand::{thread_rng, seq::SliceRandom};
-
 use rocket::{Request, response::Responder, http::Status};
 
 use rocket_contrib::templates::Template;
 
-pub mod routes;
+pub mod config;
 pub mod models;
+pub mod routes;
 pub mod schema;
 
 #[derive(Debug, Display, From)]
@@ -77,24 +76,3 @@ impl<'r> Responder<'r> for Error {
 impl std::error::Error for Error { }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub struct BannerList {
-    pub banners: Vec<String>,
-}
-
-impl BannerList {
-    pub fn new<B: Into<Vec<String>>>(banners: B) -> BannerList {
-        let banners = banners.into();
-
-        if banners.is_empty() {
-            panic!("banner list cannot be empty");
-        }
-
-        BannerList { banners: banners.into() }
-    }
-
-    pub fn choose(&self) -> &str {
-        let mut rng = thread_rng();
-        &self.banners.choose(&mut rng).unwrap()
-    }
-}

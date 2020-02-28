@@ -1,21 +1,15 @@
 #![feature(proc_macro_hygiene)]
 
+use std::path::PathBuf;
+
 use rocket::{routes, uri};
-use rocket::config::{Config, Environment};
+use rocket::config::{Config as RocketConfig, Environment};
 
 use rocket_contrib::templates::Template;
 
-use longboard::{Result, BannerList};
-use longboard::models::Database;
+use longboard::{Result, models::Database, config::Config};
 
 fn main() -> Result<()> {
-    let banners = BannerList::new(vec![
-        uri!(longboard::routes::static_file: "/banners/1.png").to_string(),
-        uri!(longboard::routes::static_file: "/banners/2.png").to_string(),
-        uri!(longboard::routes::static_file: "/banners/3.png").to_string(),
-        uri!(longboard::routes::static_file: "/banners/4.png").to_string(),
-    ]);
-
     let routes = routes![
         longboard::routes::static_file,
         longboard::routes::home,
@@ -25,16 +19,27 @@ fn main() -> Result<()> {
         longboard::routes::new_post
     ];
 
-    let conf = Config::build(Environment::Development)
+    let rocket_conf = RocketConfig::build(Environment::Development)
         .address("0.0.0.0")
         .port(8000)
         .extra("template_dir", "res/templates")
         .finalize().unwrap();
 
-    rocket::custom(conf)
+    let app_conf = Config {
+        static_dir: PathBuf::from("res/static"),
+        upload_dir: PathBuf::from("uploads"),
+        banners: vec![
+            PathBuf::from("/banners/1.png"),
+            PathBuf::from("/banners/2.png"),
+            PathBuf::from("/banners/3.png"),
+            PathBuf::from("/banners/4.png")
+        ]
+    };
+
+    rocket::custom(rocket_conf)
         .mount("/", routes)
         .manage(Database::open()?)
-        .manage(banners)
+        .manage(app_conf)
         .attach(Template::fairing())
         .launch();
 
