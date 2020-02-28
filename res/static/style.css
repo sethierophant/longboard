@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Sigmar+One|Roboto+Mono&display=swap');
+
+h1, h2 {
+    font-family: 'Sigmar One';
+    text-align: center;
+}
+
+pre {
+    overflow-x: scroll;
+}
+
+a {
+    color: hsl(340, 100%, 65%);
+}
+
+body {
+    font-family: 'Roboto Condensed';
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+}
+
+.banner {
+    border: thin solid black;
+}
+
+nav.boards ul {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+    padding: 0;
+    margin: 0.6em 0;
+}
+
+nav.boards li {
+    list-style: none;
+    margin: 0 1em;
+}
+
+nav.boards a {
+    text-decoration: none;
+}
+
+.site-name h1 {
+    font-size: 3em;
+    margin-bottom: 0.2em;
+}
+
+.site-stats {
+    text-align: center;
+    font-size: 1.2em;
+}
+
+.new-item-form {
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 6em auto;
+    width: 20em;
+}
+
+.new-item-form label.divider {
+    grid-column: 1 / span 2;
+    border-bottom: thin solid black;
+    margin: 0.4em 0 0.8em;
+}
+
+.new-item-form input, .new-item-form textarea {
+    margin: 0.2em 0;
+    padding: 0.2em 0.4em;
+    border: thin solid black;
+}
+
+.new-item-form textarea {
+    grid-column: 1 / span 2;
+    height: 200px;
+}
+
+.new-item-form input[type=submit], .new-item-form input[type=file] {
+    grid-column: 1 / span 2;
+}
+
+.thread {
+    width: 100%;
+}
+
+.post {
+    width: 100%;
+    padding: 0.6em;
+    margin: 0.8em 0;
+    background-color: hsl(340, 80%, 90%);
+    border: thin solid hsl(340, 80%, 80%);
+    box-sizing: border-box;
+    line-height: 1.45;
+}
+
+.post:target {
+    animation: 1.0s ease-out 0s hilight;
+}
+
+@keyframes hilight {
+    from {
+        background-color: hsl(340, 80%, 80%);
+    }
+
+    to {
+        background-color: hsl(340, 80%, 90%);
+    }
+}
+
+.post-info {
+    display: grid;
+    grid-template-rows: [top] auto auto auto;
+    grid-template-columns:
+        [start] auto
+        [contact] max-content
+        [timestamp] max-content
+        [id] max-content;
+}
+
+.post-info .post-ident {
+    word-break: break-all;
+    grid-column: start;
+    grid-row: top;
+}
+
+.post-info .post-author {
+    grid-column: start;
+}
+
+.post-info .post-contact {
+    grid-column: contact;
+    grid-row: top;
+}
+
+.post-info .post-timestamp {
+    grid-column: timestamp;
+    grid-row: top;
+    margin: 0 0.4em;
+}
+
+.post-info .post-id {
+    grid-column: id;
+    grid-row: top;
+}
+
+.post-author, .post-timestamp {
+    opacity: 0.5;
+}
+
+.post article {
+    padding: 0.8em;
+    box-sizing: border-box;
+}

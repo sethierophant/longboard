@@ -1,0 +1,18 @@
+<section class="post" id="{{id}}">
+    <header class="post-info">
+        {{#if author_ident}}
+            <span class="post-ident" title="{{author_ident}}">#{{author_ident}}</span>
+        {{/if}}
+        <span class="post-author">{{author_name}}</span>
+        {{#if author_contact}}
+            <span class="post-contact">{{author_contact}}</span>
+        {{/if}}
+        <span class="post-timestamp">{{time_stamp}}</span>
+        <span class="post-id"><a href="#{{id}}">#{{id}}</a></span>
+    </header>
+    <article>
+        <p>
+            {{body}}
+        </p>
+    </article>
+</section>

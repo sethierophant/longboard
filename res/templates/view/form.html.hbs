@@ -1,0 +1,22 @@
+<form class="new-item-form" method="POST" enctype="multipart/form-data">
+    {{#if new_thread_form}}
+        <label for="subject">Subject</label>
+        <input type="text" name="subject">
+    {{/if}}
+    <label for="author">Name</label>
+    <input type="text" name="author">
+    <label for="contact">Contact</label>
+    <input type="text" name="contact">
+    <label for="ident">Identity</label>
+    <input type="password" name="ident">
+    <textarea name="body"></textarea>
+    <label for="no-bump">No Bump</label>
+    <input type="checkbox" name="no-bump">
+    <input type="file" name="file">
+    {{#if new_thread_form}}
+        <input type="submit" value="New Thread">
+    {{/if}}
+    {{#unless new_thread_form}}
+        <input type="submit" value="New Post">
+    {{/unless}}
+</form>

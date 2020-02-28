@@ -1,0 +1,6 @@
+<section class="thread">
+    <h1><a href="{{thread_href}}">{{thread.subject}}</a></h1>
+    {{#each posts}}
+        {{> view/post}}
+    {{/each}}
+</section>

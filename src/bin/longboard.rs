@@ -1,38 +1,42 @@
-use warp::Filter;
+#![feature(proc_macro_hygiene)]
 
-use longboard::Result;
-use longboard::models::{Database, ThreadId};
+use rocket::{routes, uri};
+use rocket::config::{Config, Environment};
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    pretty_env_logger::init();
+use rocket_contrib::templates::Template;
 
-    let reply_home = move || {
-        format!("longboard {}", env!("CARGO_PKG_VERSION"))
-    };
-    let home = warp::path::end().map(reply_home);
+use longboard::{Result, BannerList};
+use longboard::models::Database;
 
-    let reply_board = move |board_name| {
-        let db = Database::open().unwrap();
+fn main() -> Result<()> {
+    let banners = BannerList::new(vec![
+        uri!(longboard::routes::static_file: "/banners/1.png").to_string(),
+        uri!(longboard::routes::static_file: "/banners/2.png").to_string(),
+        uri!(longboard::routes::static_file: "/banners/3.png").to_string(),
+        uri!(longboard::routes::static_file: "/banners/4.png").to_string(),
+    ]);
 
-        format!("{:#?}", db.board(board_name).unwrap())
-    };
-    let post = warp::path!(String).map(reply_board);
+    let routes = routes![
+        longboard::routes::static_file,
+        longboard::routes::home,
+        longboard::routes::board,
+        longboard::routes::thread,
+        longboard::routes::new_thread,
+        longboard::routes::new_post
+    ];
 
-    let reply_thread = move |_board_name, thread_id| {
-        let db = Database::open().unwrap();
+    let conf = Config::build(Environment::Development)
+        .address("0.0.0.0")
+        .port(8000)
+        .extra("template_dir", "res/templates")
+        .finalize().unwrap();
 
-        format!("{:#?}", db.thread(thread_id).unwrap())
-    };
-    let thread = warp::path!(String / ThreadId).map(reply_thread);
-
-    let get_routes = home
-        .or(post)
-        .or(thread);
-
-    let routes = warp::get().and(get_routes);
-
-    warp::serve(routes).run(([0, 0, 0, 0], 3000)).await;
+    rocket::custom(conf)
+        .mount("/", routes)
+        .manage(Database::open()?)
+        .manage(banners)
+        .attach(Template::fairing())
+        .launch();
 
     Ok(())
 }
