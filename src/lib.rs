@@ -27,6 +27,9 @@ pub enum Error {
     FormDataCouldntParse,
     #[display(fmt="Bad Content-Type for multipart/form-data")]
     FormDataBadContentType,
+    #[display(fmt="Error processing image: {}", _0)]
+    #[from]
+    ImageError(image::error::ImageError),
     #[display(fmt="Error hashing password: {}", _0)]
     #[from]
     HashError(argon2::Error),
@@ -66,7 +69,8 @@ impl<'r> Responder<'r> for Error {
 
                 Ok(res)
             },
-            _ => {
+            e => {
+                println!("{:?}", e);
                 Err(Status::InternalServerError)
             }
         }

@@ -6,6 +6,16 @@ table! {
 }
 
 table! {
+    file (save_name) {
+        save_name -> Text,
+        thumb_name -> Nullable<Text>,
+        orig_name -> Nullable<Text>,
+        content_type -> Nullable<Text>,
+        post -> Int4,
+    }
+}
+
+table! {
     post (id) {
         id -> Int4,
         time_stamp -> Timestamptz,
@@ -26,11 +36,13 @@ table! {
     }
 }
 
+joinable!(file -> post (post));
 joinable!(post -> thread (thread));
 joinable!(thread -> board (board));
 
 allow_tables_to_appear_in_same_query!(
     board,
+    file,
     post,
     thread,
 );

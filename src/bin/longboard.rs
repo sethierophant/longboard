@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use rocket::{routes, uri};
+use rocket::routes;
 use rocket::config::{Config as RocketConfig, Environment};
 
 use rocket_contrib::templates::Template;
@@ -12,6 +12,7 @@ use longboard::{Result, models::Database, config::Config};
 fn main() -> Result<()> {
     let routes = routes![
         longboard::routes::static_file,
+        longboard::routes::upload_file,
         longboard::routes::home,
         longboard::routes::board,
         longboard::routes::thread,

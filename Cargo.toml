@@ -20,9 +20,12 @@ chrono = { version = "0.4", features = ["serde"] }
 derive_more = "0.99"
 diesel = { version = "1.4", features = ["postgres", "chrono", "r2d2"] }
 handlebars = "3.0"
+image = "0.23"
 log = "0.4"
 maplit = "1.0"
-multipart = "0.16"
+mime = "0.2"
+mime_guess = "1.8"
+multipart = { version = "0.16", default-features = false, features = ["server"] }
 pretty_env_logger = "0.3"
 r2d2 = "0.8"
 rand = "0.7"

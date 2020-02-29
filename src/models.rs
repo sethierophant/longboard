@@ -8,7 +8,7 @@ use diesel::r2d2::{Pool, ConnectionManager};
 use serde::Serialize;
 
 use crate::Result;
-use crate::schema::{thread, post};
+use crate::schema::{thread, post, file};
 
 pub type ThreadId = i32;
 pub type PostId = i32;
@@ -54,27 +54,54 @@ pub struct Post {
     pub thread_id: ThreadId,
 }
 
+/// A user-uploaded file.
+#[derive(Debug, Queryable, Serialize)]
+pub struct File {
+    /// The name the file is saved at.
+    pub save_name: String,
+    /// The name of the thumbnail of the file, if any.
+    pub thumb_name: Option<String>,
+    /// The original name of the file, if any.
+    pub orig_name: Option<String>,
+    /// The content-type of the file, if any.
+    pub content_type: Option<String>,
+    /// The post that the file belongs to.
+    pub post_id: PostId,
+}
+
 /// A new thread to be inserted in the database. See 'Thread' for descriptions
 /// of the fields.
 #[derive(Debug, Insertable)]
 #[table_name = "thread"]
-pub struct NewThread {
+pub struct NewThread<'a> {
     pub time_stamp: DateTime<Utc>,
-    pub subject: String,
-    pub board: String,
+    pub subject: &'a str,
+    pub board: &'a str,
 }
 
 /// A new post to be inserted in the database. See 'Post' for descriptions of
 /// the fields.
 #[derive(Debug, Insertable)]
 #[table_name = "post"]
-pub struct NewPost {
+pub struct NewPost<'a> {
     pub time_stamp: DateTime<Utc>,
-    pub body: String,
-    pub author_name: Option<String>,
-    pub author_contact: Option<String>,
-    pub author_ident: Option<String>,
+    pub body: &'a str,
+    pub author_name: Option<&'a str>,
+    pub author_contact: Option<&'a str>,
+    pub author_ident: Option<&'a str>,
     pub thread: ThreadId,
+}
+
+/// A new file to be inserted in the database. See 'File' for descriptions of
+/// the fields.
+#[derive(Debug, Insertable)]
+#[table_name = "file"]
+pub struct NewFile<'a> {
+    pub save_name: &'a str,
+    pub thumb_name: Option<&'a str>,
+    pub orig_name: Option<&'a str>,
+    pub content_type: Option<&'a str>,
+    pub post: PostId,
 }
 
 pub static DATABASE_URL: &str = "postgres://longboard:@localhost/longboard";
@@ -145,6 +172,16 @@ impl Database {
            .load(&self.pool.get()?)?)
     }
 
+    /// Get all of the files in a post.
+    pub fn files_in_post(&self, post_id: PostId) -> Result<Vec<File>> {
+        use crate::schema::file::dsl::file;
+        use crate::schema::file::columns::post;
+
+        Ok(file
+           .filter(post.eq(post_id))
+           .load(&self.pool.get()?)?)
+    }
+
     /// Get the number of threads in the database.
     pub fn num_threads(&self) -> Result<i64> {
         use crate::schema::thread::dsl::thread;
@@ -179,5 +216,13 @@ impl Database {
             .values(&new_post)
             .returning(id)
             .get_result(&self.pool.get()?)?)
+    }
+
+    pub fn insert_file(&self, new_file: NewFile) -> Result<usize> {
+        use crate::schema::file::dsl::file;
+
+        Ok(insert_into(file)
+            .values(&new_file)
+            .execute(&self.pool.get()?)?)
     }
 }
