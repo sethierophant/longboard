@@ -40,9 +40,4 @@ joinable!(file -> post (post));
 joinable!(post -> thread (thread));
 joinable!(thread -> board (board));
 
-allow_tables_to_appear_in_same_query!(
-    board,
-    file,
-    post,
-    thread,
-);
+allow_tables_to_appear_in_same_query!(board, file, post, thread,);

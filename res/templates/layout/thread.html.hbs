@@ -1,9 +1,11 @@
 {{#*inline "header"}}
     {{> view/banner}}
     {{> view/board-header}}
-    {{> view/form}}
+    {{> view/new-post-form}}
 {{/inline}}
 {{#*inline "content"}}
-    {{> view/thread}}
+    {{#with thread}}
+        {{> view/thread}}
+    {{/with}}
 {{/inline}}
 {{> layout/page}}

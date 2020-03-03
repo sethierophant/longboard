@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="shortcut icon" href="/static/favicon.png" type="image/png"> 
     <link rel="stylesheet" href="/static/style.css"/>
-    <title>longboard v{{version}}</title>
+    <title>longboard v{{page_info.version}}</title>
   </head>
   <body>
     <header class="page-header">
         <nav class="boards">
-            {{#each all_boards}}
-                <ul><a href="/{{name}}">{{name}}</a></ul>
+            {{#each page_info.boards}}
+                <ul><a href="/{{name}}" title="{{description}}">{{name}}</a></ul>
             {{/each}}
         </nav>
         {{> header}}

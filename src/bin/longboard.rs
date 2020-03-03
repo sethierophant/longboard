@@ -2,12 +2,13 @@
 
 use std::path::PathBuf;
 
-use rocket::routes;
 use rocket::config::{Config as RocketConfig, Environment};
+use rocket::routes;
 
 use rocket_contrib::templates::Template;
 
-use longboard::{Result, models::Database, config::Config};
+use longboard::config::{Banner, Config};
+use longboard::{models::Database, Result};
 
 fn main() -> Result<()> {
     let routes = routes![
@@ -24,17 +25,26 @@ fn main() -> Result<()> {
         .address("0.0.0.0")
         .port(8000)
         .extra("template_dir", "res/templates")
-        .finalize().unwrap();
+        .finalize()
+        .unwrap();
 
     let app_conf = Config {
         static_dir: PathBuf::from("res/static"),
         upload_dir: PathBuf::from("uploads"),
         banners: vec![
-            PathBuf::from("/banners/1.png"),
-            PathBuf::from("/banners/2.png"),
-            PathBuf::from("/banners/3.png"),
-            PathBuf::from("/banners/4.png")
-        ]
+            Banner {
+                name: "1.png".into(),
+            },
+            Banner {
+                name: "2.png".into(),
+            },
+            Banner {
+                name: "3.png".into(),
+            },
+            Banner {
+                name: "4.png".into(),
+            },
+        ],
     };
 
     rocket::custom(rocket_conf)

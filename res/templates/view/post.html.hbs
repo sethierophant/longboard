@@ -1,24 +1,23 @@
 <section class="post" id="{{id}}">
     <header class="post-info">
-        {{#if post.author_ident}}
+        <span class="post-author">{{author_name}}</span>
+        {{#if author_contact}}
+            <span class="post-contact">{{author_contact}}</span>
+        {{/if}}
+        {{#if author_ident}}
             <span class="post-ident" title="{{author_ident}}">
-                #{{post.author_ident}}
+                #{{author_ident}}
             </span>
         {{/if}}
-        <span class="post-author">{{post.author_name}}</span>
-        {{#if post.author_contact}}
-            <span class="post-contact">{{post.author_contact}}</span>
-        {{/if}}
-        <span class="post-timestamp">{{post.time_stamp}}</span>
+        <span class="post-timestamp">{{time_stamp}}</span>
         <span class="post-id"><a href="#{{id}}">#{{id}}</a></span>
     </header>
-    <article>
-        <img src="{{file_src}}">
+    <article class="body">
+        {{#if file}}
+            <img class="post-image" src="{{file.uri}}">
+        {{/if}}
         <p>
-            {{post.body}}
+            {{body}}
         </p>
     </article>
-    {{#each files}}
-        <a href="/upload/{{save_name}}">{{orig_name}}</a>
-    {{/each}}
 </section>

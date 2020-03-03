@@ -1,16 +1,20 @@
-use chrono::DateTime;
-use chrono::offset::Utc;
+use std::fmt::Debug;
 
-use diesel::prelude::*;
+use chrono::offset::Utc;
+use chrono::DateTime;
+
 use diesel::insert_into;
-use diesel::r2d2::{Pool, ConnectionManager};
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
 
 use serde::Serialize;
 
+use crate::schema::{file, post, thread};
 use crate::Result;
-use crate::schema::{thread, post, file};
 
+/// A thread ID.
 pub type ThreadId = i32;
+/// A post ID.
 pub type PostId = i32;
 
 /// A collection of post threads about a similar topic.
@@ -106,8 +110,23 @@ pub struct NewFile<'a> {
 
 pub static DATABASE_URL: &str = "postgres://longboard:@localhost/longboard";
 
+/// A connection to the database. Used for creating and retrieving data.
 pub struct Database {
     pool: Pool<ConnectionManager<PgConnection>>,
+}
+
+impl Debug for Database {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let state = self.pool.state();
+
+        write!(
+            fmt,
+            "<#Database connections={} idle_connections={}>",
+            state.connections, state.idle_connections,
+        )?;
+
+        Ok(())
+    }
 }
 
 impl Database {
@@ -128,8 +147,8 @@ impl Database {
 
     /// Get a board.
     pub fn board<S: AsRef<str>>(&self, board_name: S) -> Result<Board> {
-        use crate::schema::board::dsl::board;
         use crate::schema::board::columns::name;
+        use crate::schema::board::dsl::board;
 
         Ok(board
             .filter(name.eq(board_name.as_ref()))
@@ -137,23 +156,19 @@ impl Database {
     }
 
     /// Get threads on a board.
-    pub fn threads_on_board<S: AsRef<str>>(&self, board_name: S)
-        -> Result<Vec<Thread>>
-    {
-        use crate::schema::thread::dsl::thread;
+    pub fn threads_on_board<S: AsRef<str>>(&self, board_name: S) -> Result<Vec<Thread>> {
         use crate::schema::thread::columns::board;
+        use crate::schema::thread::dsl::thread;
 
         Ok(thread
-           .filter(board.eq(board_name.as_ref()))
-           .load(&self.pool.get()?)?)
+            .filter(board.eq(board_name.as_ref()))
+            .load(&self.pool.get()?)?)
     }
 
     /// Get a thread.
-    pub fn thread<S: AsRef<str>>(&self, board_name: S, thread_id: ThreadId)
-        -> Result<Thread>
-    {
-        use crate::schema::thread::dsl::thread;
+    pub fn thread<S: AsRef<str>>(&self, board_name: S, thread_id: ThreadId) -> Result<Thread> {
         use crate::schema::thread::columns::{board, id};
+        use crate::schema::thread::dsl::thread;
 
         Ok(thread
             .filter(board.eq(board_name.as_ref()))
@@ -164,42 +179,38 @@ impl Database {
 
     /// Get all of the posts in a thread.
     pub fn posts_in_thread(&self, thread_id: ThreadId) -> Result<Vec<Post>> {
-        use crate::schema::post::dsl::post;
         use crate::schema::post::columns::thread;
+        use crate::schema::post::dsl::post;
 
-        Ok(post
-           .filter(thread.eq(thread_id))
-           .load(&self.pool.get()?)?)
+        Ok(post.filter(thread.eq(thread_id)).load(&self.pool.get()?)?)
     }
 
     /// Get all of the files in a post.
     pub fn files_in_post(&self, post_id: PostId) -> Result<Vec<File>> {
-        use crate::schema::file::dsl::file;
         use crate::schema::file::columns::post;
+        use crate::schema::file::dsl::file;
 
-        Ok(file
-           .filter(post.eq(post_id))
-           .load(&self.pool.get()?)?)
+        Ok(file.filter(post.eq(post_id)).load(&self.pool.get()?)?)
     }
 
     /// Get the number of threads in the database.
     pub fn num_threads(&self) -> Result<i64> {
         use crate::schema::thread::dsl::thread;
-        
+
         Ok(thread.count().first(&self.pool.get()?)?)
     }
 
     /// Get the number of posts in the database.
     pub fn num_posts(&self) -> Result<i64> {
         use crate::schema::post::dsl::post;
-        
+
         Ok(post.count().first(&self.pool.get()?)?)
     }
 
     /// Insert a new thread into the database.
     pub fn insert_thread(&self, new_thread: NewThread) -> Result<ThreadId> {
-        use crate::schema::thread::dsl::thread;
         use crate::schema::thread::columns::id;
+        use crate::schema::thread::dsl::thread;
 
         Ok(insert_into(thread)
             .values(&new_thread)
@@ -209,8 +220,8 @@ impl Database {
 
     /// Insert a new post into the database.
     pub fn insert_post(&self, new_post: NewPost) -> Result<PostId> {
-        use crate::schema::post::dsl::post;
         use crate::schema::post::columns::id;
+        use crate::schema::post::dsl::post;
 
         Ok(insert_into(post)
             .values(&new_post)
@@ -218,6 +229,7 @@ impl Database {
             .get_result(&self.pool.get()?)?)
     }
 
+    /// Insert a new file into the database.
     pub fn insert_file(&self, new_file: NewFile) -> Result<usize> {
         use crate::schema::file::dsl::file;
 
