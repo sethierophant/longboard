@@ -131,9 +131,11 @@ impl Debug for Database {
 
 impl Database {
     /// Open a connection to the database.
-    pub fn open() -> Result<Database> {
-        let url = "postgres://longboard:@localhost/longboard";
-        let pool = Pool::new(ConnectionManager::new(url))?;
+    pub fn open<S>(url: S) -> Result<Database>
+    where
+        S: AsRef<str>,
+    {
+        let pool = Pool::new(ConnectionManager::new(url.as_ref()))?;
 
         Ok(Database { pool })
     }
@@ -146,7 +148,10 @@ impl Database {
     }
 
     /// Get a board.
-    pub fn board<S: AsRef<str>>(&self, board_name: S) -> Result<Board> {
+    pub fn board<S>(&self, board_name: S) -> Result<Board>
+    where
+        S: AsRef<str>,
+    {
         use crate::schema::board::columns::name;
         use crate::schema::board::dsl::board;
 
@@ -156,7 +161,10 @@ impl Database {
     }
 
     /// Get threads on a board.
-    pub fn threads_on_board<S: AsRef<str>>(&self, board_name: S) -> Result<Vec<Thread>> {
+    pub fn threads_on_board<S>(&self, board_name: S) -> Result<Vec<Thread>>
+    where
+        S: AsRef<str>,
+    {
         use crate::schema::thread::columns::board;
         use crate::schema::thread::dsl::thread;
 
@@ -166,7 +174,10 @@ impl Database {
     }
 
     /// Get a thread.
-    pub fn thread<S: AsRef<str>>(&self, board_name: S, thread_id: ThreadId) -> Result<Thread> {
+    pub fn thread<S>(&self, board_name: S, thread_id: ThreadId) -> Result<Thread>
+    where
+        S: AsRef<str>,
+    {
         use crate::schema::thread::columns::{board, id};
         use crate::schema::thread::dsl::thread;
 

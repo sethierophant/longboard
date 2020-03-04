@@ -1,15 +1,17 @@
-use std::default::Default;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 
 use rand::{seq::SliceRandom, thread_rng};
 
 use rocket::http::uri::Origin;
 use rocket::uri;
 
+use crate::Result;
+
 /// A banner to be displayed at the top of the page.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Banner {
     pub name: String,
 }
@@ -22,7 +24,7 @@ impl Banner {
 }
 
 impl Serialize for Banner {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -31,14 +33,24 @@ impl Serialize for Banner {
 }
 
 /// Configuration for a longboard instance.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     /// Where the static files are.
     pub static_dir: PathBuf,
     /// Where the user-uploaded files are.
     pub upload_dir: PathBuf,
-    /// A list of banners. These should be in `static_dir`.
+    /// Where the templates to be rendered are.
+    pub template_dir: PathBuf,
+    /// A list of banners. These should be in `${static_dir}/banners`.
+    // TODO: Autoload these?
+    // TODO: Allow banners outside of that directory?
     pub banners: Vec<Banner>,
+    /// Address to bind to
+    pub address: String,
+    /// Port to bind to
+    pub port: u16,
+    /// URL to connect to the database
+    pub database_url: String,
 }
 
 impl Config {
@@ -49,12 +61,11 @@ impl Config {
     }
 }
 
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            static_dir: PathBuf::from("static"),
-            upload_dir: PathBuf::from("upload"),
-            banners: Vec::new(),
-        }
+impl Config {
+    pub fn open<P>(path: P) -> Result<Config>
+    where
+        P: AsRef<Path>,
+    {
+        Ok(serde_yaml::from_reader(File::open(path)?)?)
     }
 }

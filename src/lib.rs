@@ -46,6 +46,9 @@ pub enum Error {
     #[display(fmt = "JSON error: {}", _0)]
     #[from]
     JsonError(serde_json::error::Error),
+    #[display(fmt = "YAML error: {}", _0)]
+    #[from]
+    YamlError(serde_yaml::Error),
     #[display(fmt = "HTML template file error: {}", _0)]
     #[from]
     TemplateError(handlebars::TemplateFileError),
