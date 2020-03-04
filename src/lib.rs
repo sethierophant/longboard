@@ -24,7 +24,7 @@ pub mod schema;
 /// Views and types for rendering.
 pub mod views;
 
-/// Out error type.
+/// Our error type.
 #[derive(Debug, Display, From)]
 pub enum Error {
     #[display(fmt = "Missing param '{}' for new thread.", param)]
