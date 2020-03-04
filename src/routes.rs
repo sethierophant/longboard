@@ -198,7 +198,11 @@ where
     let new_path = upload_dir.as_ref().join(&new_file_name);
 
     {
-        let mut new_file = File::create(&new_path)?;
+        let msg = format!("Couldn't create new upload file {}", new_path.display());
+
+        let mut new_file = File::create(&new_path)
+            .map_err(|err| Error::from_io_error(err, msg))?;
+
         let mut readable = field.data.readable()?;
 
         io::copy(&mut readable, &mut new_file)?;
@@ -221,8 +225,12 @@ where
         Err(e) => return Err(e.into()),
     };
 
-    let source_file = BufReader::new(File::open(source)?);
-    let image = image::load(source_file, format)?;
+    let msg = format!("Couldn't open uploaded file {}", source.display());
+
+    let source_file = File::open(source)
+        .map_err(|err| Error::from_io_error(err, msg))?;
+    let source_reader = BufReader::new(source_file);
+    let image = image::load(source_reader, format)?;
 
     let thumb = image.thumbnail(200, 200);
 

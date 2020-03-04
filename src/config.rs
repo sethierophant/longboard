@@ -8,10 +8,11 @@ use rand::{seq::SliceRandom, thread_rng};
 use rocket::http::uri::Origin;
 use rocket::uri;
 
-use crate::Result;
+use crate::{Error, Result};
 
 /// A banner to be displayed at the top of the page.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct Banner {
     pub name: String,
 }
@@ -66,6 +67,12 @@ impl Config {
     where
         P: AsRef<Path>,
     {
-        Ok(serde_yaml::from_reader(File::open(path)?)?)
+        let path = path.as_ref();
+        let msg = format!("Couldn't open config file at {}", path.display());
+
+        let reader = File::open(path)
+            .map_err(|err| Error::from_io_error(err, msg))?;
+
+        Ok(serde_yaml::from_reader(reader)?)
     }
 }

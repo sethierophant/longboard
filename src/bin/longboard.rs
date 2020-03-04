@@ -8,7 +8,7 @@ use rocket_contrib::templates::Template;
 use longboard::config::Config;
 use longboard::{models::Database, Result};
 
-fn main() -> Result<()> {
+fn main_res() -> Result<()> {
     let routes = routes![
         longboard::routes::static_file,
         longboard::routes::upload_file,
@@ -19,7 +19,7 @@ fn main() -> Result<()> {
         longboard::routes::new_post
     ];
 
-    let default_config_path = if cfg!(debug_assertations) {
+    let default_config_path = if cfg!(debug_assertions) {
         "contrib/dev-config.yaml"
     } else {
         "/etc/longboard/config.yaml"
@@ -42,4 +42,10 @@ fn main() -> Result<()> {
         .launch();
 
     Ok(())
+}
+
+fn main() {
+    if let Err(e) = main_res() {
+        eprintln!("{}", e);
+    }
 }

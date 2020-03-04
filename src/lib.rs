@@ -1,5 +1,6 @@
 #![feature(proc_macro_hygiene)]
 #![feature(decl_macro)]
+#![feature(never_type)]
 
 #[macro_use]
 extern crate diesel;
@@ -64,6 +65,16 @@ pub enum Error {
     #[display(fmt = "I/O error: {}", _0)]
     #[from]
     IoError(std::io::Error),
+    #[display(fmt = "I/O error: {}: {}", msg, cause)]
+    IoErrorMsg { cause: std::io::Error, msg: String }
+}
+
+impl Error {
+    fn from_io_error<S>(cause: std::io::Error, msg: S) -> Error
+    where S: Into<String>
+    {
+        Error::IoErrorMsg { cause, msg: msg.into() }
+    }
 }
 
 impl<'r> Responder<'r> for Error {
