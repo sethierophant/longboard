@@ -1,10 +1,5 @@
 @import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Sigmar+One|Roboto+Mono&display=swap');
 
-.board-name, .board-description {
-    font-family: 'Sigmar One';
-    text-align: center;
-}
-
 pre {
     overflow-x: scroll;
 }
@@ -20,6 +15,10 @@ body {
     color: hsl(0, 0%, 98%);
 }
 
+.site-name {
+    text-align: center;
+}
+
 .page-header {
     display: flex;
     flex-flow: column nowrap;
@@ -28,6 +27,11 @@ body {
 
 .banner {
     border: thin solid black;
+}
+
+.board-name, .board-description {
+    font-family: 'Sigmar One';
+    text-align: center;
 }
 
 nav.boards ul {
@@ -59,9 +63,11 @@ nav.boards a {
 
 .new-item-form {
     margin: 0 auto;
+    padding: 0.4em;
     display: grid;
     grid-template-columns: 6em auto;
     width: 20em;
+    background-color: hsl(0, 0%, 20%);
 }
 
 .new-item-form label.divider {
@@ -73,7 +79,7 @@ nav.boards a {
 .new-item-form input, .new-item-form textarea {
     margin: 0.2em 0;
     padding: 0.2em 0.4em;
-    border: thin solid black;
+    border: none;
 }
 
 .new-item-form textarea {
