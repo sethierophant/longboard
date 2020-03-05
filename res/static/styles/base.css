@@ -62,7 +62,7 @@ nav.boards a {
 }
 
 .new-item-form {
-    margin: 0 auto;
+    margin: 1em auto;
     padding: 0.4em;
     display: grid;
     grid-template-columns: 6em auto;
