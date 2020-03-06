@@ -15,6 +15,10 @@ body {
     color: hsl(0, 0%, 98%);
 }
 
+.error h1 {
+    font-size: 250%;
+}
+
 .site-name {
     text-align: center;
 }
@@ -63,7 +67,7 @@ nav.boards a {
 
 .new-item-form {
     margin: 1em auto;
-    padding: 0.4em;
+    padding: 0.6em;
     display: grid;
     grid-template-columns: 6em auto;
     width: 20em;
@@ -92,14 +96,14 @@ nav.boards a {
 }
 
 .thread {
-    width: 100%;
-
-    margin: 2em 0;
-    padding: 0 1em;
+    margin: 1em;
 
     display: flex;
     flex-flow: column nowrap;
     align-items: flex-start;
+
+    padding-top: 1em;
+    border-top: thin solid hsl(0, 0%, 15%);
 
     box-sizing: border-box;
 }

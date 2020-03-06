@@ -70,8 +70,7 @@ impl Config {
         let path = path.as_ref();
         let msg = format!("Couldn't open config file at {}", path.display());
 
-        let reader = File::open(path)
-            .map_err(|err| Error::from_io_error(err, msg))?;
+        let reader = File::open(path).map_err(|err| Error::from_io_error(err, msg))?;
 
         Ok(serde_yaml::from_reader(reader)?)
     }

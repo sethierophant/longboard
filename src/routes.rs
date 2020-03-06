@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
+use std::string::ToString;
 
 use argon2::hash_encoded;
 
@@ -46,6 +47,10 @@ pub fn home(config: State<Config>, db: State<Database>) -> Result<HomeView> {
 /// Serve a board.
 #[get("/<board_name>", rank = 1)]
 pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> Result<BoardView> {
+    if !db.board(&board_name).is_ok() {
+        return Err(Error::BoardNotFound { board_name });
+    }
+
     BoardView::new(board_name, &db, &config)
 }
 
@@ -57,6 +62,13 @@ pub fn thread(
     config: State<Config>,
     db: State<Database>,
 ) -> Result<ThreadView> {
+    if !db.thread(&board_name, thread_id).is_ok() {
+        return Err(Error::ThreadNotFound {
+            board_name,
+            thread_id,
+        });
+    }
+
     ThreadView::new(board_name, thread_id, &db, &config)
 }
 
@@ -200,8 +212,7 @@ where
     {
         let msg = format!("Couldn't create new upload file {}", new_path.display());
 
-        let mut new_file = File::create(&new_path)
-            .map_err(|err| Error::from_io_error(err, msg))?;
+        let mut new_file = File::create(&new_path).map_err(|err| Error::from_io_error(err, msg))?;
 
         let mut readable = field.data.readable()?;
 
@@ -227,8 +238,7 @@ where
 
     let msg = format!("Couldn't open uploaded file {}", source.display());
 
-    let source_file = File::open(source)
-        .map_err(|err| Error::from_io_error(err, msg))?;
+    let source_file = File::open(source).map_err(|err| Error::from_io_error(err, msg))?;
     let source_reader = BufReader::new(source_file);
     let image = image::load(source_reader, format)?;
 
@@ -257,6 +267,10 @@ pub fn new_thread(
     config: State<Config>,
     db: State<Database>,
 ) -> Result<FragmentRedirect> {
+    if !db.board(&board_name).is_ok() {
+        return Err(Error::BoardNotFound { board_name });
+    }
+
     let missing_subject_err = Error::MissingThreadParam {
         param: "subject".into(),
     };
@@ -267,56 +281,52 @@ pub fn new_thread(
 
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
-    let new_thread_id = db.insert_thread(NewThread {
-        time_stamp: Utc::now(),
-        subject: entries.param("subject").ok_or(missing_subject_err)?,
-        board: &board_name,
-    })?;
-
     let ident = entries.param("ident").map(hash_ident).transpose()?;
 
-    let new_post_id = db.insert_post(NewPost {
-        time_stamp: Utc::now(),
-        body: entries.param("body").ok_or(missing_body_err)?,
-        author_name: entries.param("author"),
-        author_contact: entries.param("contact"),
-        author_ident: ident.as_deref(),
-        thread: new_thread_id,
-    })?;
+    let field = entries.field("file").filter(|field| field.data.size() > 0);
+    if let Some(field) = field {
+        let orig_name = field.headers.filename.as_deref();
 
-    if let Some(field) = entries.field("file") {
-        if field.data.size() > 0 {
-            let orig_name = field.headers.filename.as_deref();
+        let content_type = field.headers.content_type.as_ref().map(ToString::to_string);
 
-            let content_type = field.headers.content_type.as_ref().map(|m| m.to_string());
+        let save_path = save_file(field, &config.upload_dir)?;
+        let save_name = &save_path.file_name().unwrap().to_str().unwrap();
 
-            let save_path = save_file(field, &config.upload_dir)?;
-            let save_name = &save_path
-                .file_name()
-                .expect("bad image path")
-                .to_str()
-                .expect("bad image path");
+        let thumb_path = create_thumbnail(&save_path)?;
+        let thumb_name = thumb_path
+            .as_ref()
+            .map(|path| path.file_name().unwrap().to_str().unwrap());
 
-            let thumb_path = create_thumbnail(&save_path)?;
-            let thumb_name = thumb_path.as_ref().map(|path| {
-                path.file_name()
-                    .expect("bad image path")
-                    .to_str()
-                    .expect("bad image path")
-            });
+        let new_thread_id = db.insert_thread(NewThread {
+            time_stamp: Utc::now(),
+            subject: entries.param("subject").ok_or(missing_subject_err)?,
+            board: &board_name,
+        })?;
 
-            db.insert_file(NewFile {
-                save_name,
-                orig_name,
-                thumb_name,
-                content_type: content_type.as_deref(),
-                post: new_post_id,
-            })?;
-        }
+        let new_post_id = db.insert_post(NewPost {
+            time_stamp: Utc::now(),
+            body: entries.param("body").ok_or(missing_body_err)?,
+            author_name: entries.param("author"),
+            author_contact: entries.param("contact"),
+            author_ident: ident.as_deref(),
+            thread: new_thread_id,
+        })?;
+
+        db.insert_file(NewFile {
+            save_name,
+            orig_name,
+            thumb_name,
+            content_type: content_type.as_deref(),
+            post: new_post_id,
+        })?;
+
+        let uri = uri!(thread: board_name, new_thread_id);
+        return Ok(FragmentRedirect::to(uri, new_post_id));
     }
 
-    let uri = uri!(thread: board_name, new_thread_id);
-    Ok(FragmentRedirect::to(uri, new_post_id))
+    Err(Error::MissingThreadParam {
+        param: "file".into(),
+    })
 }
 
 /// Handle a request to create a new post.
@@ -329,6 +339,13 @@ pub fn new_post(
     config: State<Config>,
     db: State<Database>,
 ) -> Result<FragmentRedirect> {
+    if !db.thread(&board_name, thread_id).is_ok() {
+        return Err(Error::ThreadNotFound {
+            board_name,
+            thread_id,
+        });
+    }
+
     let missing_body_err = Error::MissingThreadParam {
         param: "body".into(),
     };
@@ -336,6 +353,41 @@ pub fn new_post(
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
     let ident = entries.param("ident").map(hash_ident).transpose()?;
+
+    let field = entries.field("file").filter(|field| field.data.size() > 0);
+    let content_type;
+    let save_path;
+    let thumb_path;
+    let new_file = if let Some(field) = field {
+        let orig_name = field.headers.filename.as_deref();
+
+        content_type = field.headers.content_type.as_ref().map(ToString::to_string);
+
+        save_path = save_file(field, &config.upload_dir)?;
+        let save_name = &save_path
+            .file_name()
+            .expect("bad image path")
+            .to_str()
+            .expect("bad image path");
+
+        thumb_path = create_thumbnail(&save_path)?;
+        let thumb_name = thumb_path.as_ref().map(|path| {
+            path.file_name()
+                .expect("bad image path")
+                .to_str()
+                .expect("bad image path")
+        });
+
+        Some(NewFile {
+            save_name,
+            orig_name,
+            thumb_name,
+            content_type: content_type.as_deref(),
+            post: 0,
+        })
+    } else {
+        None
+    };
 
     let new_post_id = db.insert_post(NewPost {
         time_stamp: Utc::now(),
@@ -346,35 +398,11 @@ pub fn new_post(
         thread: thread_id,
     })?;
 
-    if let Some(field) = entries.field("file") {
-        if field.data.size() > 0 {
-            let orig_name = field.headers.filename.as_deref();
-
-            let content_type = field.headers.content_type.as_ref().map(|m| m.to_string());
-
-            let save_path = save_file(field, &config.upload_dir)?;
-            let save_name = &save_path
-                .file_name()
-                .expect("bad image path")
-                .to_str()
-                .expect("bad image path");
-
-            let thumb_path = create_thumbnail(&save_path)?;
-            let thumb_name = thumb_path.as_ref().map(|path| {
-                path.file_name()
-                    .expect("bad image path")
-                    .to_str()
-                    .expect("bad image path")
-            });
-
-            db.insert_file(NewFile {
-                save_name,
-                orig_name,
-                thumb_name,
-                content_type: content_type.as_deref(),
-                post: new_post_id,
-            })?;
-        }
+    if let Some(new_file) = new_file {
+        db.insert_file(NewFile {
+            post: new_post_id,
+            ..new_file
+        })?;
     }
 
     let uri = uri!(thread: board_name, thread_id);
