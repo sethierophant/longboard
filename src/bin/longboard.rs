@@ -1,6 +1,9 @@
 #![feature(proc_macro_hygiene)]
 
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
+use std::path::PathBuf;
+
+use clap::{App, Arg};
 
 use fern::colors::{Color, ColoredLevelConfig};
 
@@ -12,7 +15,46 @@ use rocket_contrib::templates::Template;
 use longboard::{config::Config, models::Database, LogFairing, Result};
 
 fn main_res() -> Result<()> {
-    let conf = Config::open(Config::default_path())?;
+    let matches = App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILE")
+                .takes_value(true)
+                .help("Config file to use"),
+        )
+        .arg(
+            Arg::with_name("gen-config")
+                .long("gen-config")
+                .value_name("FILE")
+                .takes_value(true)
+                .default_value("-")
+                .help("Generate a new config file"),
+        )
+        .get_matches();
+
+    if matches.occurrences_of("gen-config") == 1 {
+        let gen_path = matches.value_of("gen-config").unwrap();
+
+        if gen_path == "-" {
+            Config::generate(std::io::stdout())?;
+        } else {
+            Config::generate(File::create(gen_path)?)?;
+        }
+
+        return Ok(());
+    }
+
+    let conf_path = matches
+        .value_of("config")
+        .map(PathBuf::from)
+        .unwrap_or_else(Config::default_path);
+    let conf = Config::open(conf_path)?;
+
     let log_to_file = conf.log_file.is_some();
 
     let dispatch = fern::Dispatch::new()

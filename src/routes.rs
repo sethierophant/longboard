@@ -47,7 +47,7 @@ pub fn home(config: State<Config>, db: State<Database>) -> Result<HomeView> {
 /// Serve a board.
 #[get("/<board_name>", rank = 1)]
 pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> Result<BoardView> {
-    if !db.board(&board_name).is_ok() {
+    if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
 
@@ -62,7 +62,7 @@ pub fn thread(
     config: State<Config>,
     db: State<Database>,
 ) -> Result<ThreadView> {
-    if !db.thread(&board_name, thread_id).is_ok() {
+    if db.thread(&board_name, thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
             thread_id,
@@ -267,7 +267,7 @@ pub fn new_thread(
     config: State<Config>,
     db: State<Database>,
 ) -> Result<FragmentRedirect> {
-    if !db.board(&board_name).is_ok() {
+    if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
 
@@ -339,7 +339,7 @@ pub fn new_post(
     config: State<Config>,
     db: State<Database>,
 ) -> Result<FragmentRedirect> {
-    if !db.thread(&board_name, thread_id).is_ok() {
+    if db.thread(&board_name, thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
             thread_id,

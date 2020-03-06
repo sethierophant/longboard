@@ -4,6 +4,7 @@
 name = "longboard"
 version = "0.1.0"
 authors = ["set <set@hierophant.club>"]
+description = "Imageboard engine"
 edition = "2018"
 default-run = "longboard"
 
@@ -35,3 +36,4 @@ serde_json = "1.0"
 serde_yaml = "0.8"
 log = "0.4"
 fern = { version = "0.5", features = ["colored"] }
+clap = "2.33"

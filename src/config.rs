@@ -36,6 +36,10 @@ impl Serialize for Banner {
 /// Configuration for a longboard instance.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    /// Address to bind to
+    pub address: String,
+    /// Port to bind to
+    pub port: u16,
     /// Where the static files are.
     pub static_dir: PathBuf,
     /// Where the user-uploaded files are.
@@ -46,13 +50,10 @@ pub struct Config {
     // TODO: Autoload these?
     // TODO: Allow banners outside of that directory?
     pub banners: Vec<Banner>,
-    /// Address to bind to
-    pub address: String,
-    /// Port to bind to
-    pub port: u16,
     /// URL to connect to the database
     pub database_url: String,
     /// File to log to
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub log_file: Option<PathBuf>,
 }
 
@@ -78,6 +79,16 @@ impl Config {
         Ok(serde_yaml::from_reader(reader)?)
     }
 
+    pub fn generate<W>(mut out: W) -> Result<()>
+    where
+        W: std::io::Write 
+    {
+        writeln!(&mut out, "# Configuration for longboard")?;
+        serde_yaml::to_writer(&mut out, &Config::default())?;
+        writeln!(&mut out)?;
+        Ok(())
+    }
+
     pub fn default_path() -> PathBuf {
         if cfg!(debug_assertions) {
             PathBuf::from("contrib/dev-config.yaml")
@@ -86,4 +97,30 @@ impl Config {
         }
     }
 }
+impl Default for Config {
+    fn default() -> Config {
+        if cfg!(debug_assertions) {
+            Config {
+                static_dir: PathBuf::from("res/static/"),
+                template_dir: PathBuf::from("res/templates/"),
+                upload_dir: PathBuf::from("uploads"),
+                banners: Vec::new(),
+                address: "0.0.0.0".into(),
+                port: 8000,
+                database_url: "postgres://longboard:@localhost/longboard".into(),
+                log_file: None,
+            }
+        } else {
+            Config {
+                static_dir: PathBuf::from("/usr/share/longboard/static/"),
+                template_dir: PathBuf::from("/usr/share/longboard/templates/"),
+                upload_dir: PathBuf::from("/var/lib/longboard/"),
+                banners: Vec::new(),
+                address: "0.0.0.0".into(),
+                port: 8000,
+                database_url: "postgres://longboard:@localhost/longboard".into(),
+                log_file: Some(PathBuf::from("/var/log/longboard/longboard.log")),
+            }
+        }
+    }
 }
