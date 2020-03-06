@@ -1,5 +1,7 @@
 #![feature(proc_macro_hygiene)]
 
+use std::fs::OpenOptions;
+
 use fern::colors::{Color, ColoredLevelConfig};
 
 use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
@@ -10,25 +12,46 @@ use rocket_contrib::templates::Template;
 use longboard::{config::Config, models::Database, LogFairing, Result};
 
 fn main_res() -> Result<()> {
-    let colors = ColoredLevelConfig::new()
-        .debug(Color::Magenta)
-        .info(Color::Green)
-        .warn(Color::Yellow)
-        .error(Color::Red);
+    let conf = Config::open(Config::default_path())?;
+    let log_to_file = conf.log_file.is_some();
 
-    fern::Dispatch::new()
+    let dispatch = fern::Dispatch::new()
         .format(move |out, message, record| {
-            out.finish(format_args!(
-                "{} [{}] {:>5}",
-                chrono::Local::now().format("%F %T%.3f"),
-                colors.color(record.level()),
-                message
-            ))
+            let colors = ColoredLevelConfig::new()
+                .debug(Color::Magenta)
+                .info(Color::Green)
+                .warn(Color::Yellow)
+                .error(Color::Red);
+
+            if log_to_file {
+                out.finish(format_args!(
+                    "{} [{}] {:>5}",
+                    chrono::Local::now().format("%F %T%.3f"),
+                    colors.color(record.level()),
+                    message
+                ))
+            } else {
+                out.finish(format_args!(
+                    "{} [{}] {:>5}",
+                    chrono::Local::now().format("%F %T%.3f"),
+                    record.level(),
+                    message
+                ))
+            };
         })
         .filter(|metadata| metadata.target() == "longboard")
-        .level(log::LevelFilter::Debug)
-        .chain(std::io::stdout())
-        .apply()?;
+        .level(log::LevelFilter::Debug);
+
+    match conf.log_file {
+        Some(ref log_path) => {
+            let log_file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(log_path)?;
+            dispatch.chain(log_file).apply()?
+        }
+        None => dispatch.chain(std::io::stdout()).apply()?,
+    };
 
     let routes = routes![
         longboard::routes::static_file,
@@ -39,14 +62,6 @@ fn main_res() -> Result<()> {
         longboard::routes::new_thread,
         longboard::routes::new_post,
     ];
-
-    let default_config_path = if cfg!(debug_assertions) {
-        "contrib/dev-config.yaml"
-    } else {
-        "/etc/longboard/config.yaml"
-    };
-
-    let conf = Config::open(default_config_path)?;
 
     let rocket_conf = RocketConfig::build(Environment::Development)
         .address(&conf.address)

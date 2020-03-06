@@ -34,7 +34,7 @@ impl Serialize for Banner {
 }
 
 /// Configuration for a longboard instance.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Where the static files are.
     pub static_dir: PathBuf,
@@ -52,6 +52,8 @@ pub struct Config {
     pub port: u16,
     /// URL to connect to the database
     pub database_url: String,
+    /// File to log to
+    pub log_file: Option<PathBuf>,
 }
 
 impl Config {
@@ -63,6 +65,7 @@ impl Config {
 }
 
 impl Config {
+    /// Open a config file at the given path.
     pub fn open<P>(path: P) -> Result<Config>
     where
         P: AsRef<Path>,
@@ -74,4 +77,13 @@ impl Config {
 
         Ok(serde_yaml::from_reader(reader)?)
     }
+
+    pub fn default_path() -> PathBuf {
+        if cfg!(debug_assertions) {
+            PathBuf::from("contrib/dev-config.yaml")
+        } else {
+            PathBuf::from("/etc/longboard/config.yaml")
+        }
+    }
+}
 }
