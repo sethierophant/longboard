@@ -309,8 +309,6 @@ impl TryFrom<BoardView> for TemplateData {
             "threads" => TemplateData::try_from(from.models)?.json,
         };
 
-        println!("data: {:#?}", to_value(&data));
-
         TemplateData::from_serialize(data)
     }
 }

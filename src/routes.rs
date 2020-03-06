@@ -346,8 +346,6 @@ pub fn new_post(
         thread: thread_id,
     })?;
 
-    println!("file: {:#?}", entries.field("file"));
-
     if let Some(field) = entries.field("file") {
         if field.data.size() > 0 {
             let orig_name = field.headers.filename.as_deref();
