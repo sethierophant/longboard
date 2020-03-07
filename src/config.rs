@@ -81,7 +81,7 @@ impl Config {
 
     pub fn generate<W>(mut out: W) -> Result<()>
     where
-        W: std::io::Write 
+        W: std::io::Write,
     {
         writeln!(&mut out, "# Configuration for longboard")?;
         serde_yaml::to_writer(&mut out, &Config::default())?;

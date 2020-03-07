@@ -9,7 +9,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 
 use serde::Serialize;
 
-use crate::schema::{file, post, thread};
+use crate::schema::{file, post, report, thread};
 use crate::Result;
 
 /// A thread ID.
@@ -73,8 +73,16 @@ pub struct File {
     pub post_id: PostId,
 }
 
-/// A new thread to be inserted in the database. See 'Thread' for descriptions
-/// of the fields.
+/// A report that a user made about a post.
+#[derive(Debug, Queryable, Serialize)]
+pub struct Report {
+    /// The reason the post should be removed.
+    pub reason: String,
+    /// The post.
+    pub post: PostId,
+}
+
+/// A new thread to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "thread"]
 pub struct NewThread<'a> {
@@ -83,8 +91,7 @@ pub struct NewThread<'a> {
     pub board: &'a str,
 }
 
-/// A new post to be inserted in the database. See 'Post' for descriptions of
-/// the fields.
+/// A new post to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "post"]
 pub struct NewPost<'a> {
@@ -96,8 +103,7 @@ pub struct NewPost<'a> {
     pub thread: ThreadId,
 }
 
-/// A new file to be inserted in the database. See 'File' for descriptions of
-/// the fields.
+/// A new file to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "file"]
 pub struct NewFile<'a> {
@@ -105,6 +111,14 @@ pub struct NewFile<'a> {
     pub thumb_name: Option<&'a str>,
     pub orig_name: Option<&'a str>,
     pub content_type: Option<&'a str>,
+    pub post: PostId,
+}
+
+/// A new report to be inserted in the database.
+#[derive(Debug, Insertable)]
+#[table_name = "report"]
+pub struct NewReport<'a> {
+    pub reason: &'a str,
     pub post: PostId,
 }
 
@@ -196,6 +210,38 @@ impl Database {
         Ok(post.filter(thread.eq(thread_id)).load(&self.pool.get()?)?)
     }
 
+    /// Get a post.
+    pub fn post(&self, post_id: PostId) -> Result<Post> {
+        use crate::schema::post::columns::id;
+        use crate::schema::post::dsl::post;
+
+        Ok(post
+            .filter(id.eq(post_id))
+            .limit(1)
+            .first(&self.pool.get()?)?)
+    }
+
+    /// Get the thread that a post belongs to.
+    pub fn parent_thread(&self, post_id: PostId) -> Result<Thread> {
+        let thread_id: ThreadId = {
+            use crate::schema::post::columns::{id, thread};
+            use crate::schema::post::dsl::post;
+
+            post.filter(id.eq(post_id))
+                .select(thread)
+                .limit(1)
+                .first(&self.pool.get()?)?
+        };
+
+        use crate::schema::thread::columns::id;
+        use crate::schema::thread::dsl::thread;
+
+        Ok(thread
+            .filter(id.eq(thread_id))
+            .limit(1)
+            .first(&self.pool.get()?)?)
+    }
+
     /// Get all of the files in a post.
     pub fn files_in_post(&self, post_id: PostId) -> Result<Vec<File>> {
         use crate::schema::file::columns::post;
@@ -241,11 +287,24 @@ impl Database {
     }
 
     /// Insert a new file into the database.
-    pub fn insert_file(&self, new_file: NewFile) -> Result<usize> {
+    pub fn insert_file(&self, new_file: NewFile) -> Result<()> {
         use crate::schema::file::dsl::file;
 
-        Ok(insert_into(file)
+        insert_into(file)
             .values(&new_file)
-            .execute(&self.pool.get()?)?)
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Insert a new post report.
+    pub fn insert_report(&self, new_report: NewReport) -> Result<()> {
+        use crate::schema::report::dsl::report;
+
+        insert_into(report)
+            .values(&new_report)
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
     }
 }

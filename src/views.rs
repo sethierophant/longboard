@@ -316,7 +316,7 @@ impl TryFrom<BoardView> for TemplateData {
 impl<'r> Responder<'r> for BoardView {
     fn respond_to(self, req: &Request) -> response::Result<'r> {
         TemplateData::try_from(self)
-            .map(|data| Template::render("layout/board", &data))
+            .map(|data| Template::render("layout/model/board", &data))
             .respond_to(req)
     }
 }
@@ -374,7 +374,47 @@ impl TryFrom<ThreadView> for TemplateData {
 impl<'r> Responder<'r> for ThreadView {
     fn respond_to(self, req: &Request) -> response::Result<'r> {
         TemplateData::try_from(self)
-            .map(|data| Template::render("layout/thread", &data))
+            .map(|data| Template::render("layout/model/thread", &data))
+            .respond_to(req)
+    }
+}
+
+pub struct ReportView {
+    pub post: Post,
+}
+
+impl ReportView {
+    pub fn new(id: PostId, db: &Database, _conf: &Config) -> Result<ReportView> {
+        Ok(ReportView { post: db.post(id)? })
+    }
+}
+
+impl<'r> Responder<'r> for ReportView {
+    fn respond_to(self, req: &Request) -> response::Result<'r> {
+        TemplateData::try_from(self.post)
+            .map(|data| Template::render("layout/action/report", &data))
+            .respond_to(req)
+    }
+}
+
+#[derive(Serialize)]
+pub struct ActionSuccessView {
+    pub msg: String,
+    pub redirect_uri: String,
+}
+
+impl TryFrom<ActionSuccessView> for TemplateData {
+    type Error = Error;
+
+    fn try_from(from: ActionSuccessView) -> Result<TemplateData> {
+        TemplateData::from_serialize(from)
+    }
+}
+
+impl<'r> Responder<'r> for ActionSuccessView {
+    fn respond_to(self, req: &Request) -> response::Result<'r> {
+        TemplateData::try_from(self)
+            .map(|data| Template::render("layout/action/action-success", &data))
             .respond_to(req)
     }
 }

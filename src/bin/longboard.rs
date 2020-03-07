@@ -7,6 +7,8 @@ use clap::{App, Arg};
 
 use fern::colors::{Color, ColoredLevelConfig};
 
+use log::debug;
+
 use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
 use rocket::routes;
 
@@ -53,7 +55,7 @@ fn main_res() -> Result<()> {
         .value_of("config")
         .map(PathBuf::from)
         .unwrap_or_else(Config::default_path);
-    let conf = Config::open(conf_path)?;
+    let conf = Config::open(&conf_path)?;
 
     let log_to_file = conf.log_file.is_some();
 
@@ -69,20 +71,20 @@ fn main_res() -> Result<()> {
                 out.finish(format_args!(
                     "{} [{}] {:>5}",
                     chrono::Local::now().format("%F %T%.3f"),
-                    colors.color(record.level()),
+                    record.level(),
                     message
                 ))
             } else {
                 out.finish(format_args!(
                     "{} [{}] {:>5}",
                     chrono::Local::now().format("%F %T%.3f"),
-                    record.level(),
+                    colors.color(record.level()),
                     message
                 ))
             };
         })
-        .filter(|metadata| metadata.target() == "longboard")
-        .level(log::LevelFilter::Debug);
+        .level(log::LevelFilter::Debug)
+        .filter(|metadata| metadata.target().starts_with("longboard"));
 
     match conf.log_file {
         Some(ref log_path) => {
@@ -95,10 +97,14 @@ fn main_res() -> Result<()> {
         None => dispatch.chain(std::io::stdout()).apply()?,
     };
 
+    debug!("Using config file {}", conf_path.display());
+
     let routes = routes![
+        longboard::routes::home,
         longboard::routes::static_file,
         longboard::routes::upload_file,
-        longboard::routes::home,
+        longboard::routes::report,
+        longboard::routes::new_report,
         longboard::routes::board,
         longboard::routes::thread,
         longboard::routes::new_thread,

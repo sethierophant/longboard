@@ -1,0 +1,5 @@
+CREATE TABLE report (
+    id SERIAL PRIMARY KEY,
+    time_stamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reason TEXT NOT NULL,
+    post INTEGER NOT NULL REFERENCES post);

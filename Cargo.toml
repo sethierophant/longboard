@@ -4,7 +4,7 @@
 name = "longboard"
 version = "0.1.0"
 authors = ["set <set@hierophant.club>"]
-description = "Imageboard engine"
+description = "Imageboard engine."
 edition = "2018"
 default-run = "longboard"
 

@@ -19,6 +19,7 @@ use multipart::server::{Entries, Multipart};
 use rand::{thread_rng, Rng};
 
 use rocket::http::ContentType;
+use rocket::request::{Form, FromForm};
 use rocket::response::NamedFile;
 use rocket::{get, post, uri, Data, State};
 
@@ -26,22 +27,22 @@ use crate::models::*;
 use crate::views::*;
 use crate::{config::Config, Error, Result};
 
-/// Serve a static file.
-#[get("/static/<file..>", rank = 0)]
+/// Serve the home page.
+#[get("/", rank = 0)]
+pub fn home(config: State<Config>, db: State<Database>) -> Result<HomeView> {
+    HomeView::new(&db, &config)
+}
+
+/// Serve a static asset.
+#[get("/file/static/<file..>", rank = 0)]
 pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(config.static_dir.join(file))?)
 }
 
 /// Serve a user-uploaded file.
-#[get("/upload/<file..>", rank = 0)]
+#[get("/file/upload/<file..>", rank = 0)]
 pub fn upload_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(config.upload_dir.join(file))?)
-}
-
-/// Serve the home page.
-#[get("/", rank = 0)]
-pub fn home(config: State<Config>, db: State<Database>) -> Result<HomeView> {
-    HomeView::new(&db, &config)
 }
 
 /// Serve a board.
@@ -407,4 +408,41 @@ pub fn new_post(
 
     let uri = uri!(thread: board_name, thread_id);
     Ok(FragmentRedirect::to(uri, new_post_id))
+}
+
+#[get("/action/post/report/<post_id>")]
+pub fn report(post_id: PostId, config: State<Config>, db: State<Database>) -> Result<ReportView> {
+    if db.post(post_id).is_err() {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    ReportView::new(post_id, &db, &config)
+}
+
+#[derive(FromForm)]
+pub struct ReportData {
+    reason: String,
+}
+
+#[post("/action/post/report/<post_id>", data = "<report_data>")]
+pub fn new_report(
+    post_id: PostId,
+    report_data: Form<ReportData>,
+    db: State<Database>,
+) -> Result<ActionSuccessView> {
+    if db.post(post_id).is_err() {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    let thread = db.parent_thread(post_id)?;
+
+    db.insert_report(NewReport {
+        reason: report_data.reason.as_str(),
+        post: post_id,
+    })?;
+
+    Ok(ActionSuccessView {
+        msg: format!("Reported post {} successfully.", post_id),
+        redirect_uri: uri!(thread: thread.board_name, thread.id).to_string(),
+    })
 }

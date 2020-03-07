@@ -1,0 +1,10 @@
+{{#*inline "head"}}
+    {{#if redirect_uri}}
+        <meta http-equiv="refresh" content="2;url={{redirect_uri}}">
+    {{/if}}
+{{/inline}}
+{{#*inline "content"}}
+    <h1>Success</h1>
+    <p>{{msg}}</p>
+{{/inline}}
+{{> layout/action/action}}

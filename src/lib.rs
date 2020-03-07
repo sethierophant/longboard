@@ -13,7 +13,8 @@ use derive_more::{Display, From};
 use maplit::hashmap;
 
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::{http::Status, response::Responder, Request, Response, Rocket};
+use rocket::http::{Status, StatusClass};
+use rocket::{response::Responder, Request, Response, Rocket};
 
 use rocket_contrib::templates::Template;
 
@@ -30,7 +31,7 @@ pub mod schema;
 /// Views and types for rendering.
 pub mod views;
 
-use models::ThreadId;
+use models::{PostId, ThreadId};
 
 /// Our error type.
 #[derive(Debug, Display, From)]
@@ -42,6 +43,8 @@ pub enum Error {
         board_name: String,
         thread_id: ThreadId,
     },
+    #[display(fmt = "Post #{} not found", post_id)]
+    PostNotFound { post_id: PostId },
     #[display(fmt = "Missing param '{}' for new thread", param)]
     MissingThreadParam { param: String },
     #[display(fmt = "Missing param '{}' for new post", param)]
@@ -105,10 +108,10 @@ impl<'r> Responder<'r> for Error {
             Error::MissingThreadParam { .. }
             | Error::MissingPostParam { .. }
             | Error::ImageError(..) => {
-                warn!("400 Bad Request: {}", &self);
+                warn!("{}", &self);
 
                 let template = Template::render(
-                    "error/400",
+                    "layout/error/400",
                     hashmap! {
                         "message" => self.to_string()
                     },
@@ -121,10 +124,10 @@ impl<'r> Responder<'r> for Error {
             }
 
             Error::BoardNotFound { .. } | Error::ThreadNotFound { .. } => {
-                warn!("404 Not Found: {}", &self);
+                warn!("{}", &self);
 
                 let template = Template::render(
-                    "error/404",
+                    "layout/error/404",
                     hashmap! {
                         "message" => self.to_string()
                     },
@@ -139,7 +142,7 @@ impl<'r> Responder<'r> for Error {
             _ => {
                 error!("{}", self);
 
-                let template = Template::render("error/500", ());
+                let template = Template::render("layout/error/500", ());
 
                 let mut res = template.respond_to(req)?;
                 res.set_status(Status::InternalServerError);
@@ -196,6 +199,10 @@ impl Fairing for LogFairing {
             write!(msg, " User-Agent \"{}\"", user_agent).unwrap();
         }
 
-        info!("{}", msg);
+        if let StatusClass::ClientError | StatusClass::ServerError = response.status().class() {
+            warn!("{}", msg);
+        } else {
+            info!("{}", msg);
+        }
     }
 }

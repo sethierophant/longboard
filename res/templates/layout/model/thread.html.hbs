@@ -1,11 +1,11 @@
 {{#*inline "header"}}
     {{> view/banner}}
     {{> view/board-header}}
-    {{> view/new-post-form}}
+    {{> view/form/new-post-form}}
 {{/inline}}
 {{#*inline "content"}}
     {{#with thread}}
-        {{> view/thread}}
+        {{> view/model/thread}}
     {{/with}}
 {{/inline}}
-{{> layout/page}}
+{{> layout/model/model}}

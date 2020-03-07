@@ -8,6 +8,10 @@ a {
     color: hsl(0, 100%, 60%);
 }
 
+input, textarea {
+    border: none;
+}
+
 body {
     font-family: 'Roboto Condensed';
     margin: 0 auto;
@@ -83,7 +87,6 @@ nav.boards a {
 .new-item-form input, .new-item-form textarea {
     margin: 0.2em 0;
     padding: 0.2em 0.4em;
-    border: none;
 }
 
 .new-item-form textarea {
@@ -183,4 +186,56 @@ nav.boards a {
     margin-bottom: 1em;
     border: thin solid black;
     float: left;
+}
+
+.post .actions {
+    display: flex;
+    flex-direction: row;
+    clear: both;
+}
+
+.post .actions .post-action:first-child {
+    margin-left: auto;
+}
+
+.post .actions .post-action {
+    margin: 0 0.4em;
+    color: hsl(0, 0%, 50%);
+    text-decoration: none;
+}
+
+.post .actions .post-action:hover {
+    color: hsl(0, 0%, 70%);
+}
+
+.post .actions .post-action:last-child {
+    margin-right: 0;
+}
+
+.action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.action-form {
+    display: flex;
+    flex-direction: column;
+    width: 20em;
+}
+
+.action-form > * {
+    margin: 0.5em 0;
+}
+
+.action-form textarea {
+    padding: 0.2em;
+    height: 8em;
+}
+
+.action .post {
+    margin: 1em 0;
+    background-color: hsl(0, 0%, 10%);
+    border: thin solid hsl(0, 0%, 15%);
+    align-self: center;
 }
