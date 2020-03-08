@@ -4,7 +4,7 @@ use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
-use argon2::hash_encoded;
+use argon2::{hash_encoded, verify_encoded};
 
 use chrono::offset::Utc;
 
@@ -160,8 +160,8 @@ impl MultipartEntriesExt for Entries {
     }
 }
 
-/// Compute an Argon2 hash of the ident.
-fn hash_ident<S>(ident: S) -> Result<String>
+/// Compute an Argon2 hash of a param.
+fn hash_param<S>(ident: S) -> Result<String>
 where
     S: AsRef<str>,
 {
@@ -269,6 +269,7 @@ fn create_new_models(entries: Entries, config: &Config) -> Result<(NewPost, Opti
     };
 
     let author_ident = entries.param("ident").map(hash_param).transpose()?;
+    let delete_hash = entries.param("delete-pass").map(hash_param).transpose()?;
 
     let field = entries.field("file").filter(|field| field.data.size() > 0);
 
@@ -277,6 +278,7 @@ fn create_new_models(entries: Entries, config: &Config) -> Result<(NewPost, Opti
         author_name: entries.param("author").map(ToString::to_string),
         author_contact: entries.param("contact").map(ToString::to_string),
         author_ident,
+        delete_hash,
         thread: 0,
     };
 
@@ -393,12 +395,12 @@ pub fn new_post(
 }
 
 #[get("/action/post/report/<post_id>")]
-pub fn report(post_id: PostId, config: State<Config>, db: State<Database>) -> Result<ReportView> {
+pub fn report(post_id: PostId, db: State<Database>) -> Result<ReportView> {
     if db.post(post_id).is_err() {
         return Err(Error::PostNotFound { post_id });
     }
 
-    ReportView::new(post_id, &db, &config)
+    ReportView::new(post_id, &db)
 }
 
 #[derive(FromForm)]
@@ -419,7 +421,7 @@ pub fn new_report(
     let thread = db.parent_thread(post_id)?;
 
     db.insert_report(NewReport {
-        reason: report_data.reason.as_str(),
+        reason: report_data.reason.clone(),
         post: post_id,
     })?;
 
@@ -427,4 +429,65 @@ pub fn new_report(
         msg: format!("Reported post {} successfully.", post_id),
         redirect_uri: uri!(thread: thread.board_name, thread.id).to_string(),
     })
+}
+
+#[get("/action/post/delete/<post_id>")]
+pub fn delete(post_id: PostId, db: State<Database>) -> Result<DeleteView> {
+    if db.post(post_id).is_err() {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    DeleteView::new(post_id, &db)
+}
+
+#[derive(FromForm)]
+pub struct DeleteData {
+    password: String,
+    file_only: Option<String>,
+}
+
+#[post("/action/post/delete/<post_id>", data = "<delete_data>")]
+pub fn do_delete(
+    post_id: PostId,
+    delete_data: Form<DeleteData>,
+    db: State<Database>,
+) -> Result<ActionSuccessView> {
+    if db.post(post_id).is_err() {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    let post = db.post(post_id)?;
+    let thread = db.parent_thread(post_id)?;
+
+    let hash = post.delete_hash.ok_or(Error::PasswordError)?;
+
+    if !verify_encoded(&hash, delete_data.password.as_bytes())? {
+        return Err(Error::PasswordError);
+    }
+
+    let delete_thread = db.is_first_post(post_id)?;
+    let delete_files_only = delete_data.file_only.is_some();
+
+    if delete_thread && delete_files_only {
+        return Err(Error::CannotDeleteThreadFilesOnly);
+    }
+
+    let msg = if delete_thread {
+        db.delete_thread(thread.id)?;
+        format!("Deleted thread {} successfully.", post.thread_id)
+    } else if delete_files_only {
+        db.delete_files_of_post(post_id)?;
+        format!("Deleted files from post {} successfully.", post_id)
+    } else {
+        db.delete_post(post_id)?;
+        format!("Deleted post {} successfully.", post_id)
+    };
+
+    let redirect_uri = if delete_thread {
+        uri!(board: thread.board_name).to_string()
+    } else {
+        uri!(thread: thread.board_name, thread.id).to_string()
+    };
+
+    Ok(ActionSuccessView { msg, redirect_uri })
 }

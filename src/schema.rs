@@ -24,6 +24,7 @@ table! {
         author_contact -> Nullable<Text>,
         author_ident -> Nullable<Text>,
         thread -> Int4,
+        delete_hash -> Nullable<Text>,
     }
 }
 

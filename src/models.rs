@@ -3,9 +3,8 @@ use std::fmt::Debug;
 use chrono::offset::Utc;
 use chrono::DateTime;
 
-use diesel::insert_into;
-use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::{delete, insert_into, prelude::*, sql_query};
 
 use serde::Serialize;
 
@@ -52,10 +51,12 @@ pub struct Post {
     pub author_name: Option<String>,
     /// A method of contact for the author such as an e-mail address.
     pub author_contact: Option<String>,
-    /// A method of identification for the author such as a tripcode.
+    /// The argon2 hash of the identity the user gave.
     pub author_ident: Option<String>,
     /// The thread that this post was posted on.
     pub thread_id: ThreadId,
+    /// The argon2 hash of the password the user gave for deletion.
+    pub delete_hash: Option<String>,
 }
 
 /// A user-uploaded file.
@@ -100,6 +101,7 @@ pub struct NewPost {
     pub author_name: Option<String>,
     pub author_contact: Option<String>,
     pub author_ident: Option<String>,
+    pub delete_hash: Option<String>,
     pub thread: ThreadId,
 }
 
@@ -242,6 +244,31 @@ impl Database {
             .first(&self.pool.get()?)?)
     }
 
+    pub fn is_first_post(&self, post_id: PostId) -> Result<bool> {
+        let post: Post = {
+            use crate::schema::post::columns::id;
+            use crate::schema::post::dsl::post;
+
+            post.filter(id.eq(post_id))
+                .limit(1)
+                .first(&self.pool.get()?)?
+        };
+
+        let first_post_id: PostId = {
+            use crate::schema::post::columns::{id, thread};
+            use crate::schema::post::dsl::post as post_;
+
+            post_
+                .filter(thread.eq(post.thread_id))
+                .select(id)
+                .order(id.asc())
+                .limit(1)
+                .first(&self.pool.get()?)?
+        };
+
+        Ok(post_id == first_post_id)
+    }
+
     /// Get all of the files in a post.
     pub fn files_in_post(&self, post_id: PostId) -> Result<Vec<File>> {
         use crate::schema::file::columns::post;
@@ -304,6 +331,65 @@ impl Database {
         insert_into(report)
             .values(&new_report)
             .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete a thread.
+    pub fn delete_thread(&self, thread_id: ThreadId) -> Result<()> {
+        let query = format!(
+            "DELETE FROM report R USING post P \
+                             WHERE R.post = P.id AND P.thread = {}",
+            thread_id
+        );
+        sql_query(query).execute(&self.pool.get()?)?;
+
+        let query = format!(
+            "DELETE FROM file F USING post P \
+                             WHERE F.post = P.id AND P.thread = {}",
+            thread_id
+        );
+        sql_query(query).execute(&self.pool.get()?)?;
+
+        {
+            use crate::schema::post::columns::thread;
+            use crate::schema::post::dsl::post;
+            delete(post.filter(thread.eq(thread_id))).execute(&self.pool.get()?)?;
+        }
+
+        use crate::schema::thread::columns::id;
+        use crate::schema::thread::dsl::thread;
+        delete(thread.filter(id.eq(thread_id))).execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete a post.
+    pub fn delete_post(&self, post_id: PostId) -> Result<()> {
+        {
+            use crate::schema::report::columns::post;
+            use crate::schema::report::dsl::report;
+            delete(report.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
+        }
+
+        {
+            use crate::schema::file::columns::post;
+            use crate::schema::file::dsl::file;
+            delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
+        }
+
+        use crate::schema::post::columns::id;
+        use crate::schema::post::dsl::post;
+        delete(post.filter(id.eq(post_id))).execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete all the files that belong to a post.
+    pub fn delete_files_of_post(&self, post_id: PostId) -> Result<()> {
+        use crate::schema::file::columns::post;
+        use crate::schema::file::dsl::file;
+        delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
 
         Ok(())
     }

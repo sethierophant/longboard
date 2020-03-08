@@ -19,7 +19,7 @@ body {
     color: hsl(0, 0%, 98%);
 }
 
-.error h1 {
+.error h1, .action h1 {
     font-size: 250%;
 }
 
@@ -74,7 +74,7 @@ nav.boards a {
     padding: 0.6em;
     display: grid;
     grid-template-columns: 6em auto;
-    width: 20em;
+    min-width: 20em;
     background-color: hsl(0, 0%, 20%);
 }
 
@@ -91,7 +91,7 @@ nav.boards a {
 
 .new-item-form textarea {
     grid-column: 1 / span 2;
-    height: 200px;
+    height: 16em;
 }
 
 .new-item-form input[type=submit], .new-item-form input[type=file] {
@@ -202,6 +202,7 @@ nav.boards a {
     margin: 0 0.4em;
     color: hsl(0, 0%, 50%);
     text-decoration: none;
+    font-size: 0.8em;
 }
 
 .post .actions .post-action:hover {
@@ -216,25 +217,28 @@ nav.boards a {
     display: flex;
     flex-direction: column;
     align-items: center;
+    max-width: 50%;
+    margin: 0 auto;
 }
 
 .action-form {
-    display: flex;
-    flex-direction: column;
-    width: 20em;
-}
-
-.action-form > * {
-    margin: 0.5em 0;
+    display: grid;
+    grid-template-columns: 6em auto;
+    grid-gap: 0.5em;
 }
 
 .action-form textarea {
     padding: 0.2em;
-    height: 8em;
+    height: 4em;
+    min-width: 20em;
+}
+
+.action-form textarea, .action-form input[type=submit] {
+    grid-column: 1 / 3;
 }
 
 .action .post {
-    margin: 1em 0;
+    margin-bottom: 3em;
     background-color: hsl(0, 0%, 10%);
     border: thin solid hsl(0, 0%, 15%);
     align-self: center;

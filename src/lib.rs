@@ -53,6 +53,10 @@ pub enum Error {
     FormDataCouldntParse,
     #[display(fmt = "Bad Content-Type for multipart/form-data")]
     FormDataBadContentType,
+    #[display(fmt = "The password is not correct")]
+    PasswordError,
+    #[display(fmt = "Deleting files only is not a valid option for threads")]
+    CannotDeleteThreadFilesOnly,
     #[display(fmt = "Error processing image: {}", _0)]
     #[from]
     ImageError(image::error::ImageError),
@@ -107,7 +111,8 @@ impl<'r> Responder<'r> for Error {
         match self {
             Error::MissingThreadParam { .. }
             | Error::MissingPostParam { .. }
-            | Error::ImageError(..) => {
+            | Error::ImageError(..)
+            | Error::PasswordError => {
                 warn!("{}", &self);
 
                 let template = Template::render(

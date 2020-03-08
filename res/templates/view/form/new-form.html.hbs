@@ -10,9 +10,13 @@
     <label for="ident">Identity</label>
     <input type="password" name="ident">
     <textarea name="body"></textarea>
-    <label for="no-bump">No Bump</label>
-    <input type="checkbox" name="no-bump">
     <input type="file" name="file">
+    <label for="delete-pass">Password</label>
+    <input type="password" name="delete-pass">
+    {{#unless new_thread_form}}
+        <label for="no-bump">No Bump</label>
+        <input type="checkbox" name="no-bump">
+    {{/unless}}
     {{#if new_thread_form}}
         <input type="submit" value="New Thread">
     {{/if}}

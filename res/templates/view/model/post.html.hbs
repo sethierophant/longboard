@@ -20,8 +20,10 @@
             {{body}}
         </p>
     </article>
-    <footer class="actions">
-        <a class="post-action" href="/action/post/report/{{id}}">Report</a>
-        <a class="post-action" href="/action/post/delete/{{id}}">Delete</a>
-    </footer>
+    {{#unless hide_actions}}
+        <footer class="actions">
+            <a class="post-action" href="/action/post/report/{{id}}">Report</a>
+            <a class="post-action" href="/action/post/delete/{{id}}">Delete</a>
+        </footer>
+    {{/unless}}
 </section>

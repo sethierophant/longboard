@@ -379,24 +379,6 @@ impl<'r> Responder<'r> for ThreadView {
     }
 }
 
-pub struct ReportView {
-    pub post: Post,
-}
-
-impl ReportView {
-    pub fn new(id: PostId, db: &Database, _conf: &Config) -> Result<ReportView> {
-        Ok(ReportView { post: db.post(id)? })
-    }
-}
-
-impl<'r> Responder<'r> for ReportView {
-    fn respond_to(self, req: &Request) -> response::Result<'r> {
-        TemplateData::try_from(self.post)
-            .map(|data| Template::render("layout/action/report", &data))
-            .respond_to(req)
-    }
-}
-
 #[derive(Serialize)]
 pub struct ActionSuccessView {
     pub msg: String,
@@ -415,6 +397,52 @@ impl<'r> Responder<'r> for ActionSuccessView {
     fn respond_to(self, req: &Request) -> response::Result<'r> {
         TemplateData::try_from(self)
             .map(|data| Template::render("layout/action/action-success", &data))
+            .respond_to(req)
+    }
+}
+
+pub struct ReportView {
+    pub post: Post,
+    pub file: Option<File>,
+}
+
+impl ReportView {
+    pub fn new(id: PostId, db: &Database) -> Result<ReportView> {
+        let post = db.post(id)?;
+        Ok(ReportView {
+            file: db.files_in_post(post.id)?.pop(),
+            post,
+        })
+    }
+}
+
+impl<'r> Responder<'r> for ReportView {
+    fn respond_to(self, req: &Request) -> response::Result<'r> {
+        TemplateData::try_from((self.post, self.file))
+            .map(|data| Template::render("layout/action/report", &data))
+            .respond_to(req)
+    }
+}
+
+pub struct DeleteView {
+    pub post: Post,
+    pub file: Option<File>,
+}
+
+impl DeleteView {
+    pub fn new(id: PostId, db: &Database) -> Result<DeleteView> {
+        let post = db.post(id)?;
+        Ok(DeleteView {
+            file: db.files_in_post(post.id)?.pop(),
+            post,
+        })
+    }
+}
+
+impl<'r> Responder<'r> for DeleteView {
+    fn respond_to(self, req: &Request) -> response::Result<'r> {
+        TemplateData::try_from((self.post, self.file))
+            .map(|data| Template::render("layout/action/delete", &data))
             .respond_to(req)
     }
 }

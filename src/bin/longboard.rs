@@ -103,12 +103,14 @@ fn main_res() -> Result<()> {
         longboard::routes::home,
         longboard::routes::static_file,
         longboard::routes::upload_file,
-        longboard::routes::report,
-        longboard::routes::new_report,
         longboard::routes::board,
         longboard::routes::thread,
         longboard::routes::new_thread,
         longboard::routes::new_post,
+        longboard::routes::report,
+        longboard::routes::new_report,
+        longboard::routes::delete,
+        longboard::routes::do_delete,
     ];
 
     let rocket_conf = RocketConfig::build(Environment::Development)
