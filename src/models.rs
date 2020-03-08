@@ -78,6 +78,8 @@ pub struct File {
 pub struct Report {
     /// The reason the post should be removed.
     pub reason: String,
+    /// When the report was made.
+    pub time_stamp: DateTime<Utc>,
     /// The post.
     pub post: PostId,
 }
@@ -85,40 +87,38 @@ pub struct Report {
 /// A new thread to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "thread"]
-pub struct NewThread<'a> {
-    pub time_stamp: DateTime<Utc>,
-    pub subject: &'a str,
-    pub board: &'a str,
+pub struct NewThread {
+    pub subject: String,
+    pub board: String,
 }
 
 /// A new post to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "post"]
-pub struct NewPost<'a> {
-    pub time_stamp: DateTime<Utc>,
-    pub body: &'a str,
-    pub author_name: Option<&'a str>,
-    pub author_contact: Option<&'a str>,
-    pub author_ident: Option<&'a str>,
+pub struct NewPost {
+    pub body: String,
+    pub author_name: Option<String>,
+    pub author_contact: Option<String>,
+    pub author_ident: Option<String>,
     pub thread: ThreadId,
 }
 
 /// A new file to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "file"]
-pub struct NewFile<'a> {
-    pub save_name: &'a str,
-    pub thumb_name: Option<&'a str>,
-    pub orig_name: Option<&'a str>,
-    pub content_type: Option<&'a str>,
+pub struct NewFile {
+    pub save_name: String,
+    pub thumb_name: Option<String>,
+    pub orig_name: Option<String>,
+    pub content_type: Option<String>,
     pub post: PostId,
 }
 
 /// A new report to be inserted in the database.
 #[derive(Debug, Insertable)]
 #[table_name = "report"]
-pub struct NewReport<'a> {
-    pub reason: &'a str,
+pub struct NewReport {
+    pub reason: String,
     pub post: PostId,
 }
 

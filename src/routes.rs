@@ -259,6 +259,57 @@ where
     Ok(Some(thumb_path))
 }
 
+// Create a new post and optionally a new file if the post has one. These are
+// models that should be inserted into the database.
+//
+// Note that the IDs for the parents of both models still need to be set.
+fn create_new_models(entries: Entries, config: &Config) -> Result<(NewPost, Option<NewFile>)> {
+    let missing_body_err = Error::MissingThreadParam {
+        param: "body".into(),
+    };
+
+    let author_ident = entries.param("ident").map(hash_param).transpose()?;
+
+    let field = entries.field("file").filter(|field| field.data.size() > 0);
+
+    let new_post = NewPost {
+        body: entries.param("body").ok_or(missing_body_err)?.into(),
+        author_name: entries.param("author").map(ToString::to_string),
+        author_contact: entries.param("contact").map(ToString::to_string),
+        author_ident,
+        thread: 0,
+    };
+
+    let new_file = if let Some(field) = field {
+        let save_path = save_file(field, &config.upload_dir)?;
+        let save_name = save_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+
+        let orig_name = field.headers.filename.clone();
+
+        let thumb_path = create_thumbnail(&save_path)?;
+        let thumb_name =
+            thumb_path.map(|path| path.file_name().unwrap().to_string_lossy().into_owned());
+
+        let content_type = field.headers.content_type.as_ref().map(ToString::to_string);
+
+        Some(NewFile {
+            save_name,
+            orig_name,
+            thumb_name,
+            content_type,
+            post: 0,
+        })
+    } else {
+        None
+    };
+
+    Ok((new_post, new_file))
+}
+
 /// Handle a request to create a new thread.
 #[post("/<board_name>", data = "<data>", rank = 1)]
 pub fn new_thread(
@@ -276,58 +327,36 @@ pub fn new_thread(
         param: "subject".into(),
     };
 
-    let missing_body_err = Error::MissingThreadParam {
-        param: "body".into(),
+    let missing_file_err = Error::MissingThreadParam {
+        param: "file".into(),
     };
 
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
-    let ident = entries.param("ident").map(hash_ident).transpose()?;
+    let subject = entries
+        .param("subject")
+        .ok_or(missing_subject_err)?
+        .to_string();
 
-    let field = entries.field("file").filter(|field| field.data.size() > 0);
-    if let Some(field) = field {
-        let orig_name = field.headers.filename.as_deref();
+    let models = create_new_models(entries, &config)?;
 
-        let content_type = field.headers.content_type.as_ref().map(ToString::to_string);
-
-        let save_path = save_file(field, &config.upload_dir)?;
-        let save_name = &save_path.file_name().unwrap().to_str().unwrap();
-
-        let thumb_path = create_thumbnail(&save_path)?;
-        let thumb_name = thumb_path
-            .as_ref()
-            .map(|path| path.file_name().unwrap().to_str().unwrap());
-
+    if let (mut new_post, Some(mut new_file)) = models {
         let new_thread_id = db.insert_thread(NewThread {
-            time_stamp: Utc::now(),
-            subject: entries.param("subject").ok_or(missing_subject_err)?,
-            board: &board_name,
+            subject,
+            board: board_name.clone(),
         })?;
+        new_post.thread = new_thread_id;
 
-        let new_post_id = db.insert_post(NewPost {
-            time_stamp: Utc::now(),
-            body: entries.param("body").ok_or(missing_body_err)?,
-            author_name: entries.param("author"),
-            author_contact: entries.param("contact"),
-            author_ident: ident.as_deref(),
-            thread: new_thread_id,
-        })?;
+        let new_post_id = db.insert_post(new_post)?;
+        new_file.post = new_post_id;
 
-        db.insert_file(NewFile {
-            save_name,
-            orig_name,
-            thumb_name,
-            content_type: content_type.as_deref(),
-            post: new_post_id,
-        })?;
+        db.insert_file(new_file)?;
 
         let uri = uri!(thread: board_name, new_thread_id);
-        return Ok(FragmentRedirect::to(uri, new_post_id));
+        Ok(FragmentRedirect::to(uri, new_post_id))
+    } else {
+        Err(missing_file_err)
     }
-
-    Err(Error::MissingThreadParam {
-        param: "file".into(),
-    })
 }
 
 /// Handle a request to create a new post.
@@ -347,63 +376,16 @@ pub fn new_post(
         });
     }
 
-    let missing_body_err = Error::MissingThreadParam {
-        param: "body".into(),
-    };
-
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
-    let ident = entries.param("ident").map(hash_ident).transpose()?;
+    let (mut new_post, new_file) = create_new_models(entries, &config)?;
 
-    let field = entries.field("file").filter(|field| field.data.size() > 0);
-    let content_type;
-    let save_path;
-    let thumb_path;
-    let new_file = if let Some(field) = field {
-        let orig_name = field.headers.filename.as_deref();
+    new_post.thread = thread_id;
+    let new_post_id = db.insert_post(new_post)?;
 
-        content_type = field.headers.content_type.as_ref().map(ToString::to_string);
-
-        save_path = save_file(field, &config.upload_dir)?;
-        let save_name = &save_path
-            .file_name()
-            .expect("bad image path")
-            .to_str()
-            .expect("bad image path");
-
-        thumb_path = create_thumbnail(&save_path)?;
-        let thumb_name = thumb_path.as_ref().map(|path| {
-            path.file_name()
-                .expect("bad image path")
-                .to_str()
-                .expect("bad image path")
-        });
-
-        Some(NewFile {
-            save_name,
-            orig_name,
-            thumb_name,
-            content_type: content_type.as_deref(),
-            post: 0,
-        })
-    } else {
-        None
-    };
-
-    let new_post_id = db.insert_post(NewPost {
-        time_stamp: Utc::now(),
-        body: entries.param("body").ok_or(missing_body_err)?,
-        author_name: entries.param("author"),
-        author_contact: entries.param("contact"),
-        author_ident: ident.as_deref(),
-        thread: thread_id,
-    })?;
-
-    if let Some(new_file) = new_file {
-        db.insert_file(NewFile {
-            post: new_post_id,
-            ..new_file
-        })?;
+    if let Some(mut new_file) = new_file {
+        new_file.post = new_post_id;
+        db.insert_file(new_file)?;
     }
 
     let uri = uri!(thread: board_name, thread_id);
