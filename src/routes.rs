@@ -193,8 +193,8 @@ where
         .as_ref()
         .and_then(|content_type| {
             get_mime_extensions(&content_type)
-                .and_then(|v| v.iter().last())
-                .copied()
+                .and_then(|v| v.first())
+                .map(|ext| if *ext == "jpe" { "jpg" } else { ext })
         });
 
     let file_ext = field
