@@ -4,6 +4,9 @@
     {{/with}}
     {{> view/board-header}}
     {{> view/form/new-post-form}}
+    {{#with board_info.notice}}
+        {{> view/notice}}
+    {{/with}}
 {{/inline}}
 {{#*inline "content"}}
     {{#with thread}}

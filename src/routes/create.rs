@@ -18,7 +18,7 @@ use mime_guess::get_mime_extensions;
 use multipart::server::save::{SavedData, SavedField};
 use multipart::server::{Entries, Multipart};
 
-use pulldown_cmark::{html, Options, Parser};
+use pulldown_cmark::{html::push_html, Options, Parser};
 
 use regex::{Captures, Regex};
 
@@ -255,7 +255,7 @@ where
     opts.insert(Options::ENABLE_STRIKETHROUGH);
 
     let mut html = String::new();
-    html::push_html(&mut html, Parser::new_ext(&body, opts));
+    push_html(&mut html, Parser::new_ext(&body, opts));
 
     // Third pass: sanitize HTML
     Ok(ammonia::Builder::new()

@@ -79,6 +79,8 @@ pub struct BoardPageInfo {
     pub board: Board,
     /// The banner to be displayed.
     pub banner: Banner,
+    /// A site notice to be displayed at the top of the page.
+    pub notice_html: Option<String>,
 }
 
 impl BoardPageInfo {
@@ -89,6 +91,7 @@ impl BoardPageInfo {
         Ok(BoardPageInfo {
             board: db.board(board_name)?,
             banner: config.choose_banner().clone(),
+            notice_html: config.notice_html.clone(),
         })
     }
 }
@@ -97,13 +100,22 @@ impl TryFrom<BoardPageInfo> for TemplateData {
     type Error = Error;
 
     fn try_from(from: BoardPageInfo) -> Result<TemplateData> {
-        let data = hashmap! {
+        let mut data = hashmap! {
             "board" => to_value(from.board)?,
             "banner" => to_value(hashmap!{
                 "name" => from.banner.name.clone(),
                 "uri" => from.banner.uri(),
             })?,
         };
+
+        if let Some(html) = from.notice_html {
+            data.insert(
+                "notice",
+                to_value(hashmap! {
+                    "html" => to_value(html)?
+                })?,
+            );
+        }
 
         TemplateData::from_serialize(data)
     }

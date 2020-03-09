@@ -99,6 +99,17 @@ nav.boards a {
     grid-column: 1 / span 2;
 }
 
+.notice {
+    margin: 1em 1em -1em;
+
+    align-self: stretch;
+    border-top: thin solid hsl(0, 0%, 15%);
+
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+}
+
 .thread {
     margin: 1em;
 
@@ -115,6 +126,10 @@ nav.boards a {
 .thread .subject {
     font-size: 1em;
     margin: 0 1em;
+}
+
+.thread .subject::before {
+    content: "Thread: ";
 }
 
 .thread .post:first-of-type {
@@ -135,10 +150,10 @@ nav.boards a {
 }
 
 .post:target {
-    animation: 1.0s ease-out 0s hilight;
+    animation: 1.0s ease-out 0s highlight;
 }
 
-@keyframes hilight {
+@keyframes highlight {
     from {
         background-color: hsl(0, 0%, 20%);
     }
@@ -174,7 +189,7 @@ nav.boards a {
     box-sizing: border-box;
 }
 
-.post .body :first-child {
+.post .body p:first-of-type {
     margin-top: 0;
 }
 

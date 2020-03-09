@@ -3,6 +3,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
+use pulldown_cmark::{html::push_html, Parser};
+
 use serde::{Deserialize, Deserializer, Serialize};
 
 use rand::{seq::SliceRandom, thread_rng};
@@ -19,6 +21,7 @@ pub struct Config {
     pub options: Options,
     pub banners: Vec<Banner>,
     pub names: Vec<String>,
+    pub notice_html: Option<String>,
 }
 
 impl Config {
@@ -58,10 +61,24 @@ impl Config {
             Err(e) => return Err(Error::from(e)),
         };
 
+        let default_notice_path = options.resource_dir.join("notice.md");
+        let notice_path = options.notice_path.as_ref().unwrap_or(&default_notice_path);
+
+        let notice_html = match read_to_string(notice_path) {
+            Ok(s) => {
+                let mut html = String::new();
+                push_html(&mut html, Parser::new(&s));
+                Some(html)
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+            Err(e) => return Err(Error::from(e)),
+        };
+
         Ok(Config {
             options,
             banners,
             names,
+            notice_html,
         })
     }
 
@@ -97,6 +114,7 @@ impl Default for Config {
             options: Options::default(),
             banners: Vec::new(),
             names: Vec::new(),
+            notice_html: None,
         }
     }
 }
@@ -114,7 +132,10 @@ pub struct Options {
     /// Where the user-uploaded files are.
     pub upload_dir: PathBuf,
     /// The path to a list of user names.
+    #[serde(rename = "names")]
     pub names_path: Option<PathBuf>,
+    /// The path to a notice file to be displayed at the top of each board.
+    pub notice_path: Option<PathBuf>,
     /// URL to connect to the database
     pub database_url: String,
     /// File to log to
@@ -151,6 +172,7 @@ impl Default for Options {
                 log_file: None,
                 filter_rules: Vec::new(),
                 names_path: None,
+                notice_path: None,
             }
         } else {
             Options {
@@ -162,6 +184,7 @@ impl Default for Options {
                 log_file: Some(PathBuf::from("/var/log/longboard/longboard.log")),
                 filter_rules: Vec::new(),
                 names_path: None,
+                notice_path: None,
             }
         }
     }
