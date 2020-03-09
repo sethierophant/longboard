@@ -6,6 +6,8 @@ use chrono::DateTime;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{delete, insert_into, prelude::*, sql_query};
 
+use rocket::uri;
+
 use serde::Serialize;
 
 use crate::schema::{file, post, report, thread};
@@ -221,6 +223,33 @@ impl Database {
             .filter(id.eq(post_id))
             .limit(1)
             .first(&self.pool.get()?)?)
+    }
+
+    /// Get the URI for a post.
+    pub fn post_uri(&self, post_id: PostId) -> Result<String> {
+        let thread_id: ThreadId = {
+            use crate::schema::post::columns::{id, thread};
+            use crate::schema::post::dsl::post;
+
+            post.filter(id.eq(post_id))
+                .select(thread)
+                .limit(1)
+                .first(&self.pool.get()?)?
+        };
+
+        let board_name: String = {
+            use crate::schema::thread::columns::{board, id};
+            use crate::schema::thread::dsl::thread;
+
+            thread
+                .filter(id.eq(thread_id))
+                .select(board)
+                .limit(1)
+                .first(&self.pool.get()?)?
+        };
+
+        let thread_uri = uri!(crate::routes::thread: board_name, thread_id);
+        Ok(format!("{}#{}", thread_uri.to_string(), post_id))
     }
 
     /// Get the thread that a post belongs to.

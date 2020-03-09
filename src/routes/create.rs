@@ -20,11 +20,10 @@ use multipart::server::{Entries, Multipart};
 
 use pulldown_cmark::{html, Options, Parser};
 
-use regex::Regex;
+use regex::{Captures, Regex};
 
 use rocket::http::{hyper::header::Location, ContentType};
-use rocket::Responder;
-use rocket::{post, uri, Data, State};
+use rocket::{post, uri, Data, Responder, State};
 
 use crate::models::*;
 use crate::{config::Config, Error, Result};
@@ -225,13 +224,20 @@ where
 }
 
 /// Parse a post's body.
-fn parse_body<S>(body: S) -> String
+fn parse_body<S>(body: S, db: &Database) -> String
 where
     S: AsRef<str>,
 {
     // First pass: replace post references with links
     let re = Regex::new(r">>(?P<id>\d+)").unwrap();
-    let body = re.replace_all(body.as_ref(), "<a href=\"#$id\">&gt;&gt;$id</a>");
+    let body = re.replace_all(body.as_ref(), |captures: &Captures| {
+        let id: PostId = captures.name("id").unwrap().as_str().parse().unwrap();
+
+        match db.post_uri(id) {
+            Ok(uri) => format!("<a href=\"{}\">&gt;&gt;{}</a>", uri, id),
+            Err(_) => format!("<a>&gt;&gt;{}</a>", id),
+        }
+    });
 
     // Second pass: parse markdown
     let mut opts = Options::empty();
@@ -252,14 +258,18 @@ where
 /// models that should be inserted into the database.
 ///
 /// Note that the IDs for the parents of both models still need to be set.
-fn create_new_models(entries: Entries, config: &Config) -> Result<(NewPost, Option<NewFile>)> {
+fn create_new_models(
+    entries: Entries,
+    config: &Config,
+    db: &Database,
+) -> Result<(NewPost, Option<NewFile>)> {
     let missing_body_err = Error::MissingThreadParam {
         param: "body".into(),
     };
 
     let body = entries
         .param("body")
-        .map(parse_body)
+        .map(|body| parse_body(body, db))
         .filter(|body| !body.trim().is_empty())
         .ok_or(missing_body_err)?;
 
@@ -339,7 +349,7 @@ pub fn new_thread(
         .ok_or(missing_subject_err)?
         .to_string();
 
-    let models = create_new_models(entries, &config)?;
+    let models = create_new_models(entries, &config, &db)?;
 
     if let (mut new_post, Some(mut new_file)) = models {
         let new_thread_id = db.insert_thread(NewThread {
@@ -379,7 +389,7 @@ pub fn new_post(
 
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
-    let (mut new_post, new_file) = create_new_models(entries, &config)?;
+    let (mut new_post, new_file) = create_new_models(entries, &config, &db)?;
 
     new_post.thread = thread_id;
     let new_post_id = db.insert_post(new_post)?;
