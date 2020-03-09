@@ -50,7 +50,7 @@ pub struct Post {
     /// The contents of the post.
     pub body: String,
     /// The name of the author.
-    pub author_name: Option<String>,
+    pub author_name: String,
     /// A method of contact for the author such as an e-mail address.
     pub author_contact: Option<String>,
     /// The argon2 hash of the identity the user gave.
@@ -100,7 +100,7 @@ pub struct NewThread {
 #[table_name = "post"]
 pub struct NewPost {
     pub body: String,
-    pub author_name: Option<String>,
+    pub author_name: String,
     pub author_contact: Option<String>,
     pub author_ident: Option<String>,
     pub delete_hash: Option<String>,
@@ -208,10 +208,13 @@ impl Database {
 
     /// Get all of the posts in a thread.
     pub fn posts_in_thread(&self, thread_id: ThreadId) -> Result<Vec<Post>> {
-        use crate::schema::post::columns::thread;
+        use crate::schema::post::columns::{id, thread};
         use crate::schema::post::dsl::post;
 
-        Ok(post.filter(thread.eq(thread_id)).load(&self.pool.get()?)?)
+        Ok(post
+            .filter(thread.eq(thread_id))
+            .order(id.asc())
+            .load(&self.pool.get()?)?)
     }
 
     /// Get a post.

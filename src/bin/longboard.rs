@@ -1,7 +1,7 @@
 #![feature(proc_macro_hygiene)]
 
 use std::fs::{File, OpenOptions};
-use std::path::PathBuf;
+use std::path::Path;
 
 use clap::{App, Arg};
 
@@ -14,7 +14,8 @@ use rocket::routes;
 
 use rocket_contrib::templates::Template;
 
-use longboard::{config::Config, models::Database, LogFairing, Result};
+use longboard::config::{Config, Options};
+use longboard::{models::Database, LogFairing, Result};
 
 fn main_res() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -43,9 +44,9 @@ fn main_res() -> Result<()> {
         let gen_path = matches.value_of("gen-config").unwrap();
 
         if gen_path == "-" {
-            Config::generate(std::io::stdout())?;
+            Options::generate(std::io::stdout())?;
         } else {
-            Config::generate(File::create(gen_path)?)?;
+            Options::generate(File::create(gen_path)?)?;
         }
 
         return Ok(());
@@ -53,11 +54,12 @@ fn main_res() -> Result<()> {
 
     let conf_path = matches
         .value_of("config")
-        .map(PathBuf::from)
-        .unwrap_or_else(Config::default_path);
-    let conf = Config::open(&conf_path)?;
+        .map(Path::new)
+        .unwrap_or_else(|| Config::default_path());
 
-    let log_to_file = conf.log_file.is_some();
+    let conf = Config::open(conf_path)?;
+
+    let log_to_file = conf.options.log_file.is_some();
 
     let dispatch = fern::Dispatch::new()
         .format(move |out, message, record| {
@@ -86,7 +88,7 @@ fn main_res() -> Result<()> {
         .level(log::LevelFilter::Debug)
         .filter(|metadata| metadata.target().starts_with("longboard"));
 
-    match conf.log_file {
+    match conf.options.log_file {
         Some(ref log_path) => {
             let log_file = OpenOptions::new()
                 .append(true)
@@ -98,12 +100,14 @@ fn main_res() -> Result<()> {
     };
 
     debug!("Using config file {}", conf_path.display());
-    conf.debug_log();
+    debug!("{:#?}", conf);
 
     let routes = routes![
         longboard::routes::home,
         longboard::routes::static_file,
-        longboard::routes::upload_file,
+        longboard::routes::banner,
+        longboard::routes::style,
+        longboard::routes::upload,
         longboard::routes::board,
         longboard::routes::thread,
         longboard::routes::create::new_thread,
@@ -114,17 +118,19 @@ fn main_res() -> Result<()> {
         longboard::routes::do_delete,
     ];
 
+    let template_dir = conf.options.resource_dir.join("templates");
+
     let rocket_conf = RocketConfig::build(Environment::Development)
-        .address(&conf.address)
-        .port(conf.port)
+        .address(&conf.options.address)
+        .port(conf.options.port)
         .log_level(LoggingLevel::Off)
-        .extra("template_dir", conf.template_dir.display().to_string())
+        .extra("template_dir", template_dir.display().to_string())
         .finalize()
         .unwrap();
 
     rocket::custom(rocket_conf)
         .mount("/", routes)
-        .manage(Database::open(&conf.database_url)?)
+        .manage(Database::open(&conf.options.database_url)?)
         .manage(conf)
         .attach(Template::fairing())
         .attach(LogFairing)

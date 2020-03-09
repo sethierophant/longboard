@@ -20,7 +20,7 @@ table! {
         id -> Int4,
         time_stamp -> Timestamptz,
         body -> Text,
-        author_name -> Nullable<Text>,
+        author_name -> Text,
         author_contact -> Nullable<Text>,
         author_ident -> Nullable<Text>,
         thread -> Int4,

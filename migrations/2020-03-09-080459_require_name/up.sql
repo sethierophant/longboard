@@ -1,0 +1,1 @@
+ALTER TABLE post ALTER COLUMN author_name SET NOT NULL;

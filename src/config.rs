@@ -1,5 +1,7 @@
-use std::fs::File;
+use std::fs::{read_dir, read_to_string, File};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::string::ToString;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -12,38 +14,108 @@ use rocket::uri;
 
 use crate::{Error, Result};
 
-/// A banner to be displayed at the top of the page.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Banner {
-    pub name: String,
+/// Configuration for a longboard instance.
+#[derive(Debug)]
+pub struct Config {
+    pub options: Options,
+    pub banners: Vec<Banner>,
+    pub names: Vec<String>,
 }
 
-impl Banner {
-    pub fn uri(&self) -> Origin {
-        let path = Path::new("/banners").join(&self.name);
-        uri!(crate::routes::static_file: path)
+impl Config {
+    /// Open a config file at the given path.
+    pub fn open<P>(path: P) -> Result<Config>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+
+        let map_err = |err| {
+            let msg = format!("Couldn't open config file at {}", path.display());
+            Error::from_io_error(err, msg)
+        };
+
+        let reader = File::open(path).map_err(map_err)?;
+        let options: Options = serde_yaml::from_reader(reader)?;
+
+        let banners = match read_dir(options.resource_dir.join("banners")) {
+            Ok(iter) => iter
+                .map(|entry| {
+                    Ok(Banner {
+                        name: entry?.file_name().into_string().unwrap(),
+                    })
+                })
+                .collect::<Result<_>>()?,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(Error::from(e)),
+        };
+
+        let default_names_path = options.resource_dir.join("names.txt");
+        let names_path = options.names_path.as_ref().unwrap_or(&default_names_path);
+
+        let names = match read_to_string(names_path) {
+            Ok(s) => s.lines().map(ToString::to_string).collect(),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(Error::from(e)),
+        };
+
+        Ok(Config {
+            options,
+            banners,
+            names,
+        })
+    }
+
+    /// Get the default location of the config file.
+    pub fn default_path() -> &'static Path {
+        if cfg!(debug_assertions) {
+            Path::new("contrib/config/dev.yaml")
+        } else {
+            Path::new("/etc/longboard/config.yaml")
+        }
+    }
+
+    /// Choose a banner at random.
+    pub fn choose_banner(&self) -> &Banner {
+        let mut rng = thread_rng();
+        &self.banners.choose(&mut rng).expect("banner list is empty")
+    }
+
+    /// Choose a name at random.
+    pub fn choose_name(&self) -> &str {
+        let mut rng = thread_rng();
+        &self
+            .names
+            .choose(&mut rng)
+            .map(|s| s.as_str())
+            .unwrap_or("Anonymous")
     }
 }
 
-/// Configuration for a longboard instance.
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            options: Options::default(),
+            banners: Vec::new(),
+            names: Vec::new(),
+        }
+    }
+}
+
+/// Configuration options loaded from a file.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
+#[serde(default)]
+pub struct Options {
     /// Address to bind to
     pub address: String,
     /// Port to bind to
     pub port: u16,
-    /// Where the static files are.
-    pub static_dir: PathBuf,
+    /// Where the site resources (styles, templates, ...) are.
+    pub resource_dir: PathBuf,
     /// Where the user-uploaded files are.
     pub upload_dir: PathBuf,
-    /// Where the templates to be rendered are.
-    pub template_dir: PathBuf,
-    /// A list of banners. These should be in `${static_dir}/banners`.
-    // TODO: Autoload these?
-    // TODO: Allow banners outside of that directory?
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub banners: Vec<Banner>,
+    /// The path to a list of user names.
+    pub names_path: Option<PathBuf>,
     /// URL to connect to the database
     pub database_url: String,
     /// File to log to
@@ -54,101 +126,49 @@ pub struct Config {
     pub filter_rules: Vec<Rule>,
 }
 
-impl Config {
-    /// Open a config file at the given path.
-    pub fn open<P>(path: P) -> Result<Config>
-    where
-        P: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        let msg = format!("Couldn't open config file at {}", path.display());
-
-        let reader = File::open(path).map_err(|err| Error::from_io_error(err, msg))?;
-
-        Ok(serde_yaml::from_reader(reader)?)
-    }
-
-    /// Generate a new config file from default values.
+impl Options {
     pub fn generate<W>(mut out: W) -> Result<()>
     where
-        W: std::io::Write,
+        W: Write,
     {
         writeln!(&mut out, "# Configuration for longboard")?;
-        serde_yaml::to_writer(&mut out, &Config::default())?;
         writeln!(&mut out)?;
+        serde_yaml::to_writer(&mut out, &Options::default())?;
+        writeln!(&mut out)?;
+
         Ok(())
-    }
-
-    /// Get the default location of the config file.
-    pub fn default_path() -> PathBuf {
-        if cfg!(debug_assertions) {
-            PathBuf::from("contrib/dev-config.yaml")
-        } else {
-            PathBuf::from("/etc/longboard/config.yaml")
-        }
-    }
-
-    /// Choose a banner at random.
-    pub fn choose_banner(&self) -> &Banner {
-        let mut rng = thread_rng();
-        &self.banners.choose(&mut rng).expect("banner list is empty")
-    }
-
-    /// Dump configuration info to the log.
-    pub fn debug_log(&self) {
-        use log::debug;
-
-        debug!("  address {}", self.address);
-        debug!("  port {}", self.port);
-        debug!("  database url {}", self.database_url);
-        debug!("  static dir {}", self.static_dir.display());
-        debug!("  template dir {}", self.template_dir.display());
-        debug!("  upload dir {}", self.upload_dir.display());
-        debug!("  banners:");
-        for banner in &self.banners {
-            debug!("    banner: {}", banner.name);
-        }
-        debug!("  filter rules:");
-        for rule in &self.filter_rules {
-            debug!("    filter rule: {} => {}", rule.pattern, rule.replace_with);
-        }
-        if let Some(ref log_file) = self.log_file {
-            debug!("  log file {}", log_file.display());
-        }
     }
 }
 
-impl Default for Config {
-    fn default() -> Config {
+impl Default for Options {
+    fn default() -> Options {
         if cfg!(debug_assertions) {
-            Config {
-                static_dir: PathBuf::from("res/static/"),
-                template_dir: PathBuf::from("res/templates/"),
-                upload_dir: PathBuf::from("uploads"),
-                banners: Vec::new(),
+            Options {
                 address: "0.0.0.0".into(),
                 port: 8000,
+                resource_dir: PathBuf::from("res/"),
+                upload_dir: PathBuf::from("uploads"),
                 database_url: "postgres://longboard:@localhost/longboard".into(),
                 log_file: None,
                 filter_rules: Vec::new(),
+                names_path: None,
             }
         } else {
-            Config {
-                static_dir: PathBuf::from("/usr/share/longboard/static/"),
-                template_dir: PathBuf::from("/usr/share/longboard/templates/"),
-                upload_dir: PathBuf::from("/var/lib/longboard/"),
-                banners: Vec::new(),
+            Options {
                 address: "0.0.0.0".into(),
                 port: 8000,
+                resource_dir: PathBuf::from("/etc/longboard/"),
+                upload_dir: PathBuf::from("/var/lib/longboard/"),
                 database_url: "postgres://longboard:@localhost/longboard".into(),
                 log_file: Some(PathBuf::from("/var/log/longboard/longboard.log")),
                 filter_rules: Vec::new(),
+                names_path: None,
             }
         }
     }
 }
 
-fn pattern_deserialize_helper<'de, D>(de: D) -> std::result::Result<String, D::Error>
+fn pattern_de_helper<'de, D>(de: D) -> std::result::Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -161,7 +181,20 @@ where
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Rule {
-    #[serde(deserialize_with = "pattern_deserialize_helper")]
+    #[serde(deserialize_with = "pattern_de_helper")]
     pub pattern: String,
     pub replace_with: String,
+}
+
+/// A banner to be displayed at the top of the page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Banner {
+    pub name: String,
+}
+
+impl Banner {
+    pub fn uri(&self) -> Origin {
+        uri!(crate::routes::banner: PathBuf::from(&self.name))
+    }
 }

@@ -19,20 +19,36 @@ pub fn home(config: State<Config>, db: State<Database>) -> Result<HomeView> {
     HomeView::new(&db, &config)
 }
 
-/// Serve a static asset.
-#[get("/file/static/<file..>", rank = 0)]
+/// Serve a static file.
+#[get("/file/<file..>", rank = 1)]
 pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.static_dir.join(file))?)
+    Ok(NamedFile::open(config.options.resource_dir.join(file))?)
+}
+
+/// Serve a stylesheet.
+#[get("/file/style/<file..>", rank = 0)]
+pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+    Ok(NamedFile::open(
+        config.options.resource_dir.join("style").join(file),
+    )?)
+}
+
+/// Serve a banner.
+#[get("/file/banner/<file..>", rank = 0)]
+pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+    Ok(NamedFile::open(
+        config.options.resource_dir.join("banners").join(file),
+    )?)
 }
 
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
-pub fn upload_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.upload_dir.join(file))?)
+pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+    Ok(NamedFile::open(config.options.upload_dir.join(file))?)
 }
 
 /// Serve a board.
-#[get("/<board_name>", rank = 1)]
+#[get("/<board_name>", rank = 2)]
 pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> Result<BoardView> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
@@ -42,7 +58,7 @@ pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> 
 }
 
 /// Serve a thread.
-#[get("/<board_name>/<thread_id>", rank = 1)]
+#[get("/<board_name>/<thread_id>", rank = 2)]
 pub fn thread(
     board_name: String,
     thread_id: ThreadId,

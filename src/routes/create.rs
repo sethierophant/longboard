@@ -243,7 +243,7 @@ where
         })
         .into_owned();
 
-    for rule in &conf.filter_rules {
+    for rule in &conf.options.filter_rules {
         body = Regex::new(&rule.pattern)?
             .replace_all(&body, rule.replace_with.as_str())
             .into_owned();
@@ -284,7 +284,11 @@ fn create_new_models(
         .filter(|body| !body.trim().is_empty())
         .ok_or(missing_body_err)?;
 
-    let author_name = entries.param("author").map(ToString::to_string);
+    let author_name = entries
+        .param("author")
+        .unwrap_or_else(|| config.choose_name())
+        .to_string();
+
     let author_contact = entries.param("contact").map(ToString::to_string);
     let author_ident = entries.param("ident").map(hash_param).transpose()?;
     let delete_hash = entries.param("delete-pass").map(hash_param).transpose()?;
@@ -301,7 +305,7 @@ fn create_new_models(
     let field = entries.field("file").filter(|field| field.data.size() > 0);
 
     let new_file = if let Some(field) = field {
-        let save_path = save_file(field, &config.upload_dir)?;
+        let save_path = save_file(field, &config.options.upload_dir)?;
         let save_name = save_path
             .file_name()
             .expect("bad filename for save path")

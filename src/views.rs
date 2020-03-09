@@ -118,7 +118,7 @@ impl TryFrom<File> for TemplateData {
         let uri = from
             .thumb_name
             .as_ref()
-            .map(|name| uri!(crate::routes::upload_file: PathBuf::from(name)).to_string());
+            .map(|name| uri!(crate::routes::upload: PathBuf::from(name)).to_string());
 
         let mut data = to_value(from)?;
 
@@ -136,12 +136,6 @@ impl TryFrom<Post> for TemplateData {
     type Error = Error;
 
     fn try_from(from: Post) -> Result<TemplateData> {
-        let author = from
-            .author_name
-            .as_deref()
-            .unwrap_or("Anonymous")
-            .to_owned();
-
         let date = from.time_stamp.format("%F %R").to_string();
 
         let hash = from
@@ -152,8 +146,8 @@ impl TryFrom<Post> for TemplateData {
         let mut data = to_value(from)?;
 
         let obj = data.as_object_mut().unwrap();
+
         obj.insert("time_stamp".into(), JsonValue::String(date));
-        obj.insert("author_name".into(), JsonValue::String(author));
 
         if let Some(ident) = hash {
             obj.insert("author_ident".into(), JsonValue::String(ident));
