@@ -99,9 +99,12 @@ impl TryFrom<BoardPageInfo> for TemplateData {
     type Error = Error;
 
     fn try_from(from: BoardPageInfo) -> Result<TemplateData> {
-        let data = hashmap! {
+        let data = hashmap!{
             "board" => to_value(from.board)?,
-            "banner_uri" => JsonValue::String(from.banner.uri().to_string()),
+            "banner" => to_value(hashmap!{
+                "name" => from.banner.name.clone(),
+                "uri" => from.banner.uri().to_string(),
+            })?,
         };
 
         TemplateData::from_serialize(data)

@@ -1,5 +1,7 @@
 {{#*inline "header"}}
-    {{> view/banner}}
+    {{# with board_info.banner }}
+        {{> view/banner}}
+    {{/with}}
     {{> view/board-header}}
     {{> view/form/new-thread-form}}
 {{/inline}}

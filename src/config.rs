@@ -11,7 +11,7 @@ use rocket::uri;
 use crate::{Error, Result};
 
 /// A banner to be displayed at the top of the page.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Banner {
     pub name: String,
@@ -21,15 +21,6 @@ impl Banner {
     pub fn uri(&self) -> Origin {
         let path = Path::new("/banners").join(&self.name);
         uri!(crate::routes::static_file: path)
-    }
-}
-
-impl Serialize for Banner {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.uri().to_string())
     }
 }
 
