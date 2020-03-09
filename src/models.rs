@@ -74,6 +74,8 @@ pub struct File {
     pub content_type: Option<String>,
     /// The post that the file belongs to.
     pub post_id: PostId,
+    /// Whether or not the file should be hidden by default.
+    pub is_spoiler: bool,
 }
 
 /// A report that a user made about a post.
@@ -115,6 +117,7 @@ pub struct NewFile {
     pub thumb_name: Option<String>,
     pub orig_name: Option<String>,
     pub content_type: Option<String>,
+    pub is_spoiler: bool,
     pub post: PostId,
 }
 

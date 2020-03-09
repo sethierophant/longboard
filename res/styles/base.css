@@ -76,6 +76,7 @@ nav.boards a {
     grid-template-columns: 6em auto;
     min-width: 20em;
     background-color: hsl(0, 0%, 20%);
+    grid-gap: 0.2em;
 }
 
 .new-item-form label.divider {
@@ -84,14 +85,14 @@ nav.boards a {
     margin: 0.4em 0 0.8em;
 }
 
-.new-item-form input, .new-item-form textarea {
-    margin: 0.2em 0;
-    padding: 0.2em 0.4em;
-}
-
 .new-item-form textarea {
     grid-column: 1 / span 2;
     height: 16em;
+}
+
+.new-item-form input, .new-item-form textarea {
+    margin: 0.2em 0;
+    padding: 0.2em 0.4em;
 }
 
 .new-item-form input[type=submit], .new-item-form input[type=file] {
@@ -184,8 +185,12 @@ nav.boards a {
 .post-image {
     margin-right: 1em;
     margin-bottom: 1em;
-    border: thin solid black;
     float: left;
+}
+
+.post-image.spoiler {
+    width: 200px;
+    height: 200px;
 }
 
 .post .actions {

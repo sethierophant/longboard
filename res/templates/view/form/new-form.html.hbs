@@ -11,10 +11,12 @@
     <input type="password" name="ident">
     <textarea name="body"></textarea>
     <input type="file" name="file">
+    <label for="spoiler">Spoiler?</label>
+    <input type="checkbox" name="spoiler">
     <label for="delete-pass">Password</label>
     <input type="password" name="delete-pass">
     {{#unless new_thread_form}}
-        <label for="no-bump">No Bump</label>
+        <label for="no-bump">No Bump?</label>
         <input type="checkbox" name="no-bump">
     {{/unless}}
     {{#if new_thread_form}}

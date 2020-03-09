@@ -322,11 +322,14 @@ fn create_new_models(
 
         let content_type = field.headers.content_type.as_ref().map(ToString::to_string);
 
+        let is_spoiler = entries.param("spoiler").is_some();
+
         Some(NewFile {
             save_name,
             orig_name,
             thumb_name,
             content_type,
+            is_spoiler,
             post: 0,
         })
     } else {

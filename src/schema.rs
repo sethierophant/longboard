@@ -12,6 +12,7 @@ table! {
         orig_name -> Nullable<Text>,
         content_type -> Nullable<Text>,
         post -> Int4,
+        is_spoiler -> Bool,
     }
 }
 

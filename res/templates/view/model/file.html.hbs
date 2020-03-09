@@ -1,0 +1,6 @@
+{{#unless is_spoiler}}
+    <img class="post-image" src="{{file.uri}}">
+{{/unless}}
+{{#if is_spoiler}}
+    <img class="post-image spoiler" data-uri="{{file.uri}}" src="/file/spoiler.png">
+{{/if}}

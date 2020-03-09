@@ -1,0 +1,1 @@
+ALTER TABLE file ADD COLUMN is_spoiler BOOL NOT NULL;

@@ -13,9 +13,9 @@
         <span class="post-id"><a href="#{{id}}">#{{id}}</a></span>
     </header>
     <article class="body">
-        {{#if file}}
-            <img class="post-image" src="{{file.uri}}">
-        {{/if}}
+        {{#with file}}
+            {{> view/model/file}}
+        {{/with}}
         <p>
             {{{body}}}
         </p>
