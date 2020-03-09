@@ -12,3 +12,9 @@ banners:
     - 4.png
 
 database_url: postgres://longboard:@localhost/longboard
+
+filter_rules:
+    - pattern: word\s?filter
+      replace_with: language enhancer
+    - pattern: big dick
+      replace_with: sizable dongus

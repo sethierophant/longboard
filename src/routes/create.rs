@@ -224,20 +224,30 @@ where
 }
 
 /// Parse a post's body.
-fn parse_body<S>(body: S, db: &Database) -> String
+fn parse_body<S>(body: S, conf: &Config, db: &Database) -> Result<String>
 where
     S: AsRef<str>,
 {
-    // First pass: replace post references with links
-    let re = Regex::new(r">>(?P<id>\d+)").unwrap();
-    let body = re.replace_all(body.as_ref(), |captures: &Captures| {
-        let id: PostId = captures.name("id").unwrap().as_str().parse().unwrap();
+    // TODO: This is definitely not the most efficient way to do this.
 
-        match db.post_uri(id) {
-            Ok(uri) => format!("<a href=\"{}\">&gt;&gt;{}</a>", uri, id),
-            Err(_) => format!("<a>&gt;&gt;{}</a>", id),
-        }
-    });
+    // First pass: replace post references with links and run word filters
+    let re = Regex::new(r">>(?P<id>\d+)").unwrap();
+    let mut body = re
+        .replace_all(body.as_ref(), |captures: &Captures| {
+            let id: PostId = captures.name("id").unwrap().as_str().parse().unwrap();
+
+            match db.post_uri(id) {
+                Ok(uri) => format!("<a href=\"{}\">&gt;&gt;{}</a>", uri, id),
+                Err(_) => format!("<a>&gt;&gt;{}</a>", id),
+            }
+        })
+        .into_owned();
+
+    for rule in &conf.filter_rules {
+        body = Regex::new(&rule.pattern)?
+            .replace_all(&body, rule.replace_with.as_str())
+            .into_owned();
+    }
 
     // Second pass: parse markdown
     let mut opts = Options::empty();
@@ -248,10 +258,10 @@ where
     html::push_html(&mut html, Parser::new_ext(&body, opts));
 
     // Third pass: sanitize HTML
-    ammonia::Builder::new()
+    Ok(ammonia::Builder::new()
         .link_rel(Some("noopener noreferrer nofollow"))
         .clean(&html)
-        .to_string()
+        .to_string())
 }
 
 /// Create a new post and optionally a new file if the post has one. These are
@@ -269,7 +279,8 @@ fn create_new_models(
 
     let body = entries
         .param("body")
-        .map(|body| parse_body(body, db))
+        .map(|body| parse_body(body, config, db))
+        .transpose()?
         .filter(|body| !body.trim().is_empty())
         .ok_or(missing_body_err)?;
 

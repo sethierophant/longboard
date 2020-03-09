@@ -98,6 +98,7 @@ fn main_res() -> Result<()> {
     };
 
     debug!("Using config file {}", conf_path.display());
+    conf.debug_log();
 
     let routes = routes![
         longboard::routes::home,

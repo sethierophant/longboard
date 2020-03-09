@@ -1,9 +1,11 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use rand::{seq::SliceRandom, thread_rng};
+
+use regex::Regex;
 
 use rocket::http::uri::Origin;
 use rocket::uri;
@@ -40,20 +42,16 @@ pub struct Config {
     /// A list of banners. These should be in `${static_dir}/banners`.
     // TODO: Autoload these?
     // TODO: Allow banners outside of that directory?
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub banners: Vec<Banner>,
     /// URL to connect to the database
     pub database_url: String,
     /// File to log to
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_file: Option<PathBuf>,
-}
-
-impl Config {
-    /// Choose a banner at random.
-    pub fn choose_banner(&self) -> &Banner {
-        let mut rng = thread_rng();
-        &self.banners.choose(&mut rng).expect("banner list is empty")
-    }
+    /// Filter rules to apply to posts
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub filter_rules: Vec<Rule>,
 }
 
 impl Config {
@@ -70,6 +68,7 @@ impl Config {
         Ok(serde_yaml::from_reader(reader)?)
     }
 
+    /// Generate a new config file from default values.
     pub fn generate<W>(mut out: W) -> Result<()>
     where
         W: std::io::Write,
@@ -80,6 +79,7 @@ impl Config {
         Ok(())
     }
 
+    /// Get the default location of the config file.
     pub fn default_path() -> PathBuf {
         if cfg!(debug_assertions) {
             PathBuf::from("contrib/dev-config.yaml")
@@ -87,7 +87,37 @@ impl Config {
             PathBuf::from("/etc/longboard/config.yaml")
         }
     }
+
+    /// Choose a banner at random.
+    pub fn choose_banner(&self) -> &Banner {
+        let mut rng = thread_rng();
+        &self.banners.choose(&mut rng).expect("banner list is empty")
+    }
+
+    /// Dump configuration info to the log.
+    pub fn debug_log(&self) {
+        use log::debug;
+
+        debug!("  address {}", self.address);
+        debug!("  port {}", self.port);
+        debug!("  database url {}", self.database_url);
+        debug!("  static dir {}", self.static_dir.display());
+        debug!("  template dir {}", self.template_dir.display());
+        debug!("  upload dir {}", self.upload_dir.display());
+        debug!("  banners:");
+        for banner in &self.banners {
+            debug!("    banner: {}", banner.name);
+        }
+        debug!("  filter rules:");
+        for rule in &self.filter_rules {
+            debug!("    filter rule: {} => {}", rule.pattern, rule.replace_with);
+        }
+        if let Some(ref log_file) = self.log_file {
+            debug!("  log file {}", log_file.display());
+        }
+    }
 }
+
 impl Default for Config {
     fn default() -> Config {
         if cfg!(debug_assertions) {
@@ -100,6 +130,7 @@ impl Default for Config {
                 port: 8000,
                 database_url: "postgres://longboard:@localhost/longboard".into(),
                 log_file: None,
+                filter_rules: Vec::new(),
             }
         } else {
             Config {
@@ -111,7 +142,26 @@ impl Default for Config {
                 port: 8000,
                 database_url: "postgres://longboard:@localhost/longboard".into(),
                 log_file: Some(PathBuf::from("/var/log/longboard/longboard.log")),
+                filter_rules: Vec::new(),
             }
         }
     }
+}
+
+fn pattern_deserialize_helper<'de, D>(de: D) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    String::deserialize(de).and_then(|s| {
+        // Make sure that the pattern is a valid regex.
+        let _ = Regex::new(&s).map_err(serde::de::Error::custom)?;
+        Ok(s)
+    })
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Rule {
+    #[serde(deserialize_with = "pattern_deserialize_helper")]
+    pub pattern: String,
+    pub replace_with: String,
 }

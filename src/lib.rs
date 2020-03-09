@@ -57,6 +57,9 @@ pub enum Error {
     PasswordError,
     #[display(fmt = "Deleting files only is not a valid option for threads")]
     CannotDeleteThreadFilesOnly,
+    #[display(fmt = "Couldn't create regex: {}", _0)]
+    #[from]
+    RegexError(regex::Error),
     #[display(fmt = "Error processing image: {}", _0)]
     #[from]
     ImageError(image::error::ImageError),

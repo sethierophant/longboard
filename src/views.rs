@@ -99,7 +99,7 @@ impl TryFrom<BoardPageInfo> for TemplateData {
     type Error = Error;
 
     fn try_from(from: BoardPageInfo) -> Result<TemplateData> {
-        let data = hashmap!{
+        let data = hashmap! {
             "board" => to_value(from.board)?,
             "banner" => to_value(hashmap!{
                 "name" => from.banner.name.clone(),
