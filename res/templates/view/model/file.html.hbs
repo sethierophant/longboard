@@ -1,6 +1,12 @@
 {{#unless is_spoiler}}
-    <img class="post-image" src="{{file.uri}}">
+    <section class="post-image" data-uri="{{uri}}" data-thumb-uri="{{thumb_uri}}">
+        <a href="{{uri}}" title="{{orig_name}}">{{orig_name}}</a>
+        <img src="{{thumb_uri}}">
+    </section>
 {{/unless}}
 {{#if is_spoiler}}
-    <img class="post-image spoiler" data-uri="{{file.uri}}" src="/file/spoiler.png">
+    <section class="post-image spoiler" data-uri="{{uri}}" data-thumb-uri="{{thumb_uri}}">
+        <a href="{{uri}}" title="{{orig_name}}">{{orig_name}}</a>
+        <img src="/file/spoiler.png">
+    </section>
 {{/if}}

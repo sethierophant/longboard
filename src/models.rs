@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::path::PathBuf;
 
 use chrono::offset::Utc;
 use chrono::DateTime;
@@ -27,6 +28,12 @@ pub struct Board {
     pub description: String,
 }
 
+impl Board {
+    pub fn uri(&self) -> String {
+        uri!(crate::routes::board: &self.name).to_string()
+    }
+}
+
 /// A series of posts about a specific subject.
 #[derive(Debug, Queryable, Serialize)]
 pub struct Thread {
@@ -38,6 +45,12 @@ pub struct Thread {
     pub subject: String,
     /// The board that this thread was created on.
     pub board_name: String,
+}
+
+impl Thread {
+    pub fn uri(&self) -> String {
+        uri!(crate::routes::thread: &self.board_name, self.id).to_string()
+    }
 }
 
 /// A user-made post.
@@ -59,6 +72,15 @@ pub struct Post {
     pub thread_id: ThreadId,
     /// The argon2 hash of the password the user gave for deletion.
     pub delete_hash: Option<String>,
+    /// The board that this post was posted on.
+    pub board_name: String,
+}
+
+impl Post {
+    pub fn uri(&self) -> String {
+        let uri = uri!(crate::routes::thread: &self.board_name, &self.thread_id);
+        format!("{}#{}", uri, self.id)
+    }
 }
 
 /// A user-uploaded file.
@@ -76,6 +98,18 @@ pub struct File {
     pub post_id: PostId,
     /// Whether or not the file should be hidden by default.
     pub is_spoiler: bool,
+}
+
+impl File {
+    pub fn uri(&self) -> String {
+        uri!(crate::routes::upload: PathBuf::from(&self.save_name)).to_string()
+    }
+
+    pub fn thumb_uri(&self) -> Option<String> {
+        self.thumb_name
+            .as_ref()
+            .map(|thumb_name| uri!(crate::routes::upload: PathBuf::from(thumb_name)).to_string())
+    }
 }
 
 /// A report that a user made about a post.
@@ -107,6 +141,7 @@ pub struct NewPost {
     pub author_ident: Option<String>,
     pub delete_hash: Option<String>,
     pub thread: ThreadId,
+    pub board: String,
 }
 
 /// A new file to be inserted in the database.
@@ -218,6 +253,31 @@ impl Database {
             .filter(thread.eq(thread_id))
             .order(id.asc())
             .load(&self.pool.get()?)?)
+    }
+
+    /// Get the first post and up to `limit` recent posts from a thread.
+    pub fn preview_thread(&self, thread_id: ThreadId, limit: u32) -> Result<Vec<Post>> {
+        use crate::schema::post::columns::{id, thread};
+        use crate::schema::post::dsl::post;
+
+        let first_post: Post = post
+            .filter(thread.eq(thread_id))
+            .order(id.asc())
+            .limit(1)
+            .first(&self.pool.get()?)?;
+
+        let mut posts: Vec<Post> = post
+            .filter(id.ne(first_post.id))
+            .filter(thread.eq(thread_id))
+            .order(id.desc())
+            .limit(limit.into())
+            .load(&self.pool.get()?)?;
+
+        posts.reverse();
+
+        posts.insert(0, first_post);
+
+        Ok(posts)
     }
 
     /// Get a post.
@@ -427,5 +487,36 @@ impl Database {
         delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
 
         Ok(())
+    }
+
+    pub fn recent_posts(&self, limit: u32) -> Result<Vec<Post>> {
+        use crate::schema::post::columns::time_stamp;
+        use crate::schema::post::dsl::post;
+
+        Ok(post
+            .order(time_stamp.desc())
+            .limit(limit.into())
+            .load(&self.pool.get()?)?)
+    }
+
+    pub fn recent_files(&self, limit: u32) -> Result<Vec<File>> {
+        use crate::schema::file::columns::*;
+        use crate::schema::file::dsl::file;
+        use crate::schema::post::columns::time_stamp;
+        use crate::schema::post::dsl::post as post_table;
+
+        Ok(file
+            .inner_join(post_table)
+            .order(time_stamp.desc())
+            .limit(limit.into())
+            .select((
+                save_name,
+                thumb_name,
+                orig_name,
+                content_type,
+                post,
+                is_spoiler,
+            ))
+            .load(&self.pool.get()?)?)
     }
 }

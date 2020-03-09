@@ -74,7 +74,7 @@ nav.boards a {
     padding: 0.6em;
     display: grid;
     grid-template-columns: 6em auto;
-    min-width: 20em;
+    width: 20em;
     background-color: hsl(0, 0%, 20%);
     grid-gap: 0.2em;
 }
@@ -117,7 +117,7 @@ nav.boards a {
     margin: 0 1em;
 }
 
-.post:first-of-type {
+.thread .post:first-of-type {
     background: none;
     border: none;
     align-self: stretch;
@@ -183,12 +183,36 @@ nav.boards a {
 }
 
 .post-image {
+    display: inline-flex;
+    flex-flow: column nowrap;
+
+    position: relative;
+
     margin-right: 1em;
     margin-bottom: 1em;
+
     float: left;
 }
 
-.post-image.spoiler {
+.post-image a {
+    font-size: 0.75em;
+
+    position: absolute;
+    left: 0;
+    right: 0;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    margin-bottom: 1em;
+}
+
+.post-image img {
+    margin-top: 1.2em;
+}
+
+.post-image.spoiler img {
     width: 200px;
     height: 200px;
 }
@@ -235,7 +259,7 @@ nav.boards a {
 .action-form textarea {
     padding: 0.2em;
     height: 4em;
-    min-width: 20em;
+    width: 20em;
 }
 
 .action-form textarea, .action-form input[type=submit] {
@@ -247,4 +271,41 @@ nav.boards a {
     background-color: hsl(0, 0%, 10%);
     border: thin solid hsl(0, 0%, 15%);
     align-self: center;
+}
+
+.home {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.recent {
+    display: grid;
+    grid-template-columns: auto auto;
+}
+
+.recent .recent-posts, .recent .recent-files {
+    margin: 1em 4em;
+}
+
+.recent .recent-files {
+    grid-column: 1;
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+}
+
+.recent .recent-posts {
+    grid-column: 2;
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+}
+
+.recent .recent-posts .post-preview {
+    align-self: flex-start;
+}
+
+.post-preview .body {
+    padding-left: 2em;
+    border-left: solid 5px hsl(0, 0%, 10%);
 }

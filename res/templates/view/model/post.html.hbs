@@ -10,15 +10,13 @@
             </span>
         {{/if}}
         <span class="post-timestamp">{{time_stamp}}</span>
-        <span class="post-id"><a href="#{{id}}">#{{id}}</a></span>
+        <span class="post-id"><a href="{{uri}}">#{{id}}</a></span>
     </header>
     <article class="body">
         {{#with file}}
             {{> view/model/file}}
         {{/with}}
-        <p>
-            {{{body}}}
-        </p>
+        {{{body}}}
     </article>
     {{#unless hide_actions}}
         <footer class="actions">

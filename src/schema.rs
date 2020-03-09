@@ -26,6 +26,7 @@ table! {
         author_ident -> Nullable<Text>,
         thread -> Int4,
         delete_hash -> Nullable<Text>,
+        board -> Text,
     }
 }
 
@@ -48,6 +49,7 @@ table! {
 }
 
 joinable!(file -> post (post));
+joinable!(post -> board (board));
 joinable!(post -> thread (thread));
 joinable!(report -> post (post));
 joinable!(thread -> board (board));

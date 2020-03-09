@@ -1,11 +1,9 @@
 use std::convert::TryFrom;
-use std::path::PathBuf;
 
 use maplit::hashmap;
 
 use rocket::request::Request;
 use rocket::response::{self, Responder};
-use rocket::uri;
 
 use rocket_contrib::templates::Template;
 
@@ -103,7 +101,7 @@ impl TryFrom<BoardPageInfo> for TemplateData {
             "board" => to_value(from.board)?,
             "banner" => to_value(hashmap!{
                 "name" => from.banner.name.clone(),
-                "uri" => from.banner.uri().to_string(),
+                "uri" => from.banner.uri(),
             })?,
         };
 
@@ -115,17 +113,16 @@ impl TryFrom<File> for TemplateData {
     type Error = Error;
 
     fn try_from(from: File) -> Result<TemplateData> {
-        let uri = from
-            .thumb_name
-            .as_ref()
-            .map(|name| uri!(crate::routes::upload: PathBuf::from(name)).to_string());
+        let uri = from.uri();
+        let thumb_uri = from.thumb_uri();
 
         let mut data = to_value(from)?;
 
-        if let Some(uri) = uri {
-            data.as_object_mut()
-                .unwrap()
-                .insert("uri".into(), JsonValue::String(uri));
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("uri".into(), JsonValue::String(uri));
+
+        if let Some(thumb_uri) = thumb_uri {
+            obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri));
         }
 
         TemplateData::from_serialize(data)
@@ -143,11 +140,14 @@ impl TryFrom<Post> for TemplateData {
             .as_ref()
             .map(|ident| ident.split('$').last().unwrap().to_owned());
 
+        let uri = from.uri();
+
         let mut data = to_value(from)?;
 
         let obj = data.as_object_mut().unwrap();
 
         obj.insert("time_stamp".into(), JsonValue::String(date));
+        obj.insert("uri".into(), JsonValue::String(uri));
 
         if let Some(ident) = hash {
             obj.insert("author_ident".into(), JsonValue::String(ident));
@@ -161,7 +161,7 @@ impl TryFrom<Thread> for TemplateData {
     type Error = Error;
 
     fn try_from(from: Thread) -> Result<TemplateData> {
-        let uri = uri!(crate::routes::thread: &from.board_name, from.id).to_string();
+        let uri = from.uri();
 
         let mut data = to_value(from)?;
 
@@ -231,8 +231,8 @@ impl TryFrom<(Thread, Vec<(Post, Option<File>)>)> for TemplateData {
 pub struct HomeView {
     page_info: PageInfo,
 
-    num_threads: i64,
-    num_posts: i64,
+    recent_posts: Vec<Post>,
+    recent_files: Vec<File>,
 }
 
 impl HomeView {
@@ -240,8 +240,8 @@ impl HomeView {
         Ok(HomeView {
             page_info: PageInfo::new(db, config)?,
 
-            num_threads: db.num_threads()?,
-            num_posts: db.num_posts()?,
+            recent_posts: db.recent_posts(5)?,
+            recent_files: db.recent_files(5)?,
         })
     }
 }
@@ -250,7 +250,13 @@ impl TryFrom<HomeView> for TemplateData {
     type Error = Error;
 
     fn try_from(from: HomeView) -> Result<TemplateData> {
-        TemplateData::from_serialize(from)
+        let data = hashmap! {
+            "page_info" => TemplateData::try_from(from.page_info)?.json,
+            "recent_posts" => TemplateData::try_from(from.recent_posts)?.json,
+            "recent_files" => TemplateData::try_from(from.recent_files)?.json,
+        };
+
+        TemplateData::from_serialize(data)
     }
 }
 
@@ -280,7 +286,7 @@ impl BoardView {
         for thread in db.threads_on_board(&board_name)? {
             let mut post_models = Vec::new();
 
-            for post in db.posts_in_thread(thread.id)? {
+            for post in db.preview_thread(thread.id, 3)? {
                 let file = db.files_in_post(post.id)?.pop();
                 post_models.push((post, file));
             }

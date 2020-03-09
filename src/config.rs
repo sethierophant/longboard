@@ -9,7 +9,6 @@ use rand::{seq::SliceRandom, thread_rng};
 
 use regex::Regex;
 
-use rocket::http::uri::Origin;
 use rocket::uri;
 
 use crate::{Error, Result};
@@ -194,7 +193,7 @@ pub struct Banner {
 }
 
 impl Banner {
-    pub fn uri(&self) -> Origin {
-        uri!(crate::routes::banner: PathBuf::from(&self.name))
+    pub fn uri(&self) -> String {
+        uri!(crate::routes::banner: PathBuf::from(&self.name)).to_string()
     }
 }
