@@ -33,6 +33,14 @@ pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     )?)
 }
 
+/// Serve a script.
+#[get("/file/script/<file..>", rank = 0)]
+pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+    Ok(NamedFile::open(
+        config.options.resource_dir.join("script").join(file),
+    )?)
+}
+
 /// Serve a banner.
 #[get("/file/banner/<file..>", rank = 0)]
 pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
@@ -73,6 +81,21 @@ pub fn thread(
     }
 
     ThreadView::new(board_name, thread_id, &db, &config)
+}
+
+/// Serve a post preview.
+#[get("/<_board_name>/<_thread_id>/preview/<post_id>", rank=2)]
+pub fn post_preview(
+    _board_name: String,
+    _thread_id: ThreadId,
+    post_id: PostId,
+    db: State<Database>,
+) -> Result<PostPreviewView> {
+    if db.post(post_id).is_err() {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    PostPreviewView::new(post_id, &db)
 }
 
 #[get("/action/post/report/<post_id>")]

@@ -6,8 +6,8 @@ upload_dir: uploads
 
 database_url: postgres://longboard:@localhost/longboard
 
-names_path: contrib/config/names.txt
-notice_path: contrib/config/notice.md
+names: contrib/config/names.txt
+notice: contrib/config/notice.md
 
 filter_rules:
     - pattern: word\s?filter

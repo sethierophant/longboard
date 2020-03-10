@@ -394,6 +394,37 @@ impl<'r> Responder<'r> for ThreadView {
     }
 }
 
+#[derive(Debug)]
+pub struct PostPreviewView {
+    post: Post,
+    file: Option<File>,
+}
+
+impl PostPreviewView {
+    pub fn new(post_id: PostId, db: &Database) -> Result<PostPreviewView> {
+        Ok(PostPreviewView {
+            post: db.post(post_id)?,
+            file: db.files_in_post(post_id)?.pop(),
+        })
+    }
+}
+
+impl TryFrom<PostPreviewView> for TemplateData {
+    type Error = Error;
+
+    fn try_from(from: PostPreviewView) -> Result<TemplateData> {
+        TemplateData::try_from((from.post, from.file))
+    }
+}
+
+impl<'r> Responder<'r> for PostPreviewView {
+    fn respond_to(self, req: &Request) -> response::Result<'r> {
+        TemplateData::try_from(self)
+            .map(|data| Template::render("view/model/post", &data))
+            .respond_to(req)
+    }
+}
+
 #[derive(Serialize)]
 pub struct ActionSuccessView {
     pub msg: String,

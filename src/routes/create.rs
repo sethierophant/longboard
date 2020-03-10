@@ -13,6 +13,8 @@ use chrono::offset::Utc;
 use image::error::ImageError;
 use image::ImageFormat;
 
+use maplit::{hashmap, hashset};
+
 use mime_guess::get_mime_extensions;
 
 use multipart::server::save::{SavedData, SavedField};
@@ -237,7 +239,7 @@ where
             let id: PostId = captures.name("id").unwrap().as_str().parse().unwrap();
 
             match db.post_uri(id) {
-                Ok(uri) => format!("<a href=\"{}\">&gt;&gt;{}</a>", uri, id),
+                Ok(uri) => format!("<a class=\"post-ref\" href=\"{}\">&gt;&gt;{}</a>", uri, id),
                 Err(_) => format!("<a>&gt;&gt;{}</a>", id),
             }
         })
@@ -260,6 +262,7 @@ where
     // Third pass: sanitize HTML
     Ok(ammonia::Builder::new()
         .link_rel(Some("noopener noreferrer nofollow"))
+        .allowed_classes(hashmap!{ "a" => hashset!["post-ref"] })
         .clean(&html)
         .to_string())
 }

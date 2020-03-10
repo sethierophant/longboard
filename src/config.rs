@@ -55,6 +55,8 @@ impl Config {
         let default_names_path = options.resource_dir.join("names.txt");
         let names_path = options.names_path.as_ref().unwrap_or(&default_names_path);
 
+        log::debug!("names_path: {}", names_path.display());
+
         let names = match read_to_string(names_path) {
             Ok(s) => s.lines().map(ToString::to_string).collect(),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),

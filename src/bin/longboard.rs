@@ -110,6 +110,7 @@ fn main_res() -> Result<()> {
         longboard::routes::upload,
         longboard::routes::board,
         longboard::routes::thread,
+        longboard::routes::post_preview,
         longboard::routes::create::new_thread,
         longboard::routes::create::new_post,
         longboard::routes::report,

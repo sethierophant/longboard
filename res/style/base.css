@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Sigmar+One|Roboto+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Roboto+Mono|Oswald:700&display=swap');
 
 pre {
     overflow-x: scroll;
@@ -35,11 +35,21 @@ body {
 
 .banner {
     border: thin solid black;
+    margin: 1em 0;
 }
 
 .board-name, .board-description {
-    font-family: 'Sigmar One';
+    font-family: 'Oswald';
     text-align: center;
+}
+
+.board-name {
+    margin-top: 0.4em;
+    margin-bottom: 0.8em;
+}
+
+.board-description {
+    margin-top: 0;
 }
 
 nav.boards ul {
@@ -75,8 +85,11 @@ nav.boards a {
     display: grid;
     grid-template-columns: 6em auto;
     width: 20em;
-    background-color: hsl(0, 0%, 20%);
     grid-gap: 0.2em;
+
+    background-color: hsl(0, 0%, 12%);
+    border: thin solid hsl(0, 0%, 15%);
+    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 }
 
 .new-item-form label.divider {
@@ -124,12 +137,21 @@ nav.boards a {
 }
 
 .thread .subject {
-    font-size: 1em;
-    margin: 0 1em;
+    font: bold 1em 'Oswald';
+
+    background-color: hsl(0, 0%, 12%);
+    border: thin solid hsl(0, 0%, 15%);
+    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
+
+    padding: 0.4em;
+    margin-left: 0.4em;
+
+    align-self: center;
 }
 
-.thread .subject::before {
-    content: "Thread: ";
+.thread .subject a {
+    color: hsl(0, 0%, 98%);
+    text-decoration: none;
 }
 
 .thread .post:first-of-type {
@@ -165,6 +187,7 @@ nav.boards a {
 
 .post-info {
     display: flex;
+    font-size: 0.9em;
 }
 
 .post-info * {
@@ -172,11 +195,11 @@ nav.boards a {
     margin: 0 0.2em;
 }
 
-.post-info :first-child {
+.post-info > :first-child {
     margin-left: 0;
 }
 
-.post-info :last-child {
+.post-info > :last-child {
     margin-right: 0;
 }
 
@@ -185,26 +208,26 @@ nav.boards a {
 }
 
 .post .body {
-    padding: 0.4em;
     box-sizing: border-box;
+    margin: 0.4em;
 }
 
 .post .body p:first-of-type {
     margin-top: 0;
 }
 
-.post .body :last-child {
+.post .body > :last-child {
     margin-bottom: 0;
 }
 
 .post-image {
-    display: inline-flex;
+    display: flex;
     flex-flow: column nowrap;
-
-    position: relative;
 
     margin-right: 1em;
     margin-bottom: 1em;
+
+    position: relative;
 
     float: left;
 }
@@ -216,11 +239,11 @@ nav.boards a {
     left: 0;
     right: 0;
 
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    max-width: 100%;
 
-    margin-bottom: 1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .post-image img {
@@ -230,6 +253,10 @@ nav.boards a {
 .post-image.spoiler img {
     width: 200px;
     height: 200px;
+}
+
+.post-preview {
+    position: fixed;
 }
 
 .post .actions {
