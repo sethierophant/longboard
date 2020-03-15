@@ -1,0 +1,17 @@
+--- _schema.rs	2020-03-11 09:22:37.546677810 -0400
++++ schema.rs	2020-03-11 09:24:17.040014867 -0400
+@@ -48,13 +48,13 @@
+ }
+ 
+ table! {
+     staff (name) {
+         name -> Text,
+         password_hash -> Text,
+-        role -> Role,
++        role -> crate::sql_types::Role,
+     }
+ }
+ 
+ table! {
+     thread (id) {
+         id -> Int4,
