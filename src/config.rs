@@ -1,3 +1,5 @@
+//! App configuration.
+
 use std::fs::{read_dir, read_to_string, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -15,7 +17,7 @@ use rocket::uri;
 
 use crate::{Error, Result};
 
-/// Configuration for a longboard instance.
+/// Configuration for a longboard server.
 #[derive(Debug)]
 pub struct Config {
     pub options: Options,
@@ -125,9 +127,9 @@ impl Default for Config {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Options {
-    /// Address to bind to
+    /// Address to bind to.
     pub address: String,
-    /// Port to bind to
+    /// Port to bind to.
     pub port: u16,
     /// Where the site resources (styles, templates, ...) are.
     pub resource_dir: PathBuf,
@@ -138,12 +140,12 @@ pub struct Options {
     pub names_path: Option<PathBuf>,
     /// The path to a notice file to be displayed at the top of each board.
     pub notice_path: Option<PathBuf>,
-    /// URL to connect to the database
+    /// URL to connect to the database.
     pub database_url: String,
-    /// File to log to
+    /// File to log to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_file: Option<PathBuf>,
-    /// Filter rules to apply to posts
+    /// Filter rules to apply to posts.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub filter_rules: Vec<Rule>,
 }
@@ -204,6 +206,7 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+/// A rule for filtering/enhancing user posts.
 pub struct Rule {
     #[serde(deserialize_with = "pattern_de_helper")]
     pub pattern: String,

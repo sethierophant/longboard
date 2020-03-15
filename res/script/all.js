@@ -47,7 +47,7 @@ function onMouseEnterPostRef(ev) {
 }
 
 function addPostPreview(postPreview, targetRect) {
-    postPreview.classList.add("post-preview")
+    postPreview.classList.add("post-fixed")
 
     document.body.appendChild(postPreview)
 

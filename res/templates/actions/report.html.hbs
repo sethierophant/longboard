@@ -1,0 +1,9 @@
+<h1>Report Post {{id}}</h1>
+{{#with post}}
+    {{> models/post hide_actions=true}}
+{{/with}}
+<form class="action-form" method="POST">
+    <label for="reason">Reason</label>
+    <textarea name="reason"></textarea>
+    <input type="submit" value="Report Post">
+</form>

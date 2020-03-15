@@ -1,3 +1,5 @@
+//! Rocket HTTP routes.
+
 use std::path::PathBuf;
 use std::string::ToString;
 
@@ -5,18 +7,44 @@ use argon2::verify_encoded;
 
 use rocket::request::{Form, FromForm};
 use rocket::response::NamedFile;
-use rocket::{get, post, uri, State};
+use rocket::{get, post, routes, uri, Route, State};
 
 use crate::models::*;
 use crate::views::*;
 use crate::{config::Config, Error, Result};
 
-pub mod create;
+pub mod new;
+pub mod staff;
+
+/// Get all routes.
+pub fn routes() -> Vec<Route> {
+    routes![
+        crate::routes::home,
+        crate::routes::static_file,
+        crate::routes::banner,
+        crate::routes::style,
+        crate::routes::upload,
+        crate::routes::board,
+        crate::routes::thread,
+        crate::routes::post_preview,
+        crate::routes::new::new_thread,
+        crate::routes::new::new_post,
+        crate::routes::report,
+        crate::routes::new_report,
+        crate::routes::delete,
+        crate::routes::handle_delete,
+        crate::routes::staff::login,
+        crate::routes::staff::handle_login,
+        crate::routes::staff::logout,
+        crate::routes::staff::overview,
+        crate::routes::staff::log,
+    ]
+}
 
 /// Serve the home page.
 #[get("/", rank = 0)]
-pub fn home(config: State<Config>, db: State<Database>) -> Result<HomeView> {
-    HomeView::new(&db, &config)
+pub fn home(config: State<Config>, db: State<Database>) -> Result<HomePage> {
+    HomePage::new(&db, &config)
 }
 
 /// Serve a static file.
@@ -57,12 +85,12 @@ pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 
 /// Serve a board.
 #[get("/<board_name>", rank = 2)]
-pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> Result<BoardView> {
+pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> Result<BoardPage> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
 
-    BoardView::new(board_name, &db, &config)
+    BoardPage::new(board_name, &db, &config)
 }
 
 /// Serve a thread.
@@ -72,52 +100,64 @@ pub fn thread(
     thread_id: ThreadId,
     config: State<Config>,
     db: State<Database>,
-) -> Result<ThreadView> {
-    if db.thread(&board_name, thread_id).is_err() {
+) -> Result<ThreadPage> {
+    if db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
             thread_id,
         });
     }
 
-    ThreadView::new(board_name, thread_id, &db, &config)
+    ThreadPage::new(board_name, thread_id, &db, &config)
 }
 
 /// Serve a post preview.
-#[get("/<_board_name>/<_thread_id>/preview/<post_id>", rank=2)]
+#[get("/<_board_name>/<_thread_id>/preview/<post_id>", rank = 2)]
 pub fn post_preview(
     _board_name: String,
     _thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
-) -> Result<PostPreviewView> {
+) -> Result<PostPreview> {
     if db.post(post_id).is_err() {
         return Err(Error::PostNotFound { post_id });
     }
 
-    PostPreviewView::new(post_id, &db)
+    PostPreview::new(post_id, &db)
 }
 
-#[get("/action/post/report/<post_id>")]
-pub fn report(post_id: PostId, db: State<Database>) -> Result<ReportView> {
+/// Report a post.
+#[get("/<_board_name>/<_thread_id>/report/<post_id>")]
+pub fn report(
+    _board_name: String,
+    _thread_id: ThreadId,
+    post_id: PostId,
+    db: State<Database>,
+) -> Result<ReportPage> {
     if db.post(post_id).is_err() {
         return Err(Error::PostNotFound { post_id });
     }
 
-    ReportView::new(post_id, &db)
+    Ok(ReportPage {
+        post: db.post(post_id)?,
+    })
 }
 
+/// Form data for reporting a post.
 #[derive(FromForm)]
 pub struct ReportData {
     reason: String,
 }
 
-#[post("/action/post/report/<post_id>", data = "<report_data>")]
+/// Create a new post report.
+#[post("/<_board_name>/<_thread_id>/report/<post_id>", data = "<report_data>")]
 pub fn new_report(
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     report_data: Form<ReportData>,
     db: State<Database>,
-) -> Result<ActionSuccessView> {
+) -> Result<ActionSuccessPage> {
     if db.post(post_id).is_err() {
         return Err(Error::PostNotFound { post_id });
     }
@@ -129,33 +169,45 @@ pub fn new_report(
         post: post_id,
     })?;
 
-    Ok(ActionSuccessView {
+    Ok(ActionSuccessPage {
         msg: format!("Reported post {} successfully.", post_id),
         redirect_uri: uri!(thread: thread.board_name, thread.id).to_string(),
     })
 }
 
-#[get("/action/post/delete/<post_id>")]
-pub fn delete(post_id: PostId, db: State<Database>) -> Result<DeleteView> {
+/// Serve a form for deleting a post.
+#[get("/<_board_name>/<_thread_id>/delete/<post_id>")]
+pub fn delete(
+    _board_name: String,
+    _thread_id: ThreadId,
+    post_id: PostId,
+    db: State<Database>,
+) -> Result<DeletePage> {
     if db.post(post_id).is_err() {
         return Err(Error::PostNotFound { post_id });
     }
 
-    DeleteView::new(post_id, &db)
+    Ok(DeletePage {
+        post: db.post(post_id)?,
+    })
 }
 
+/// Form data for deleting a post.
 #[derive(FromForm)]
 pub struct DeleteData {
     password: String,
     file_only: Option<String>,
 }
 
-#[post("/action/post/delete/<post_id>", data = "<delete_data>")]
-pub fn do_delete(
+/// Delete a post.
+#[post("/<_board_name>/<_thread_id>/delete/<post_id>", data = "<delete_data>")]
+pub fn handle_delete(
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     delete_data: Form<DeleteData>,
     db: State<Database>,
-) -> Result<ActionSuccessView> {
+) -> Result<ActionSuccessPage> {
     if db.post(post_id).is_err() {
         return Err(Error::PostNotFound { post_id });
     }
@@ -163,10 +215,10 @@ pub fn do_delete(
     let post = db.post(post_id)?;
     let thread = db.parent_thread(post_id)?;
 
-    let hash = post.delete_hash.ok_or(Error::PasswordError)?;
+    let hash = post.delete_hash.ok_or(Error::DeleteInvalidPassword)?;
 
     if !verify_encoded(&hash, delete_data.password.as_bytes())? {
-        return Err(Error::PasswordError);
+        return Err(Error::DeleteInvalidPassword);
     }
 
     let delete_thread = db.is_first_post(post_id)?;
@@ -193,5 +245,5 @@ pub fn do_delete(
         uri!(thread: thread.board_name, thread.id).to_string()
     };
 
-    Ok(ActionSuccessView { msg, redirect_uri })
+    Ok(ActionSuccessPage { msg, redirect_uri })
 }

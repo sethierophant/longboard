@@ -7,15 +7,14 @@ use clap::{App, Arg};
 
 use fern::colors::{Color, ColoredLevelConfig};
 
-use log::debug;
+use log::{debug, info};
 
 use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
-use rocket::routes;
 
 use rocket_contrib::templates::Template;
 
-use longboard::config::{Config, Options};
-use longboard::{models::Database, LogFairing, Result};
+use longboard::config::Options;
+use longboard::{Config, Database, LogFairing, Result};
 
 fn main_res() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -37,6 +36,16 @@ fn main_res() -> Result<()> {
                 .takes_value(true)
                 .default_value("-")
                 .help("Generate a new config file"),
+        )
+        .arg(
+            Arg::with_name("log-all")
+                .long("log-all")
+                .help("Show all log messages, this makes the log very messy"),
+        )
+        .arg(
+            Arg::with_name("debug-config")
+                .long("debug-config")
+                .help("Dump the configuration to the log on startup"),
         )
         .get_matches();
 
@@ -61,6 +70,8 @@ fn main_res() -> Result<()> {
 
     let log_to_file = conf.options.log_file.is_some();
 
+    let log_all = matches.is_present("log-all");
+
     let dispatch = fern::Dispatch::new()
         .format(move |out, message, record| {
             let colors = ColoredLevelConfig::new()
@@ -74,19 +85,19 @@ fn main_res() -> Result<()> {
                     "{} [{}] {:>5}",
                     chrono::Local::now().format("%F %T%.3f"),
                     record.level(),
-                    message
+                    message,
                 ))
             } else {
                 out.finish(format_args!(
                     "{} [{}] {:>5}",
                     chrono::Local::now().format("%F %T%.3f"),
                     colors.color(record.level()),
-                    message
+                    message,
                 ))
             };
         })
         .level(log::LevelFilter::Debug)
-        .filter(|metadata| metadata.target().starts_with("longboard"));
+        .filter(move |metadata| metadata.target().starts_with("longboard") || log_all);
 
     match conf.options.log_file {
         Some(ref log_path) => {
@@ -99,25 +110,13 @@ fn main_res() -> Result<()> {
         None => dispatch.chain(std::io::stdout()).apply()?,
     };
 
-    debug!("Using config file {}", conf_path.display());
-    debug!("{:#?}", conf);
+    info!("Using config file {}", conf_path.display());
 
-    let routes = routes![
-        longboard::routes::home,
-        longboard::routes::static_file,
-        longboard::routes::banner,
-        longboard::routes::style,
-        longboard::routes::upload,
-        longboard::routes::board,
-        longboard::routes::thread,
-        longboard::routes::post_preview,
-        longboard::routes::create::new_thread,
-        longboard::routes::create::new_post,
-        longboard::routes::report,
-        longboard::routes::new_report,
-        longboard::routes::delete,
-        longboard::routes::do_delete,
-    ];
+    if matches.is_present("debug-config") {
+        for line in format!("{:#?}", conf).lines() {
+            debug!("{}", line);
+        }
+    }
 
     let template_dir = conf.options.resource_dir.join("templates");
 
@@ -130,7 +129,7 @@ fn main_res() -> Result<()> {
         .unwrap();
 
     rocket::custom(rocket_conf)
-        .mount("/", routes)
+        .mount("/", longboard::routes::routes())
         .manage(Database::open(&conf.options.database_url)?)
         .manage(conf)
         .attach(Template::fairing())

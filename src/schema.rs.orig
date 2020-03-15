@@ -40,18 +40,10 @@ table! {
 }
 
 table! {
-    session (id) {
-        id -> Text,
-        expires -> Timestamptz,
-        staff_name -> Text,
-    }
-}
-
-table! {
     staff (name) {
         name -> Text,
         password_hash -> Text,
-        role -> crate::sql_types::Role,
+        role -> Role,
     }
 }
 
@@ -68,7 +60,13 @@ joinable!(file -> post (post));
 joinable!(post -> board (board));
 joinable!(post -> thread (thread));
 joinable!(report -> post (post));
-joinable!(session -> staff (staff_name));
 joinable!(thread -> board (board));
 
-allow_tables_to_appear_in_same_query!(board, file, post, report, session, staff, thread,);
+allow_tables_to_appear_in_same_query!(
+    board,
+    file,
+    post,
+    report,
+    staff,
+    thread,
+);

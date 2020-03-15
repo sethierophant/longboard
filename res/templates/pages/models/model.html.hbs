@@ -1,0 +1,12 @@
+{{#*inline "body"}}
+    <header class="page-header">
+        <nav class="boards">
+            {{#each page_info.boards}}
+                <ul><a href="/{{name}}" title="{{description}}">{{name}}</a></ul>
+            {{/each}}
+        </nav>
+        {{> header}}
+    </header>
+    {{> content}}
+{{/inline}}
+{{> pages/page}}

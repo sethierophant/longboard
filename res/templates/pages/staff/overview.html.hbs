@@ -1,0 +1,16 @@
+{{#*inline "content"}}
+    <header class="dashboard-header">
+        <h1>Dashboard</h1>
+        <section class="login-actions">
+            <span class="staff-name">Logged in as {{user.name}}.</span>
+            <span class="staff-logout"><a href="/staff/logout">Logout</a></span>
+        </section>
+    </header>
+    <section class="report-list">
+        <h2>Reports</h2>
+        {{#each reports}}
+            {{> staff/report}}
+        {{/each}}
+    </section>
+{{/inline}}
+{{> pages/staff/staff}}

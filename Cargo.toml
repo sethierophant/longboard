@@ -9,12 +9,12 @@ edition = "2018"
 default-run = "longboard"
 
 [[bin]]
-name = "lbinfo"
-path = "src/bin/lbinfo.rs"
-
-[[bin]]
 name = "longboard"
 path = "src/bin/longboard.rs"
+
+[[bin]]
+name = "longctl"
+path = "src/bin/longctl.rs"
 
 [dependencies]
 ammonia = "3.0"

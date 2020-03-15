@@ -1,0 +1,27 @@
+<section class="post" id="{{id}}">
+    <header class="post-info">
+        <span class="post-author">{{author_name}}</span>
+        {{#if author_contact}}
+            <span class="post-contact">{{author_contact}}</span>
+        {{/if}}
+        {{#if author_ident}}
+            <span class="post-ident" title="{{author_ident}}">
+                #{{author_ident}}
+            </span>
+        {{/if}}
+        <span class="post-timestamp">{{time_stamp}}</span>
+        <span class="post-id"><a href="{{uri}}">#{{id}}</a></span>
+    </header>
+    <article class="body">
+        {{#with file}}
+            {{> models/file}}
+        {{/with}}
+        {{{body}}}
+    </article>
+    {{#unless hide_actions}}
+        <footer class="actions">
+            <a class="post-action" href="{{report_uri}}">Report</a>
+            <a class="post-action" href="{{delete_uri}}">Delete</a>
+        </footer>
+    {{/unless}}
+</section>
