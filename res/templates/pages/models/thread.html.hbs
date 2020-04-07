@@ -1,16 +1,9 @@
-{{#*inline "header"}}
-    {{# with board_info.banner }}
-        {{> banner}}
-    {{/with}}
-    {{> board-header}}
+{{#*inline "new-form"}}
     {{> new-forms/new-post-form}}
-    {{#with board_info.notice}}
-        {{> notice_html}}
-    {{/with}}
 {{/inline}}
 {{#*inline "content"}}
     {{#with thread}}
         {{> models/thread}}
     {{/with}}
 {{/inline}}
-{{> pages/models/model}}
+{{> pages/models/model is_thread=true}}

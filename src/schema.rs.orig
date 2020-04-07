@@ -3,6 +3,7 @@ table! {
         id -> Int4,
         hash -> Text,
         ban_expires -> Nullable<Timestamptz>,
+        note -> Nullable<Text>,
     }
 }
 
@@ -71,6 +72,8 @@ table! {
         time_stamp -> Timestamptz,
         subject -> Text,
         board -> Text,
+        pinned -> Bool,
+        locked -> Bool,
     }
 }
 

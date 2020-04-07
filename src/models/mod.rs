@@ -14,7 +14,7 @@ use rocket::uri;
 use serde::Serialize;
 
 use crate::schema::{board, file, post, report, thread};
-use crate::Result;
+use crate::{Error, Result};
 
 pub mod staff;
 pub use staff::*;
@@ -53,6 +53,10 @@ pub struct Thread {
     pub subject: String,
     /// The board that this thread was created on.
     pub board_name: String,
+    /// Whether or not a thread is pinned to the top of a board.
+    pub pinned: bool,
+    /// Whether or not a thread is locked from new posts.
+    pub locked: bool,
 }
 
 impl Thread {
@@ -144,6 +148,8 @@ pub struct Report {
 pub struct NewThread {
     pub subject: String,
     pub board: String,
+    pub locked: bool,
+    pub pinned: bool,
 }
 
 /// A new post to be inserted in the database.
@@ -380,6 +386,66 @@ impl Database {
         Ok(posts)
     }
 
+    /// Lock a thread.
+    pub fn lock_thread(&self, thread_id: ThreadId) -> Result<()> {
+        use crate::schema::thread::columns::{id, locked};
+        use crate::schema::thread::dsl::thread;
+
+        update(thread.filter(id.eq(thread_id)))
+            .set(locked.eq(true))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Unlock a thread.
+    pub fn unlock_thread(&self, thread_id: ThreadId) -> Result<()> {
+        use crate::schema::thread::columns::{id, locked};
+        use crate::schema::thread::dsl::thread;
+
+        update(thread.filter(id.eq(thread_id)))
+            .set(locked.eq(false))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Pin a thread.
+    pub fn pin_thread(&self, thread_id: ThreadId) -> Result<()> {
+        use crate::schema::thread::columns::{id, pinned};
+        use crate::schema::thread::dsl::thread;
+
+        update(thread.filter(id.eq(thread_id)))
+            .set(pinned.eq(true))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Unpin a thread.
+    pub fn unpin_thread(&self, thread_id: ThreadId) -> Result<()> {
+        use crate::schema::thread::columns::{id, pinned};
+        use crate::schema::thread::dsl::thread;
+
+        update(thread.filter(id.eq(thread_id)))
+            .set(pinned.eq(false))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Check whether a thread is locked.
+    pub fn is_locked(&self, thread_id: ThreadId) -> Result<bool> {
+        use crate::schema::thread::columns::{id, locked};
+        use crate::schema::thread::dsl::thread;
+
+        Ok(thread
+            .filter(id.eq(thread_id))
+            .select(locked)
+            .limit(1)
+            .first(&self.pool.get()?)?)
+    }
+
     /// Get a post.
     pub fn post(&self, post_id: PostId) -> Result<Post> {
         use crate::schema::post::columns::id;
@@ -395,6 +461,10 @@ impl Database {
     pub fn insert_post(&self, new_post: NewPost) -> Result<PostId> {
         use crate::schema::post::columns::id;
         use crate::schema::post::dsl::post;
+
+        if self.is_locked(new_post.thread)? {
+            return Err(Error::ThreadLocked);
+        }
 
         Ok(insert_into(post)
             .values(&new_post)
@@ -564,6 +634,16 @@ impl Database {
         insert_into(report)
             .values(&new_report)
             .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete a report.
+    pub fn delete_report(&self, report_id: ReportId) -> Result<()> {
+        use crate::schema::report::columns::id;
+        use crate::schema::report::dsl::report;
+
+        delete(report.filter(id.eq(report_id))).execute(&self.pool.get()?)?;
 
         Ok(())
     }

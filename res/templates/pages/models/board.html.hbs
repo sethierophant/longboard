@@ -1,14 +1,5 @@
-{{#*inline "header"}}
-    {{#with page_header.banner }}
-        {{> banner}}
-    {{/with}}
-    {{#with page_header.board }}
-        {{> board-header}}
-    {{/with}}
+{{#*inline "new-form"}}
     {{> new-forms/new-thread-form}}
-    {{#with page_header.notice_html}}
-        {{> view/notice}}
-    {{/with}}
 {{/inline}}
 {{#*inline "content"}}
     {{> models/board}}

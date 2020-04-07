@@ -21,8 +21,7 @@
     {{/unless}}
     {{#if new_thread_form}}
         <input type="submit" value="New Thread">
-    {{/if}}
-    {{#unless new_thread_form}}
+    {{else}}
         <input type="submit" value="New Post">
-    {{/unless}}
+    {{/if}}
 </form>

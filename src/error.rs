@@ -53,6 +53,10 @@ pub enum Error {
     InvalidSessionCookie,
     #[display(fmt = "Session expired")]
     ExpiredSession,
+    #[display(fmt = "Report length was more than the max of 250 characters.")]
+    ReportTooLong,
+    #[display(fmt = "Cannot add a post to a locked thread.")]
+    ThreadLocked,
     #[display(fmt = "Couldn't create regex: {}", _0)]
     #[from]
     RegexError(regex::Error),
@@ -119,7 +123,9 @@ impl<'r> Responder<'r> for Error {
             | Error::ImageError(..)
             | Error::DeleteInvalidPassword
             | Error::StaffInvalidUsername { .. }
-            | Error::StaffInvalidPassword { .. } => {
+            | Error::StaffInvalidPassword { .. }
+            | Error::ReportTooLong
+            | Error::ThreadLocked => {
                 warn!("{}", &self);
 
                 let template = Template::render(

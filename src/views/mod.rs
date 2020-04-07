@@ -176,12 +176,57 @@ impl Serialize for PostView {
 
         let uri = self.0.uri();
 
-        let report_uri =
-            uri!(crate::routes::report: &self.0.board_name, self.0.thread_id, self.0.id)
-                .to_string();
-        let delete_uri =
-            uri!(crate::routes::delete: &self.0.board_name, self.0.thread_id, self.0.id)
-                .to_string();
+        let pin_uri = uri!(
+            crate::routes::staff::pin:
+            &self.0.board_name,
+            self.0.thread_id
+        )
+        .to_string();
+
+        let unpin_uri = uri!(
+            crate::routes::staff::unpin:
+            &self.0.board_name,
+            self.0.thread_id
+        )
+        .to_string();
+
+        let lock_uri = uri!(
+            crate::routes::staff::lock:
+            &self.0.board_name,
+            self.0.thread_id
+        )
+        .to_string();
+
+        let unlock_uri = uri!(
+            crate::routes::staff::unlock:
+            &self.0.board_name,
+            self.0.thread_id
+        )
+        .to_string();
+
+        let report_uri = uri!(
+            crate::routes::report:
+            &self.0.board_name,
+            self.0.thread_id,
+            self.0.id
+        )
+        .to_string();
+
+        let delete_uri = uri!(
+            crate::routes::delete:
+            &self.0.board_name,
+            self.0.thread_id,
+            self.0.id
+        )
+        .to_string();
+
+        let staff_delete_uri = uri!(
+            crate::routes::staff::staff_delete:
+            &self.0.board_name,
+            self.0.thread_id,
+            self.0.id
+        )
+        .to_string();
 
         let mut data = to_value(&self.0).expect("could not serialize post");
 
@@ -189,8 +234,16 @@ impl Serialize for PostView {
 
         obj.insert("time_stamp".into(), JsonValue::String(time_stamp));
         obj.insert("uri".into(), JsonValue::String(uri));
+        obj.insert("pin_uri".into(), JsonValue::String(pin_uri));
+        obj.insert("unpin_uri".into(), JsonValue::String(unpin_uri));
+        obj.insert("lock_uri".into(), JsonValue::String(lock_uri));
+        obj.insert("unlock_uri".into(), JsonValue::String(unlock_uri));
         obj.insert("report_uri".into(), JsonValue::String(report_uri));
         obj.insert("delete_uri".into(), JsonValue::String(delete_uri));
+        obj.insert(
+            "staff_delete_uri".into(),
+            JsonValue::String(staff_delete_uri),
+        );
 
         if let Some(ident) = hash {
             obj.insert("author_ident".into(), JsonValue::String(ident));
@@ -370,6 +423,7 @@ pub struct BoardPage {
     page_nav: PageNav,
     page_header: PageHeader,
     threads: Vec<DeepThread>,
+    is_staff: bool,
 }
 
 impl BoardPage {
@@ -377,6 +431,7 @@ impl BoardPage {
         board_name: S,
         db: &Database,
         config: &Config,
+        is_staff: bool,
     ) -> Result<BoardPage>
     where
         S: AsRef<str>,
@@ -394,6 +449,7 @@ impl BoardPage {
             page_nav: PageNav::new(db, config)?,
             page_header: PageHeader::new(board_name, db, config)?,
             threads,
+            is_staff,
         })
     }
 }
@@ -407,6 +463,7 @@ pub struct ThreadPage {
     page_nav: PageNav,
     page_header: PageHeader,
     thread: DeepThread,
+    is_staff: bool,
 }
 
 impl ThreadPage {
@@ -415,6 +472,7 @@ impl ThreadPage {
         thread_id: ThreadId,
         db: &Database,
         config: &Config,
+        is_staff: bool,
     ) -> Result<ThreadPage>
     where
         S: AsRef<str>,
@@ -426,7 +484,8 @@ impl ThreadPage {
             page_info: PageInfo::new(subject.clone()),
             page_nav: PageNav::new(db, config)?,
             page_header: PageHeader::new(board_name.as_ref(), db, config)?,
-            thread: thread,
+            thread,
+            is_staff,
         })
     }
 }
@@ -463,7 +522,7 @@ pub struct ReportPage {
 impl ReportPage {
     pub fn new(post_id: PostId, db: &Database) -> Result<ReportPage> {
         Ok(ReportPage {
-            page_info: PageInfo::new(format!("Report post")),
+            page_info: PageInfo::new("Report post"),
             post: db.post(post_id)?,
         })
     }

@@ -1,5 +1,13 @@
 <section class="thread">
-    <h1 class="subject"><a href="{{uri}}">{{subject}}</a></h1>
+    <h1 class="subject">
+        <a href="{{uri}}">{{subject}}</a>
+        {{#if pinned}}
+            <span class="thread-pin">&#128204;</span>
+        {{/if}}
+        {{#if locked}}
+            <span class="thread-lock">&#128274;</span>
+        {{/if}}
+    </h1>
     {{#each posts}}
         {{> models/post}}
     {{/each}}

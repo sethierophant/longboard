@@ -1,0 +1,1 @@
+ALTER TABLE anon_user ADD COLUMN note TEXT;

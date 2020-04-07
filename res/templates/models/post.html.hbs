@@ -22,8 +22,50 @@
     </article>
     {{#unless hide_actions}}
         <footer class="actions">
-            <a class="post-action" href="{{report_uri}}">Report</a>
-            <a class="post-action" href="{{delete_uri}}">Delete</a>
+            {{#if @root.is_staff}}
+                {{#if @first}}
+                    {{#unless ../pinned}}
+                        <form class="post-action" method="POST"
+                              action="{{pin_uri}}">
+                            <input type="hidden" name="id" value="{{id}}">
+                            <input type="submit" value="Pin">
+                        </form>
+                    {{else}}
+                        <form class="post-action" method="POST"
+                              action="{{unpin_uri}}">
+                            <input type="hidden" name="id" value="{{id}}">
+                            <input type="submit" value="Unpin">
+                        </form>
+                    {{/unless}}
+
+                    {{#unless ../locked}}
+                        <form class="post-action" method="POST"
+                              action="{{lock_uri}}">
+                            <input type="hidden" name="id" value="{{id}}">
+                            <input type="submit" value="Lock">
+                        </form>
+                    {{else}}
+                        <form class="post-action" method="POST"
+                              action="{{unlock_uri}}">
+                            <input type="hidden" name="id" value="{{id}}">
+                            <input type="submit" value="Unock">
+                        </form>
+                    {{/unless}}
+                {{/if}}
+
+                <form class="post-action" method="POST"
+                      action="{{staff_delete_uri}}">
+                    <input type="hidden" name="id" value="{{id}}">
+                    <input type="submit" value="Delete">
+                </form>
+            {{/if}}
+
+            {{#unless @root.is_staff}}
+                <a class="post-action action-report"
+                   href="{{report_uri}}">Report</a>
+                <a class="post-action action-delete"
+                   href="{{delete_uri}}">Delete</a>
+            {{/unless}}
         </footer>
     {{/unless}}
 </section>

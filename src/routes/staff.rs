@@ -91,7 +91,6 @@ pub struct LoginData {
 pub fn handle_login<'r>(
     login_data: Form<LoginData>,
     db: State<Database>,
-    _user: User,
 ) -> Result<Response<'r>> {
     let user = db.staff(&login_data.user)?;
 
@@ -105,7 +104,10 @@ pub fn handle_login<'r>(
 
     let expires = Utc::now() + Duration::weeks(1);
 
-    let session_cookie = Cookie::build("session", id.clone()).finish();
+    let session_cookie = Cookie::build("session", id.clone())
+        .path("/")
+        .http_only(true)
+        .finish();
 
     db.insert_session(&Session {
         id,
@@ -126,7 +128,6 @@ pub fn logout<'r>(
     session: Session,
     mut cookies: Cookies,
     db: State<Database>,
-    _user: User,
 ) -> Result<Response<'r>> {
     if let Some(cookie) = cookies.get("session").cloned() {
         cookies.remove(cookie)
@@ -145,7 +146,6 @@ pub fn logout<'r>(
 pub fn overview(
     session: Session,
     db: State<Database>,
-    _user: User,
 ) -> Result<OverviewPage> {
     OverviewPage::new(session.staff_name, &db)
 }
@@ -154,6 +154,27 @@ pub fn overview(
 #[get("/staff/history")]
 pub fn history(_session: Session, _user: User) -> Result<HistoryPage> {
     HistoryPage::new()
+}
+
+/// Form data for closing a report.
+#[derive(FromForm)]
+pub struct CloseReportData {
+    pub id: ReportId,
+}
+
+/// Close a report.
+#[post("/staff/close-report", data = "<close_data>")]
+pub fn close_report(
+    close_data: Form<CloseReportData>,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    let CloseReportData { id } = close_data.into_inner();
+
+    db.delete_report(id)?;
+
+    let msg = format!("Closed report {} successfully.", id);
+    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
 }
 
 /// Form data for creating a board.
@@ -168,7 +189,7 @@ pub struct CreateBoardData {
 pub fn create_board(
     create_data: Form<CreateBoardData>,
     db: State<Database>,
-    _user: User,
+    _session: Session,
 ) -> Result<ActionSuccessPage> {
     let CreateBoardData { name, description } = create_data.into_inner();
 
@@ -191,7 +212,7 @@ pub struct EditBoardData {
 pub fn edit_board(
     edit_data: Form<EditBoardData>,
     db: State<Database>,
-    _user: User,
+    _session: Session,
 ) -> Result<ActionSuccessPage> {
     let EditBoardData { name, description } = edit_data.into_inner();
 
@@ -213,7 +234,7 @@ pub struct DeleteBoardData {
 pub fn delete_board(
     delete_data: Form<DeleteBoardData>,
     db: State<Database>,
-    _user: User,
+    _session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeleteBoardData { name } = delete_data.into_inner();
 
@@ -251,7 +272,7 @@ pub struct BanUserData {
 pub fn ban_user(
     ban_data: Form<BanUserData>,
     db: State<Database>,
-    _user: User,
+    _session: Session,
 ) -> Result<ActionSuccessPage> {
     let BanUserData {
         id,
@@ -274,16 +295,37 @@ pub struct AddNoteData {
 
 /// Add a note to a user.
 #[post("/staff/add-note", data = "<note_data>")]
-pub fn add_note_data(
+pub fn add_note(
     note_data: Form<AddNoteData>,
     db: State<Database>,
-    _user: User,
+    _session: Session,
 ) -> Result<ActionSuccessPage> {
     let AddNoteData { id, note } = note_data.into_inner();
 
-    db.add_note_to_user(id, note)?;
+    db.set_user_note(id, note)?;
 
     let msg = "Added note successfully.".to_string();
+    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+}
+
+/// Form data for removing a note from a user.
+#[derive(FromForm)]
+pub struct RemoveNoteData {
+    id: UserId,
+}
+
+/// Remove a note from a user.
+#[post("/staff/remove-note", data = "<note_data>")]
+pub fn remove_note(
+    note_data: Form<RemoveNoteData>,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    let RemoveNoteData { id } = note_data.into_inner();
+
+    db.remove_user_note(id)?;
+
+    let msg = "Removed note successfully.".to_string();
     Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
 }
 
@@ -298,7 +340,7 @@ pub struct DeletePostsForUserData {
 pub fn delete_posts_for_user(
     delete_data: Form<DeletePostsForUserData>,
     db: State<Database>,
-    _user: User,
+    _session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeletePostsForUserData { id } = delete_data.into_inner();
 
@@ -306,4 +348,134 @@ pub fn delete_posts_for_user(
 
     let msg = "Deleted posts successfully.".to_string();
     Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+}
+
+/// Pin a thread.
+#[post("/<board_name>/<thread_id>/pin")]
+pub fn pin(
+    board_name: String,
+    thread_id: ThreadId,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
+        return Err(Error::ThreadNotFound {
+            board_name,
+            thread_id,
+        });
+    }
+
+    let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
+
+    db.pin_thread(thread_id)?;
+
+    let msg: String = "Pinned post successfully.".into();
+    Ok(ActionSuccessPage::new(msg, uri))
+}
+
+/// Unpin a thread.
+#[post("/<board_name>/<thread_id>/unpin")]
+pub fn unpin(
+    board_name: String,
+    thread_id: ThreadId,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
+        return Err(Error::ThreadNotFound {
+            board_name,
+            thread_id,
+        });
+    }
+
+    let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
+
+    db.unpin_thread(thread_id)?;
+
+    let msg: String = "Unpinned post successfully.".into();
+    Ok(ActionSuccessPage::new(msg, uri))
+}
+
+/// Lock a thread.
+#[post("/<board_name>/<thread_id>/lock")]
+pub fn lock(
+    board_name: String,
+    thread_id: ThreadId,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
+        return Err(Error::ThreadNotFound {
+            board_name,
+            thread_id,
+        });
+    }
+
+    let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
+
+    db.lock_thread(thread_id)?;
+
+    let msg: String = "Locked post successfully.".into();
+    Ok(ActionSuccessPage::new(msg, uri))
+}
+
+/// Unlock a thread.
+#[post("/<board_name>/<thread_id>/unlock")]
+pub fn unlock(
+    board_name: String,
+    thread_id: ThreadId,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
+        return Err(Error::ThreadNotFound {
+            board_name,
+            thread_id,
+        });
+    }
+
+    let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
+
+    db.unlock_thread(thread_id)?;
+
+    let msg: String = "Unlocked post successfully.".into();
+    Ok(ActionSuccessPage::new(msg, uri))
+}
+
+/// Delete a post without needing a password.
+#[post("/<board_name>/<thread_id>/staff-delete/<post_id>")]
+pub fn staff_delete(
+    board_name: String,
+    thread_id: ThreadId,
+    post_id: PostId,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    if db.board(&board_name).is_err()
+        || db.thread(thread_id).is_err()
+        || db.post(post_id).is_err()
+    {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    let post = db.post(post_id)?;
+    let thread = db.parent_thread(post_id)?;
+
+    let delete_thread = db.is_first_post(post_id)?;
+
+    let msg = if delete_thread {
+        db.delete_thread(thread.id)?;
+        format!("Deleted thread {} successfully.", post.thread_id)
+    } else {
+        db.delete_post(post_id)?;
+        format!("Deleted post {} successfully.", post_id)
+    };
+
+    let redirect_uri = if delete_thread {
+        uri!(crate::routes::board: thread.board_name)
+    } else {
+        uri!(crate::routes::thread: thread.board_name, thread.id)
+    };
+
+    Ok(ActionSuccessPage::new(msg, redirect_uri.to_string()))
 }

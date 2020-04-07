@@ -1,0 +1,2 @@
+ALTER TABLE thread DELETE COLUMN pinned;
+ALTER TABLE thread DELETE COLUMN locked;

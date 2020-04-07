@@ -8,37 +8,37 @@
     </header>
     <section class="overview-item reports">
         <h1>Reports</h1>
-        <table class="report-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Timestamp</th>
-                    <th>Reason</th>
-                    <th>Post</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{#each reports}}
-                    {{> staff/report-row}}
-                {{/each}}
-            </tbody>
-        </table>
+        <section class="report-table">
+            <span class="table-header">ID</span>
+            <span class="table-header">Timestamp</span>
+            <span class="table-header">Reason</span>
+            <span class="table-header">Post</span>
+            {{#each reports}}
+                <span class="report-id">{{id}}</span>
+                <span class="report-timestamp">{{time_stamp}}</span>
+                <span class="report-reason">{{reason}}</span>
+                <span class="report-post-id">
+                    <a href="{{post_uri}}">#{{post_id}}</a>
+                </span>
+            {{/each}}
+        </section>
+        <form action="/staff/close-report" method="POST">
+            <h2>Close Report</h2>
+            <label class="row-2" for="id">Report ID</label>
+            <input class="row-2" name="id" type="number">
+            <input class="row-2" value="Close" type="submit">
+        </form>
     </section>
     <section class="overview-item boards">
         <h1>Boards</h1>
-        <table class="board-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{#each boards}}
-                    {{> staff/board-row}}
-                {{/each}}
-            </tbody>
-        </table>
+        <section class="board-table">
+            <span class="table-header">Name</span>
+            <span class="table-header">Description</span>
+            {{#each boards}}
+                <span class="board-name">{{name}}</span>
+                <span class="board-description">{{description}}</span>
+            {{/each}}
+        </section>
         <form action="/staff/create-board" method="POST">
             <h2>Create Board</h2>
             <label class="row-2" for="name">Name</label>
@@ -64,21 +64,28 @@
     </section>
     <section class="overview-item users">
         <h1>Users</h1>
-        <table class="user-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Hash</th>
-                    <th>Is Banned?</th>
-                    <th>Ban Expires</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{#each users}}
-                    {{> staff/user-row}}
-                {{/each}}
-            </tbody>
-        </table>
+        <section class="user-table">
+            <span class="table-header">ID</span>
+            <span class="table-header">Hash</span>
+            <span class="table-header">Is Banned?</span>
+            <span class="table-header">Ban Expires</span>
+            {{#each users}}
+                <span>{{id}}</span>
+                <span title="{{hash}}">{{hash}}</span>
+                <span>
+                    {{#if ban_expires}}
+                        Yes
+                    {{/if}}
+                    {{#unless ban_expires}}
+                        No
+                    {{/unless}}
+                </span>
+                <span>{{ban_expires}}</span>
+                {{#if note}}
+                    <span class="user-note">Note: {{note}}</span>
+                {{/if}}
+            {{/each}}
+        </section>
         <form action="/staff/ban-user/" method="POST">
             <h2>Ban User</h2>
             <label class="row-2" for="id">User ID</label>
@@ -95,6 +102,12 @@
             <input class="row-3" type="text" name="note">
             <input class="row-3" type="submit" value="Add">
         </form>
+        <form action="/staff/remove-note/" method="POST">
+            <h2>Remove Note</h2>
+            <label class="row-2" for="id">User ID</label>
+            <input class="row-2" type="number" name="id">
+            <input class="row-2" type="submit" value="Remove">
+        </form>
         <form action="/staff/delete-posts-for-user/" method="POST">
             <h2>Delete All Posts</h2>
             <label class="row-2" for="id">User ID</label>
@@ -103,4 +116,4 @@
         </form>
     </section>
 {{/inline}}
-{{> pages/staff/staff}}
+{{> pages/staff/staff page_class="staff-overview-page"}}

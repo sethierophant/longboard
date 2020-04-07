@@ -38,12 +38,19 @@ pub fn routes() -> Vec<Route> {
         crate::routes::staff::logout,
         crate::routes::staff::overview,
         crate::routes::staff::history,
+        crate::routes::staff::close_report,
         crate::routes::staff::create_board,
         crate::routes::staff::edit_board,
         crate::routes::staff::delete_board,
         crate::routes::staff::ban_user,
-        crate::routes::staff::add_note_data,
+        crate::routes::staff::add_note,
+        crate::routes::staff::remove_note,
         crate::routes::staff::delete_posts_for_user,
+        crate::routes::staff::staff_delete,
+        crate::routes::staff::pin,
+        crate::routes::staff::unpin,
+        crate::routes::staff::lock,
+        crate::routes::staff::unlock,
     ]
 }
 
@@ -119,13 +126,14 @@ pub fn board(
     board_name: String,
     config: State<Config>,
     db: State<Database>,
+    session: Option<Session>,
     _user: User,
 ) -> Result<BoardPage> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
 
-    BoardPage::new(board_name, &db, &config)
+    BoardPage::new(board_name, &db, &config, session.is_some())
 }
 
 /// Serve a thread.
@@ -135,6 +143,7 @@ pub fn thread(
     thread_id: ThreadId,
     config: State<Config>,
     db: State<Database>,
+    session: Option<Session>,
     _user: User,
 ) -> Result<ThreadPage> {
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
@@ -144,7 +153,7 @@ pub fn thread(
         });
     }
 
-    ThreadPage::new(board_name, thread_id, &db, &config)
+    ThreadPage::new(board_name, thread_id, &db, &config, session.is_some())
 }
 
 /// Serve a post preview.
@@ -208,10 +217,16 @@ pub fn new_report(
         return Err(Error::PostNotFound { post_id });
     }
 
+    let ReportData { reason } = report_data.into_inner();
+
+    if reason.len() > 250 {
+        return Err(Error::ReportTooLong);
+    }
+
     let thread = db.parent_thread(post_id)?;
 
     db.insert_report(NewReport {
-        reason: report_data.reason.clone(),
+        reason,
         post: post_id,
         user_id: user.id,
     })?;

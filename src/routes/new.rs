@@ -386,6 +386,8 @@ pub fn new_thread(
         let new_thread_id = db.insert_thread(NewThread {
             subject,
             board: board_name.clone(),
+            locked: false,
+            pinned: false,
         })?;
         new_post.thread = new_thread_id;
         new_post.board = board_name.clone();

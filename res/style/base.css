@@ -104,6 +104,10 @@ nav.boards a {
     box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 }
 
+.new-item-form label {
+    align-self: center;
+}
+
 .new-item-form label.divider {
     grid-column: 1 / span 2;
     border-bottom: thin solid black;
@@ -305,6 +309,18 @@ nav.boards a {
     margin-right: 0;
 }
 
+form.post-action input[type=submit] {
+    font: normal 1em 'Roboto Condensed';
+    color: hsl(0, 0%, 50%);
+    background: none;
+    padding: 0;
+}
+
+form.post-action input[type=submit]:hover {
+    color: hsl(0, 0%, 70%);
+    cursor: pointer;
+}
+
 .action {
     display: flex;
     flex-direction: column;
@@ -380,12 +396,21 @@ nav.boards a {
 
 .staff-page {
     margin: 2em auto;
-    max-width: 700px;
+    max-width: 900px;
     display: flex;
     flex-flow: column nowrap;
 }
 
+.staff-page h1 {
+    width: max-content;
+}
+
+.staff-login-page {
+    align-items: center;
+}
+
 .staff-login-form {
+    width: max-content;
     display: grid;
     grid-template-columns: 5em 10em;
     grid-gap: 0.4em;
@@ -422,14 +447,33 @@ nav.boards a {
     padding-bottom: 1em;
 }
 
-.overview-item table {
-    border-spacing: 2em 0em;
-    margin-left: -1em;
+.report-table, .board-table, .user-table {
+    display: grid;
+    grid-gap: 0.4em 1em;
 }
 
-.overview-item th {
-    text-align: left;
+.report-table {
+    grid-template-columns: min-content max-content auto min-content;
+}
+
+.board-table {
+    grid-template-columns: max-content auto;
+}
+
+.user-table {
+    grid-template-columns: min-content auto max-content max-content;
+}
+
+.table-header {
+    font-weight: bold;
     color: hsl(0, 0%, 40%);
+}
+
+.user-note {
+    grid-column: 1 / 5;
+    font-style: italic;
+    margin-top: -0.2em;
+    margin-bottom: 0.2em;
 }
 
 .overview-item form {

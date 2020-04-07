@@ -103,6 +103,8 @@ pub struct User {
     pub hash: String,
     /// If the user is banned, when the user's ban expires.
     pub ban_expires: Option<DateTime<Utc>>,
+    /// A note about a user by a moderator.
+    pub note: Option<String>,
 }
 
 impl User {
@@ -133,6 +135,7 @@ impl User {
 pub struct NewUser {
     pub hash: String,
     pub ban_expires: Option<DateTime<Utc>>,
+    pub note: Option<String>,
 }
 
 impl NewUser {
@@ -141,6 +144,7 @@ impl NewUser {
         NewUser {
             hash: User::hash_ip(ip),
             ban_expires: None,
+            note: None,
         }
     }
 }
@@ -276,14 +280,6 @@ impl Database {
         Ok(anon_user.load(&self.pool.get()?)?)
     }
 
-    /// Add a note to a user.
-    pub fn add_note_to_user<S>(&self, _user_id: UserId, _note: S) -> Result<()>
-    where
-        S: AsRef<str>,
-    {
-        unimplemented!()
-    }
-
     /// Insert a user.
     pub fn insert_user(&self, new_user: &NewUser) -> Result<User> {
         use crate::schema::anon_user::dsl::anon_user;
@@ -311,8 +307,40 @@ impl Database {
         Ok(())
     }
 
+    /// Update the moderation notes for a user.
+    pub fn set_user_note<S>(&self, user_id: UserId, new_note: S) -> Result<()>
+    where
+        S: Into<String>,
+    {
+        use crate::schema::anon_user::columns::{id, note};
+        use crate::schema::anon_user::dsl::anon_user;
+
+        update(anon_user.filter(id.eq(user_id)))
+            .set(note.eq(Some(new_note.into())))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Remove the moderation notes for a user.
+    pub fn remove_user_note(&self, user_id: UserId) -> Result<()> {
+        use crate::schema::anon_user::columns::{id, note};
+        use crate::schema::anon_user::dsl::anon_user;
+
+        update(anon_user.filter(id.eq(user_id)))
+            .set(note.eq::<Option<String>>(None))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
     /// Delete all of the posts a user has made.
-    pub fn delete_posts_for_user(&self, _user_id: UserId) -> Result<()> {
-        unimplemented!()
+    pub fn delete_posts_for_user(&self, id: UserId) -> Result<()> {
+        use crate::schema::post::columns::user_id;
+        use crate::schema::post::dsl::post;
+
+        delete(post.filter(user_id.eq(id))).execute(&self.pool.get()?)?;
+
+        Ok(())
     }
 }
