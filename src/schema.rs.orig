@@ -1,4 +1,12 @@
 table! {
+    anon_user (id) {
+        id -> Int4,
+        hash -> Text,
+        ban_expires -> Nullable<Timestamptz>,
+    }
+}
+
+table! {
     board (name) {
         name -> Text,
         description -> Text,
@@ -27,6 +35,7 @@ table! {
         thread -> Int4,
         delete_hash -> Nullable<Text>,
         board -> Text,
+        user_id -> Int4,
     }
 }
 
@@ -36,6 +45,15 @@ table! {
         time_stamp -> Timestamptz,
         reason -> Text,
         post -> Int4,
+        user_id -> Int4,
+    }
+}
+
+table! {
+    session (id) {
+        id -> Text,
+        expires -> Timestamptz,
+        staff_name -> Text,
     }
 }
 
@@ -57,16 +75,21 @@ table! {
 }
 
 joinable!(file -> post (post));
+joinable!(post -> anon_user (user_id));
 joinable!(post -> board (board));
 joinable!(post -> thread (thread));
+joinable!(report -> anon_user (user_id));
 joinable!(report -> post (post));
+joinable!(session -> staff (staff_name));
 joinable!(thread -> board (board));
 
 allow_tables_to_appear_in_same_query!(
+    anon_user,
     board,
     file,
     post,
     report,
+    session,
     staff,
     thread,
 );

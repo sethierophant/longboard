@@ -97,7 +97,9 @@ fn main_res() -> Result<()> {
             };
         })
         .level(log::LevelFilter::Debug)
-        .filter(move |metadata| metadata.target().starts_with("longboard") || log_all);
+        .filter(move |metadata| {
+            metadata.target().starts_with("longboard") || log_all
+        });
 
     match conf.options.log_file {
         Some(ref log_path) => {

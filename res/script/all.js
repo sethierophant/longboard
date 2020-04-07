@@ -2,9 +2,19 @@ function onClickPostImage(ev) {
     if (ev.target.dataset.expanded) {
         delete ev.target.dataset.expanded
         ev.target.src = ev.target.dataset.thumbUri
+    } else if (ev.target.dataset.expanding) {
+        delete ev.target.dataset.expanding
+        ev.target.src = ev.target.dataset.thumbUri
     } else {
-        ev.target.dataset.expanded = "expanded"
+        ev.target.dataset.expanding = "expanding"
         ev.target.src = ev.target.dataset.uri
+    }
+}
+
+function onLoadPostImage(ev) {
+    if (ev.target.dataset.expanding) {
+        delete ev.target.dataset.expanding
+        ev.target.dataset.expanded = "expanded"
     }
 }
 
@@ -67,7 +77,7 @@ function addPostPreview(postPreview, targetRect) {
 }
 
 function onMouseLeavePostRef(ev) {
-    document.querySelectorAll('.post-preview').forEach((elem) => {
+    document.querySelectorAll('.post-fixed').forEach((elem) => {
         elem.remove()
     })
 }
@@ -75,6 +85,7 @@ function onMouseLeavePostRef(ev) {
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.post-image img').forEach((elem) => {
         elem.addEventListener('click', onClickPostImage)
+        elem.addEventListener('load', onLoadPostImage)
     })
 
     document.querySelectorAll('.post .post-id').forEach((elem) => {

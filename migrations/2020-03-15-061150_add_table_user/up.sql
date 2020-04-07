@@ -1,0 +1,10 @@
+CREATE TABLE anon_user (
+    id SERIAL PRIMARY KEY,
+    hash TEXT NOT NULL,
+    ban_expires TIMESTAMPTZ);
+
+ALTER TABLE post ADD COLUMN
+    user_id INTEGER NOT NULL REFERENCES anon_user;
+
+ALTER TABLE report ADD COLUMN
+    user_id INTEGER NOT NULL REFERENCES anon_user;

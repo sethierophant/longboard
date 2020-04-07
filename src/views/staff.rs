@@ -8,6 +8,8 @@ use crate::models::{Database, Report, Staff};
 use crate::Result;
 
 use crate::impl_template_responder;
+use crate::models::{staff::User, Board};
+use crate::views::PageInfo;
 
 #[derive(Debug)]
 pub struct ReportView {
@@ -24,14 +26,18 @@ impl ReportView {
 }
 
 impl Serialize for ReportView {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let time_stamp = self.report.time_stamp.format("%F %R").to_string();
         let uri = self.post_uri.clone();
 
-        let mut data = to_value(&self.report).expect("could not serialize report");
+        let mut data =
+            to_value(&self.report).expect("could not serialize report");
 
         let obj = data.as_object_mut().unwrap();
         obj.insert("time_stamp".into(), JsonValue::String(time_stamp));
@@ -41,10 +47,44 @@ impl Serialize for ReportView {
     }
 }
 
+#[derive(Debug)]
+pub struct UserView(User);
+
+impl Serialize for UserView {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let ban_expires = self
+            .0
+            .ban_expires
+            .as_ref()
+            .map(|time| time.format("%F %R").to_string());
+        let hash = self.0.hash.split('$').last().unwrap().to_string();
+
+        let mut data = to_value(&self.0).expect("could not serialize user");
+
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("hash".into(), JsonValue::String(hash));
+
+        if let Some(ban_expires) = ban_expires {
+            obj.insert("ban_expires".into(), JsonValue::String(ban_expires));
+        }
+
+        data.serialize(serializer)
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct OverviewPage {
-    user: Staff,
+    page_info: PageInfo,
+    staff: Staff,
     reports: Vec<ReportView>,
+    boards: Vec<Board>,
+    users: Vec<UserView>,
 }
 
 impl OverviewPage {
@@ -53,12 +93,15 @@ impl OverviewPage {
         S: AsRef<str>,
     {
         Ok(OverviewPage {
-            user: db.staff(user_name)?,
+            page_info: PageInfo::new("Overview"),
+            staff: db.staff(user_name)?,
             reports: db
                 .all_reports()?
                 .into_iter()
                 .map(|report| ReportView::new(report.id, db))
                 .collect::<Result<_>>()?,
+            boards: db.all_boards()?,
+            users: db.all_users()?.into_iter().map(UserView).collect(),
         })
     }
 }
@@ -66,23 +109,31 @@ impl OverviewPage {
 impl_template_responder!(OverviewPage, "pages/staff/overview");
 
 #[derive(Debug, Serialize)]
-pub struct LoginPage;
+pub struct LoginPage {
+    page_info: PageInfo,
+}
 
 impl LoginPage {
     pub fn new() -> Result<LoginPage> {
-        Ok(LoginPage)
+        Ok(LoginPage {
+            page_info: PageInfo::new("Login"),
+        })
     }
 }
 
 impl_template_responder!(LoginPage, "pages/staff/login");
 
 #[derive(Debug, Serialize)]
-pub struct LogPage;
+pub struct HistoryPage {
+    page_info: PageInfo,
+}
 
-impl LogPage {
-    pub fn new() -> Result<LogPage> {
-        Ok(LogPage)
+impl HistoryPage {
+    pub fn new() -> Result<HistoryPage> {
+        Ok(HistoryPage {
+            page_info: PageInfo::new("Moderation History"),
+        })
     }
 }
 
-impl_template_responder!(LogPage, "pages/staff/log");
+impl_template_responder!(HistoryPage, "pages/staff/log");

@@ -16,6 +16,8 @@ use crate::{config::Config, Result};
 
 pub mod staff;
 
+/// Implement `Responder` for a type which implements `Serialize`, given a path
+/// to a template file that should be loaded.
 #[macro_export]
 macro_rules! impl_template_responder {
     ($t:ty, $template:expr) => {
@@ -24,8 +26,11 @@ macro_rules! impl_template_responder {
                 self,
                 req: &::rocket::request::Request,
             ) -> ::rocket::response::Result<'r> {
-                let data = ::serde_json::value::to_value(self).expect("could not serialize value");
-                let template = ::rocket_contrib::templates::Template::render($template, data);
+                let data = ::serde_json::value::to_value(self)
+                    .expect("could not serialize value");
+                let template = ::rocket_contrib::templates::Template::render(
+                    $template, data,
+                );
 
                 log::trace!("Rendering template at {}", $template);
 
@@ -38,24 +43,41 @@ macro_rules! impl_template_responder {
 /// Display information for a page.
 #[derive(Debug, Serialize)]
 pub struct PageInfo {
-    /// A list of boards the user can go to.
-    pub boards: Vec<Board>,
+    /// The title of the page.
+    pub title: String,
     /// The verson of the longboard server.
     pub version: String,
 }
 
 impl PageInfo {
-    fn new(db: &Database, _config: &Config) -> Result<PageInfo> {
-        Ok(PageInfo {
-            boards: db.all_boards()?,
+    fn new<S>(title: S) -> PageInfo
+    where
+        S: Into<String>,
+    {
+        PageInfo {
+            title: title.into(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+        }
+    }
+}
+
+/// The board navigation at the top of the page.
+#[derive(Debug, Serialize)]
+pub struct PageNav {
+    pub boards: Vec<Board>,
+}
+
+impl PageNav {
+    fn new(db: &Database, _config: &Config) -> Result<PageNav> {
+        Ok(PageNav {
+            boards: db.all_boards()?,
         })
     }
 }
 
-/// Display information about a page on a specific board.
+/// The header of a board or thread page.
 #[derive(Debug, Serialize)]
-pub struct BoardPageInfo {
+pub struct PageHeader {
     /// The board we're on.
     pub board: Board,
     /// The banner to be displayed.
@@ -65,12 +87,16 @@ pub struct BoardPageInfo {
     pub notice_html: Option<String>,
 }
 
-impl BoardPageInfo {
-    fn new<S>(board_name: S, db: &Database, config: &Config) -> Result<BoardPageInfo>
+impl PageHeader {
+    fn new<S>(
+        board_name: S,
+        db: &Database,
+        config: &Config,
+    ) -> Result<PageHeader>
     where
         S: AsRef<str>,
     {
-        Ok(BoardPageInfo {
+        Ok(PageHeader {
             board: db.board(board_name)?,
             banner: BannerView(config.choose_banner().clone()),
             notice_html: config.notice_html.clone(),
@@ -83,7 +109,10 @@ impl BoardPageInfo {
 pub struct BannerView(Banner);
 
 impl Serialize for BannerView {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -101,7 +130,10 @@ impl Serialize for BannerView {
 pub struct FileView(File);
 
 impl Serialize for FileView {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -114,7 +146,9 @@ impl Serialize for FileView {
 
         obj.insert("uri".into(), JsonValue::String(uri));
 
-        thumb_uri.map(|thumb_uri| obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri)));
+        thumb_uri.map(|thumb_uri| {
+            obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri))
+        });
 
         data.serialize(serializer)
     }
@@ -125,7 +159,10 @@ impl Serialize for FileView {
 pub struct PostView(Post);
 
 impl Serialize for PostView {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -168,7 +205,10 @@ impl Serialize for PostView {
 pub struct ThreadView(Thread);
 
 impl Serialize for ThreadView {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -197,7 +237,10 @@ impl DeepPost {
 }
 
 impl Serialize for DeepPost {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -240,13 +283,17 @@ impl DeepThread {
 }
 
 impl Serialize for DeepThread {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let DeepThread(thread, posts) = self;
 
-        let mut thread_data = to_value(thread).expect("could not serialize thread");
+        let mut thread_data =
+            to_value(thread).expect("could not serialize thread");
 
         thread_data.as_object_mut().unwrap().insert(
             "posts".into(),
@@ -260,14 +307,14 @@ impl Serialize for DeepThread {
 /// A recent post to be displayed on the home page.
 #[derive(Debug, Serialize)]
 #[serde(transparent)]
-pub struct RecentPost(Post);
+pub struct RecentPost(PostView);
 
 impl RecentPost {
     fn load(db: &Database, limit: u32) -> Result<Vec<RecentPost>> {
         Ok(db
             .recent_posts(limit)?
             .into_iter()
-            .map(RecentPost)
+            .map(|post| RecentPost(PostView(post)))
             .collect())
     }
 }
@@ -298,6 +345,7 @@ impl RecentFile {
 #[derive(Debug, Serialize)]
 pub struct HomePage {
     page_info: PageInfo,
+    page_nav: PageNav,
     recent_posts: Vec<RecentPost>,
     recent_files: Vec<RecentFile>,
 }
@@ -305,7 +353,8 @@ pub struct HomePage {
 impl HomePage {
     pub fn new(db: &Database, config: &Config) -> Result<HomePage> {
         Ok(HomePage {
-            page_info: PageInfo::new(db, config)?,
+            page_info: PageInfo::new("LONGBOARD"),
+            page_nav: PageNav::new(db, config)?,
             recent_posts: RecentPost::load(db, 5)?,
             recent_files: RecentFile::load(db, 5)?,
         })
@@ -318,12 +367,17 @@ impl_template_responder!(HomePage, "pages/home");
 #[derive(Debug, Serialize)]
 pub struct BoardPage {
     page_info: PageInfo,
-    board_info: BoardPageInfo,
+    page_nav: PageNav,
+    page_header: PageHeader,
     threads: Vec<DeepThread>,
 }
 
 impl BoardPage {
-    pub fn new<S>(board_name: S, db: &Database, config: &Config) -> Result<BoardPage>
+    pub fn new<S>(
+        board_name: S,
+        db: &Database,
+        config: &Config,
+    ) -> Result<BoardPage>
     where
         S: AsRef<str>,
     {
@@ -336,8 +390,9 @@ impl BoardPage {
             .collect::<Result<_>>()?;
 
         Ok(BoardPage {
-            page_info: PageInfo::new(db, config)?,
-            board_info: BoardPageInfo::new(board_name, db, config)?,
+            page_info: PageInfo::new(board_name),
+            page_nav: PageNav::new(db, config)?,
+            page_header: PageHeader::new(board_name, db, config)?,
             threads,
         })
     }
@@ -349,7 +404,8 @@ impl_template_responder!(BoardPage, "pages/models/board");
 #[derive(Debug, Serialize)]
 pub struct ThreadPage {
     page_info: PageInfo,
-    board_info: BoardPageInfo,
+    page_nav: PageNav,
+    page_header: PageHeader,
     thread: DeepThread,
 }
 
@@ -363,10 +419,14 @@ impl ThreadPage {
     where
         S: AsRef<str>,
     {
+        let thread = DeepThread::new(thread_id, db)?;
+        let DeepThread(ThreadView(Thread { ref subject, .. }), ..) = thread;
+
         Ok(ThreadPage {
-            page_info: PageInfo::new(db, config)?,
-            board_info: BoardPageInfo::new(&board_name, db, config)?,
-            thread: DeepThread::new(thread_id, db)?,
+            page_info: PageInfo::new(subject.clone()),
+            page_nav: PageNav::new(db, config)?,
+            page_header: PageHeader::new(board_name.as_ref(), db, config)?,
+            thread: thread,
         })
     }
 }
@@ -396,7 +456,17 @@ impl_template_responder!(PostPreview, "models/post");
 /// A page for reporting a post.
 #[derive(Debug, Serialize)]
 pub struct ReportPage {
+    pub page_info: PageInfo,
     pub post: Post,
+}
+
+impl ReportPage {
+    pub fn new(post_id: PostId, db: &Database) -> Result<ReportPage> {
+        Ok(ReportPage {
+            page_info: PageInfo::new(format!("Report post")),
+            post: db.post(post_id)?,
+        })
+    }
 }
 
 impl_template_responder!(ReportPage, "pages/actions/report");
@@ -404,7 +474,17 @@ impl_template_responder!(ReportPage, "pages/actions/report");
 /// A page for deleting a post.
 #[derive(Debug, Serialize)]
 pub struct DeletePage {
+    pub page_info: PageInfo,
     pub post: Post,
+}
+
+impl DeletePage {
+    pub fn new(post_id: PostId, db: &Database) -> Result<DeletePage> {
+        Ok(DeletePage {
+            page_info: PageInfo::new("Delete post"),
+            post: db.post(post_id)?,
+        })
+    }
 }
 
 impl_template_responder!(DeletePage, "pages/actions/delete");
@@ -412,8 +492,23 @@ impl_template_responder!(DeletePage, "pages/actions/delete");
 /// A page to display a success message about a message.
 #[derive(Debug, Serialize)]
 pub struct ActionSuccessPage {
+    pub page_info: PageInfo,
     pub msg: String,
     pub redirect_uri: String,
+}
+
+impl ActionSuccessPage {
+    pub fn new<S1, S2>(msg: S1, redirect_uri: S2) -> ActionSuccessPage
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+    {
+        ActionSuccessPage {
+            page_info: PageInfo::new("Success"),
+            msg: msg.into(),
+            redirect_uri: redirect_uri.into(),
+        }
+    }
 }
 
 impl_template_responder!(ActionSuccessPage, "pages/actions/action-success");

@@ -50,17 +50,17 @@ body {
     margin: 1em 0;
 }
 
-.board-name, .board-description {
+.page-header .board-name, .page-header .board-description {
     font-family: 'Oswald';
     text-align: center;
 }
 
-.board-name {
+.page-header .board-name {
     margin-top: 0.4em;
     margin-bottom: 0.8em;
 }
 
-.board-description {
+.page-header .board-description {
     margin-top: 0;
 }
 
@@ -224,11 +224,11 @@ nav.boards a {
     margin: 0.4em;
 }
 
-.post .body p:first-of-type {
+.post .body-contents > :first-child {
     margin-top: 0;
 }
 
-.post .body > :last-child {
+.post .body-contents > :last-child {
     margin-bottom: 0;
 }
 
@@ -242,6 +242,15 @@ nav.boards a {
     position: relative;
 
     float: left;
+}
+
+.post-image img {
+    max-width: 100vw;
+    max-height: 100vh;
+}
+
+.post-image img[data-expanding] {
+    filter: grayscale(0.5) brightness(0.5);
 }
 
 .post-image a {
@@ -370,10 +379,10 @@ nav.boards a {
 }
 
 .staff-page {
-    margin: 2em;
+    margin: 2em auto;
+    max-width: 700px;
     display: flex;
     flex-flow: column nowrap;
-    align-items: center;
 }
 
 .staff-login-form {
@@ -386,47 +395,70 @@ nav.boards a {
     grid-column: 1 / 3;
 }
 
-.dashboard-header {
-    display: grid;
+.overview-header {
     align-self: stretch;
+    display: grid;
 }
 
-.dashboard-header h1 {
-    margin: 0;
-    grid-row: 2;
-    justify-self: center;
-}
-
-.dashboard-header .login-actions {
+.overview-header h1 {
     grid-row: 1;
+    grid-column: 1;
+    justify-self: center;
+    margin: 0.4em;
+}
+
+.overview-header .login-actions {
+    grid-row: 1;
+    grid-column: 1;
     justify-self: end;
 }
 
-.dashboard-header .login-actions > * {
+.overview-header .login-actions > * {
     margin: 0 0.4em;
 }
 
-.report {
-    display: flex;
-    flex-flow: row nowrap;
+.overview-item {
+    border-top: thin solid hsl(0, 0%, 8%);
+    padding-bottom: 1em;
 }
 
-.report .report-id, .report .report-timestamp {
-    color: hsl(0, 0%, 50%);
+.overview-item table {
+    border-spacing: 2em 0em;
+    margin-left: -1em;
 }
 
-.report > * {
-    margin: 0 0.6em;
+.overview-item th {
+    text-align: left;
+    color: hsl(0, 0%, 40%);
 }
 
-.report > :first-child {
-    margin-left: 0;
+.overview-item form {
+    display: grid;
+    padding: 0.8em;
+    margin-top: 0.8em;
+    grid-gap: 0.5em 1em;
+    grid-template-columns: 7em auto 10em;
+    background-color: hsl(0, 0%, 8%);
+    border-color: hsl(0, 0%, 14%);
+    border-radius: 4px;
 }
 
-.report > :last-child {
-    margin-right: 0;
+.overview-item form h2 {
+    font: 1em 'Oswald';
+    text-align: center;
+    grid-row: 1;
+    grid-column: 1 / 4;
+    margin: 0 0 0.4em;
 }
 
-.report .report-post-id {
-    margin-left: auto;
+.overview-item form input[type="number"] {
+    width: 100%;
+}
+
+.row-2 {
+    grid-row: 2;
+}
+
+.row-3 {
+    grid-row: 3;
 }

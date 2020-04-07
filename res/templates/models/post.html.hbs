@@ -16,7 +16,9 @@
         {{#with file}}
             {{> models/file}}
         {{/with}}
-        {{{body}}}
+        <section class="body-contents">
+            {{{body}}}
+        </section>
     </article>
     {{#unless hide_actions}}
         <footer class="actions">

@@ -1,10 +1,12 @@
 {{#*inline "header"}}
-    {{# with board_info.banner }}
+    {{#with page_header.banner }}
         {{> banner}}
     {{/with}}
-    {{> board-header}}
-    {{> forms/new-thread-form}}
-    {{#with board_info.notice_html}}
+    {{#with page_header.board }}
+        {{> board-header}}
+    {{/with}}
+    {{> new-forms/new-thread-form}}
+    {{#with page_header.notice_html}}
         {{> view/notice}}
     {{/with}}
 {{/inline}}

@@ -22,6 +22,8 @@ use multipart::server::{Entries, Multipart};
 
 use pulldown_cmark::{html::push_html, Options, Parser};
 
+use rand::{thread_rng, Rng};
+
 use regex::{Captures, Regex};
 
 use rocket::http::{hyper::header::Location, ContentType};
@@ -114,34 +116,22 @@ impl MultipartEntriesExt for Entries {
     }
 }
 
-/// Compute an Argon2 hash of a param.
-fn hash_param<S>(ident: S) -> Result<String>
-where
-    S: AsRef<str>,
-{
-    let conf = argon2::Config::default();
-    Ok(hash_encoded(
-        ident.as_ref().as_bytes(),
-        b"longboard",
-        &conf,
-    )?)
-}
-
 /// Copy a file from the user's request into the uploads dir. Returns the path
 /// the file was saved under.
 fn save_file<P>(field: &SavedField, upload_dir: P) -> Result<PathBuf>
 where
     P: AsRef<Path>,
 {
-    let mime_ext = field
-        .headers
-        .content_type
-        .as_ref()
-        .and_then(|content_type| {
-            get_mime_extensions(&content_type)
-                .and_then(|v| v.first())
-                .map(|ext| if *ext == "jpe" { "jpg" } else { ext })
-        });
+    let mime_ext =
+        field
+            .headers
+            .content_type
+            .as_ref()
+            .and_then(|content_type| {
+                get_mime_extensions(&content_type)
+                    .and_then(|v| v.first())
+                    .map(|ext| if *ext == "jpe" { "jpg" } else { ext })
+            });
 
     let file_ext = field
         .headers
@@ -205,7 +195,8 @@ where
 
     let msg = format!("Couldn't open uploaded file {}", source.display());
 
-    let source_file = File::open(source).map_err(|err| Error::from_io_error(err, msg))?;
+    let source_file =
+        File::open(source).map_err(|err| Error::from_io_error(err, msg))?;
     let source_reader = BufReader::new(source_file);
     let image = image::load(source_reader, format)?;
 
@@ -236,10 +227,14 @@ where
     let re = Regex::new(r">>(?P<id>\d+)").unwrap();
     let mut body = re
         .replace_all(body.as_ref(), |captures: &Captures| {
-            let id: PostId = captures.name("id").unwrap().as_str().parse().unwrap();
+            let id: PostId =
+                captures.name("id").unwrap().as_str().parse().unwrap();
 
             match db.post_uri(id) {
-                Ok(uri) => format!("<a class=\"post-ref\" href=\"{}\">&gt;&gt;{}</a>", uri, id),
+                Ok(uri) => format!(
+                    "<a class=\"post-ref\" href=\"{}\">&gt;&gt;{}</a>",
+                    uri, id
+                ),
                 Err(_) => format!("<a>&gt;&gt;{}</a>", id),
             }
         })
@@ -275,6 +270,7 @@ fn create_new_models(
     entries: Entries,
     config: &Config,
     db: &Database,
+    user: User,
 ) -> Result<(NewPost, Option<NewFile>)> {
     let missing_body_err = Error::MissingThreadParam {
         param: "body".into(),
@@ -293,8 +289,18 @@ fn create_new_models(
         .to_string();
 
     let author_contact = entries.param("contact").map(ToString::to_string);
-    let author_ident = entries.param("ident").map(hash_param).transpose()?;
-    let delete_hash = entries.param("delete-pass").map(hash_param).transpose()?;
+
+    let author_ident = entries.param("ident").map(|ident| {
+        let salt: [u8; 20] = thread_rng().gen();
+        hash_encoded(ident.as_bytes(), &salt, &argon2::Config::default())
+            .expect("could not hash ident with Argon2")
+    });
+
+    let delete_hash = entries.param("delete-pass").map(|pass| {
+        let salt = b"longboard-delete";
+        hash_encoded(pass.as_bytes(), salt, &argon2::Config::default())
+            .expect("could not hash delete password with Argon2")
+    });
 
     let new_post = NewPost {
         body,
@@ -304,6 +310,7 @@ fn create_new_models(
         delete_hash,
         thread: 0,
         board: String::new(),
+        user_id: user.id,
     };
 
     let field = entries.field("file").filter(|field| field.data.size() > 0);
@@ -324,7 +331,8 @@ fn create_new_models(
                 .map(|os_str| os_str.to_string_lossy().into_owned())
         });
 
-        let content_type = field.headers.content_type.as_ref().map(ToString::to_string);
+        let content_type =
+            field.headers.content_type.as_ref().map(ToString::to_string);
 
         let is_spoiler = entries.param("spoiler").is_some();
 
@@ -351,6 +359,7 @@ pub fn new_thread(
     data: Data,
     config: State<Config>,
     db: State<Database>,
+    user: User,
 ) -> Result<FragmentRedirect> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
@@ -371,7 +380,7 @@ pub fn new_thread(
         .ok_or(missing_subject_err)?
         .to_string();
 
-    let models = create_new_models(entries, &config, &db)?;
+    let models = create_new_models(entries, &config, &db, user)?;
 
     if let (mut new_post, Some(mut new_file)) = models {
         let new_thread_id = db.insert_thread(NewThread {
@@ -402,6 +411,7 @@ pub fn new_post(
     data: Data,
     config: State<Config>,
     db: State<Database>,
+    user: User,
 ) -> Result<FragmentRedirect> {
     if db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
@@ -412,7 +422,8 @@ pub fn new_post(
 
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
-    let (mut new_post, new_file) = create_new_models(entries, &config, &db)?;
+    let (mut new_post, new_file) =
+        create_new_models(entries, &config, &db, user)?;
 
     new_post.thread = thread_id;
     new_post.board = board_name.clone();

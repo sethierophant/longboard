@@ -35,7 +35,8 @@ impl Config {
         let path = path.as_ref();
 
         let map_err = |err| {
-            let msg = format!("Couldn't open config file at {}", path.display());
+            let msg =
+                format!("Couldn't open config file at {}", path.display());
             Error::from_io_error(err, msg)
         };
 
@@ -55,7 +56,8 @@ impl Config {
         };
 
         let default_names_path = options.resource_dir.join("names.txt");
-        let names_path = options.names_path.as_ref().unwrap_or(&default_names_path);
+        let names_path =
+            options.names_path.as_ref().unwrap_or(&default_names_path);
 
         log::debug!("names_path: {}", names_path.display());
 
@@ -66,7 +68,8 @@ impl Config {
         };
 
         let default_notice_path = options.resource_dir.join("notice.md");
-        let notice_path = options.notice_path.as_ref().unwrap_or(&default_notice_path);
+        let notice_path =
+            options.notice_path.as_ref().unwrap_or(&default_notice_path);
 
         let notice_html = match read_to_string(notice_path) {
             Ok(s) => {
@@ -172,7 +175,8 @@ impl Default for Options {
                 port: 8000,
                 resource_dir: PathBuf::from("res/"),
                 upload_dir: PathBuf::from("uploads"),
-                database_url: "postgres://longboard:@localhost/longboard".into(),
+                database_url: "postgres://longboard:@localhost/longboard"
+                    .into(),
                 log_file: None,
                 filter_rules: Vec::new(),
                 names_path: None,
@@ -184,8 +188,11 @@ impl Default for Options {
                 port: 8000,
                 resource_dir: PathBuf::from("/etc/longboard/"),
                 upload_dir: PathBuf::from("/var/lib/longboard/"),
-                database_url: "postgres://longboard:@localhost/longboard".into(),
-                log_file: Some(PathBuf::from("/var/log/longboard/longboard.log")),
+                database_url: "postgres://longboard:@localhost/longboard"
+                    .into(),
+                log_file: Some(PathBuf::from(
+                    "/var/log/longboard/longboard.log",
+                )),
                 filter_rules: Vec::new(),
                 names_path: None,
                 notice_path: None,

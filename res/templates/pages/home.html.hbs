@@ -1,4 +1,7 @@
-{{#*inline "content"}}
+{{#*inline "body"}}
+    {{#with page_nav}}
+        {{> page-nav}}
+    {{/with}}
     <section class="home">
         <section class="site-name"><h1>Longboard {{page_info.version}}</h1></section>
         <section class="recent">
@@ -17,4 +20,4 @@
         </section>
     </section>
 {{/inline}}
-{{> pages/models/model}}
+{{> pages/page}}

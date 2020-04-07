@@ -1,16 +1,106 @@
 {{#*inline "content"}}
-    <header class="dashboard-header">
+    <header class="overview-header">
         <h1>Dashboard</h1>
         <section class="login-actions">
-            <span class="staff-name">Logged in as {{user.name}}.</span>
+            <span class="staff-name">Logged in as {{staff.name}}.</span>
             <span class="staff-logout"><a href="/staff/logout">Logout</a></span>
         </section>
     </header>
-    <section class="report-list">
-        <h2>Reports</h2>
-        {{#each reports}}
-            {{> staff/report}}
-        {{/each}}
+    <section class="overview-item reports">
+        <h1>Reports</h1>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>Reason</th>
+                    <th>Post</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each reports}}
+                    {{> staff/report-row}}
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+    <section class="overview-item boards">
+        <h1>Boards</h1>
+        <table class="board-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each boards}}
+                    {{> staff/board-row}}
+                {{/each}}
+            </tbody>
+        </table>
+        <form action="/staff/create-board" method="POST">
+            <h2>Create Board</h2>
+            <label class="row-2" for="name">Name</label>
+            <input class="row-2" name="name" type="text">
+            <label class="row-3" for="description">Description</label>
+            <input class="row-3" name="description" type="text">
+            <input class="row-3" value="Create" type="submit">
+        </form>
+        <form action="/staff/edit-board" method="POST">
+            <h2>Edit Board</h2>
+            <label class="row-2" for="name">Name</label>
+            <input class="row-2" name="name" type="text">
+            <label class="row-3" for="description">New Description</label>
+            <input class="row-3" name="description" type="text">
+            <input class="row-3" value="Edit" type="submit">
+        </form>
+        <form action="/staff/delete-board" method="POST">
+            <h2>Delete Board</h2>
+            <label class="row-2" for="name">Name</label>
+            <input class="row-2" name="name" type="text">
+            <input class="row-2" value="Delete" type="submit">
+        </form>
+    </section>
+    <section class="overview-item users">
+        <h1>Users</h1>
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Hash</th>
+                    <th>Is Banned?</th>
+                    <th>Ban Expires</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each users}}
+                    {{> staff/user-row}}
+                {{/each}}
+            </tbody>
+        </table>
+        <form action="/staff/ban-user/" method="POST">
+            <h2>Ban User</h2>
+            <label class="row-2" for="id">User ID</label>
+            <input class="row-2" type="number" name="id">
+            <label class="row-3" for="duration">Duration</label>
+            <input class="row-3" type="datetime" name="duration">
+            <input class="row-3" type="submit" value="Ban">
+        </form>
+        <form action="/staff/add-note/" method="POST">
+            <h2>Add Note</h2>
+            <label class="row-2" for="id">User ID</label>
+            <input class="row-2" type="number" name="id">
+            <label class="row-3" for="note">Note</label>
+            <input class="row-3" type="text" name="note">
+            <input class="row-3" type="submit" value="Add">
+        </form>
+        <form action="/staff/delete-posts-for-user/" method="POST">
+            <h2>Delete All Posts</h2>
+            <label class="row-2" for="id">User ID</label>
+            <input class="row-2" type="number" name="id">
+            <input class="row-2" type="submit" value="Delete All">
+        </form>
     </section>
 {{/inline}}
 {{> pages/staff/staff}}

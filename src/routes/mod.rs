@@ -37,25 +37,43 @@ pub fn routes() -> Vec<Route> {
         crate::routes::staff::handle_login,
         crate::routes::staff::logout,
         crate::routes::staff::overview,
-        crate::routes::staff::log,
+        crate::routes::staff::history,
+        crate::routes::staff::create_board,
+        crate::routes::staff::edit_board,
+        crate::routes::staff::delete_board,
+        crate::routes::staff::ban_user,
+        crate::routes::staff::add_note_data,
+        crate::routes::staff::delete_posts_for_user,
     ]
 }
 
 /// Serve the home page.
 #[get("/", rank = 0)]
-pub fn home(config: State<Config>, db: State<Database>) -> Result<HomePage> {
+pub fn home(
+    config: State<Config>,
+    db: State<Database>,
+    _user: User,
+) -> Result<HomePage> {
     HomePage::new(&db, &config)
 }
 
 /// Serve a static file.
 #[get("/file/<file..>", rank = 1)]
-pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn static_file(
+    file: PathBuf,
+    config: State<Config>,
+    _user: User,
+) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.resource_dir.join(file))?)
 }
 
 /// Serve a stylesheet.
 #[get("/file/style/<file..>", rank = 0)]
-pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn style(
+    file: PathBuf,
+    config: State<Config>,
+    _user: User,
+) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("style").join(file),
     )?)
@@ -63,7 +81,11 @@ pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 
 /// Serve a script.
 #[get("/file/script/<file..>", rank = 0)]
-pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn script(
+    file: PathBuf,
+    config: State<Config>,
+    _user: User,
+) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("script").join(file),
     )?)
@@ -71,7 +93,11 @@ pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 
 /// Serve a banner.
 #[get("/file/banner/<file..>", rank = 0)]
-pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn banner(
+    file: PathBuf,
+    config: State<Config>,
+    _user: User,
+) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("banners").join(file),
     )?)
@@ -79,13 +105,22 @@ pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
-pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn upload(
+    file: PathBuf,
+    config: State<Config>,
+    _user: User,
+) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.upload_dir.join(file))?)
 }
 
 /// Serve a board.
 #[get("/<board_name>", rank = 2)]
-pub fn board(board_name: String, config: State<Config>, db: State<Database>) -> Result<BoardPage> {
+pub fn board(
+    board_name: String,
+    config: State<Config>,
+    db: State<Database>,
+    _user: User,
+) -> Result<BoardPage> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
@@ -100,8 +135,9 @@ pub fn thread(
     thread_id: ThreadId,
     config: State<Config>,
     db: State<Database>,
+    _user: User,
 ) -> Result<ThreadPage> {
-    if db.thread(thread_id).is_err() {
+    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
             thread_id,
@@ -112,14 +148,18 @@ pub fn thread(
 }
 
 /// Serve a post preview.
-#[get("/<_board_name>/<_thread_id>/preview/<post_id>", rank = 2)]
+#[get("/<board_name>/<thread_id>/preview/<post_id>", rank = 2)]
 pub fn post_preview(
-    _board_name: String,
-    _thread_id: ThreadId,
+    board_name: String,
+    thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
+    _user: User,
 ) -> Result<PostPreview> {
-    if db.post(post_id).is_err() {
+    if db.board(board_name).is_err()
+        || db.thread(thread_id).is_err()
+        || db.post(post_id).is_err()
+    {
         return Err(Error::PostNotFound { post_id });
     }
 
@@ -127,20 +167,22 @@ pub fn post_preview(
 }
 
 /// Report a post.
-#[get("/<_board_name>/<_thread_id>/report/<post_id>")]
+#[get("/<board_name>/<thread_id>/report/<post_id>")]
 pub fn report(
-    _board_name: String,
-    _thread_id: ThreadId,
+    board_name: String,
+    thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
+    _user: User,
 ) -> Result<ReportPage> {
-    if db.post(post_id).is_err() {
+    if db.board(board_name).is_err()
+        || db.thread(thread_id).is_err()
+        || db.post(post_id).is_err()
+    {
         return Err(Error::PostNotFound { post_id });
     }
 
-    Ok(ReportPage {
-        post: db.post(post_id)?,
-    })
+    ReportPage::new(post_id, &db)
 }
 
 /// Form data for reporting a post.
@@ -150,15 +192,19 @@ pub struct ReportData {
 }
 
 /// Create a new post report.
-#[post("/<_board_name>/<_thread_id>/report/<post_id>", data = "<report_data>")]
+#[post("/<board_name>/<thread_id>/report/<post_id>", data = "<report_data>")]
 pub fn new_report(
-    _board_name: String,
-    _thread_id: ThreadId,
+    board_name: String,
+    thread_id: ThreadId,
     post_id: PostId,
     report_data: Form<ReportData>,
     db: State<Database>,
+    user: User,
 ) -> Result<ActionSuccessPage> {
-    if db.post(post_id).is_err() {
+    if db.board(board_name).is_err()
+        || db.thread(thread_id).is_err()
+        || db.post(post_id).is_err()
+    {
         return Err(Error::PostNotFound { post_id });
     }
 
@@ -167,29 +213,31 @@ pub fn new_report(
     db.insert_report(NewReport {
         reason: report_data.reason.clone(),
         post: post_id,
+        user_id: user.id,
     })?;
 
-    Ok(ActionSuccessPage {
-        msg: format!("Reported post {} successfully.", post_id),
-        redirect_uri: uri!(thread: thread.board_name, thread.id).to_string(),
-    })
+    let msg = format!("Reported post {} successfully.", post_id);
+    let uri = uri!(thread: thread.board_name, thread.id).to_string();
+    Ok(ActionSuccessPage::new(msg, uri))
 }
 
 /// Serve a form for deleting a post.
-#[get("/<_board_name>/<_thread_id>/delete/<post_id>")]
+#[get("/<board_name>/<thread_id>/delete/<post_id>")]
 pub fn delete(
-    _board_name: String,
-    _thread_id: ThreadId,
+    board_name: String,
+    thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
+    _user: User,
 ) -> Result<DeletePage> {
-    if db.post(post_id).is_err() {
+    if db.board(board_name).is_err()
+        || db.thread(thread_id).is_err()
+        || db.post(post_id).is_err()
+    {
         return Err(Error::PostNotFound { post_id });
     }
 
-    Ok(DeletePage {
-        post: db.post(post_id)?,
-    })
+    DeletePage::new(post_id, &db)
 }
 
 /// Form data for deleting a post.
@@ -200,15 +248,19 @@ pub struct DeleteData {
 }
 
 /// Delete a post.
-#[post("/<_board_name>/<_thread_id>/delete/<post_id>", data = "<delete_data>")]
+#[post("/<board_name>/<thread_id>/delete/<post_id>", data = "<delete_data>")]
 pub fn handle_delete(
-    _board_name: String,
-    _thread_id: ThreadId,
+    board_name: String,
+    thread_id: ThreadId,
     post_id: PostId,
     delete_data: Form<DeleteData>,
     db: State<Database>,
+    _user: User,
 ) -> Result<ActionSuccessPage> {
-    if db.post(post_id).is_err() {
+    if db.board(board_name).is_err()
+        || db.thread(thread_id).is_err()
+        || db.post(post_id).is_err()
+    {
         return Err(Error::PostNotFound { post_id });
     }
 
@@ -240,10 +292,10 @@ pub fn handle_delete(
     };
 
     let redirect_uri = if delete_thread {
-        uri!(board: thread.board_name).to_string()
+        uri!(board: thread.board_name)
     } else {
-        uri!(thread: thread.board_name, thread.id).to_string()
+        uri!(thread: thread.board_name, thread.id)
     };
 
-    Ok(ActionSuccessPage { msg, redirect_uri })
+    Ok(ActionSuccessPage::new(msg, redirect_uri.to_string()))
 }

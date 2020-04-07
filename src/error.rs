@@ -16,9 +16,15 @@ use crate::models::{PostId, ThreadId};
 /// Our error type.
 #[derive(Debug, Display, From)]
 pub enum Error {
+    #[display(fmt = "Banned user {} attempted to access page", user_hash)]
+    UserIsBanned { user_hash: String },
     #[display(fmt = "Board '{}' not found", board_name)]
     BoardNotFound { board_name: String },
-    #[display(fmt = "Thread #{} on board '{}' not found", thread_id, board_name)]
+    #[display(
+        fmt = "Thread #{} on board '{}' not found",
+        thread_id,
+        board_name
+    )]
     ThreadNotFound {
         board_name: String,
         thread_id: ThreadId,
@@ -85,6 +91,12 @@ pub enum Error {
     IoError(std::io::Error),
     #[display(fmt = "I/O error: {}: {}", msg, cause)]
     IoErrorMsg { cause: std::io::Error, msg: String },
+    #[display(fmt = "Error parsing duration: {}", _0)]
+    #[from]
+    DurationParseError(parse_duration::parse::Error),
+    #[display(fmt = "Duration out of range: {}", _0)]
+    #[from]
+    DurationOutOfRangeError(time::OutOfRangeError),
 }
 
 impl Error {
@@ -111,7 +123,7 @@ impl<'r> Responder<'r> for Error {
                 warn!("{}", &self);
 
                 let template = Template::render(
-                    "layout/error/400",
+                    "pages/error/400",
                     hashmap! {
                         "message" => self.to_string()
                     },
@@ -129,7 +141,7 @@ impl<'r> Responder<'r> for Error {
                 warn!("{}", &self);
 
                 let template = Template::render(
-                    "layout/error/404",
+                    "pages/error/404",
                     hashmap! {
                         "message" => self.to_string()
                     },
@@ -144,7 +156,7 @@ impl<'r> Responder<'r> for Error {
             _ => {
                 error!("{}", self);
 
-                let template = Template::render("layout/error/500", ());
+                let template = Template::render("pages/error/500", ());
 
                 let mut res = template.respond_to(req)?;
                 res.set_status(Status::InternalServerError);

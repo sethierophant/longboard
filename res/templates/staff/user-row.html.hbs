@@ -1,0 +1,13 @@
+<tr>
+    <td>{{id}}</td>
+    <td title="{{hash}}">{{hash}}</td>
+    <td>
+        {{#if ban_expires}}
+            Yes
+        {{/if}}
+        {{#unless ban_expires}}
+            No
+        {{/unless}}
+    <td>
+    <td>{{ban_expires}}</td>
+</tr>

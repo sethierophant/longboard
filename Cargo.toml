@@ -30,6 +30,7 @@ maplit = "1.0"
 mime = "0.2"
 mime_guess = "1.8"
 multipart = { version = "0.16", default-features = false, features = ["server"] }
+parse_duration = "2.1"
 pulldown-cmark = "0.7.0"
 r2d2 = "0.8"
 rand = "0.7"
@@ -40,3 +41,4 @@ rust-argon2 = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
+time = "0.1.42"

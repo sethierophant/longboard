@@ -1,19 +1,24 @@
 //! Types for staff roles and moderation actions.
 
+use std::net::IpAddr;
 use std::str::FromStr;
 
-use chrono::{DateTime, Utc};
+use argon2::hash_encoded;
+
+use chrono::{DateTime, Duration, Utc};
 
 use derive_more::Display;
 
 use diesel::prelude::*;
-use diesel::{delete, insert_into, Insertable, Queryable};
+use diesel::{delete, insert_into, update, Insertable, Queryable};
 
 use serde::Serialize;
 
 use super::{PostId, ThreadId};
-use crate::schema::{session, staff};
-use crate::{Error, Result};
+use crate::schema::{anon_user, session, staff};
+use crate::{Database, Error, Result};
+
+pub type UserId = i32;
 
 /// A session for a staff member.
 #[derive(Debug, Queryable, Insertable)]
@@ -34,7 +39,9 @@ pub struct Staff {
 }
 
 /// The authority level of a staff member.
-#[derive(Clone, Debug, PartialEq, AsExpression, FromSqlRow, Serialize, Display)]
+#[derive(
+    Clone, Debug, PartialEq, AsExpression, FromSqlRow, Serialize, Display,
+)]
 #[sql_type = "sql_types::Role"]
 pub enum Role {
     #[display(fmt = "janitor")]
@@ -87,6 +94,57 @@ pub mod sql_types {
     }
 }
 
+/// An anonymous site user.
+#[derive(Debug, Queryable, Serialize)]
+pub struct User {
+    /// The user's ID in the database.
+    pub id: UserId,
+    /// The hash of the user's IP.
+    pub hash: String,
+    /// If the user is banned, when the user's ban expires.
+    pub ban_expires: Option<DateTime<Utc>>,
+}
+
+impl User {
+    /// Hash a user's IP address.
+    pub fn hash_ip(ip: IpAddr) -> String {
+        let salt = b"longboard-user";
+        let conf = argon2::Config::default();
+
+        match ip {
+            IpAddr::V4(v4_addr) => hash_encoded(&v4_addr.octets(), salt, &conf)
+                .expect("could not hash IP address with Argon2"),
+            IpAddr::V6(v6_addr) => hash_encoded(&v6_addr.octets(), salt, &conf)
+                .expect("could not hash IP address with Argon2"),
+        }
+    }
+
+    /// Whether or not the user is banned.
+    pub fn is_banned(&self) -> bool {
+        self.ban_expires
+            .map(|time| time > Utc::now())
+            .unwrap_or(false)
+    }
+}
+
+/// A new anonymous site user to insert into the database.
+#[derive(Debug, Insertable)]
+#[table_name = "anon_user"]
+pub struct NewUser {
+    pub hash: String,
+    pub ban_expires: Option<DateTime<Utc>>,
+}
+
+impl NewUser {
+    /// Create a `NewUser` from an user's IP address.
+    pub fn from_ip(ip: IpAddr) -> NewUser {
+        NewUser {
+            hash: User::hash_ip(ip),
+            ban_expires: None,
+        }
+    }
+}
+
 pub enum UserAction {
     Ban { user: u8 },
 }
@@ -114,7 +172,7 @@ pub enum BoardAction {
     Create { board: String },
 }
 
-impl super::Database {
+impl Database {
     /// Get a staff member.
     pub fn staff<S>(&self, name: S) -> Result<Staff>
     where
@@ -130,11 +188,11 @@ impl super::Database {
     }
 
     /// Insert a new staff member.
-    pub fn insert_staff(&self, new_staff: Staff) -> Result<()> {
+    pub fn insert_staff(&self, new_staff: &Staff) -> Result<()> {
         use crate::schema::staff::dsl::staff;
 
         insert_into(staff)
-            .values(&new_staff)
+            .values(new_staff)
             .execute(&self.pool.get()?)?;
 
         Ok(())
@@ -148,7 +206,8 @@ impl super::Database {
         use crate::schema::staff::columns::name as column_name;
         use crate::schema::staff::dsl::staff;
 
-        delete(staff.filter(column_name.eq(name.as_ref()))).execute(&self.pool.get()?)?;
+        delete(staff.filter(column_name.eq(name.as_ref())))
+            .execute(&self.pool.get()?)?;
 
         Ok(())
     }
@@ -175,11 +234,11 @@ impl super::Database {
     }
 
     /// Insert a session.
-    pub fn insert_session(&self, new_session: Session) -> Result<()> {
+    pub fn insert_session(&self, new_session: &Session) -> Result<()> {
         use crate::schema::session::dsl::session;
 
         insert_into(session)
-            .values(&new_session)
+            .values(new_session)
             .execute(&self.pool.get()?)?;
 
         Ok(())
@@ -193,8 +252,67 @@ impl super::Database {
         use crate::schema::session::columns::id;
         use crate::schema::session::dsl::session;
 
-        delete(session.filter(id.eq(session_id.as_ref()))).execute(&self.pool.get()?)?;
+        delete(session.filter(id.eq(session_id.as_ref())))
+            .execute(&self.pool.get()?)?;
 
         Ok(())
+    }
+
+    /// Get a user by their IP.
+    pub fn user(&self, ip: IpAddr) -> Result<User> {
+        use crate::schema::anon_user::columns::hash;
+        use crate::schema::anon_user::dsl::anon_user;
+
+        Ok(anon_user
+            .filter(hash.eq(User::hash_ip(ip)))
+            .limit(1)
+            .first(&self.pool.get()?)?)
+    }
+
+    /// Get all users.
+    pub fn all_users(&self) -> Result<Vec<User>> {
+        use crate::schema::anon_user::dsl::anon_user;
+
+        Ok(anon_user.load(&self.pool.get()?)?)
+    }
+
+    /// Add a note to a user.
+    pub fn add_note_to_user<S>(&self, _user_id: UserId, _note: S) -> Result<()>
+    where
+        S: AsRef<str>,
+    {
+        unimplemented!()
+    }
+
+    /// Insert a user.
+    pub fn insert_user(&self, new_user: &NewUser) -> Result<User> {
+        use crate::schema::anon_user::dsl::anon_user;
+
+        let user = insert_into(anon_user)
+            .values(new_user)
+            .get_result(&self.pool.get()?)?;
+
+        Ok(user)
+    }
+
+    /// Ban a user.
+    pub fn ban_user(
+        &self,
+        user_id: UserId,
+        ban_duration: Duration,
+    ) -> Result<()> {
+        use crate::schema::anon_user::columns::{ban_expires, id};
+        use crate::schema::anon_user::dsl::anon_user;
+
+        update(anon_user.filter(id.eq(user_id)))
+            .set(ban_expires.eq(Some(Utc::now() + ban_duration)))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete all of the posts a user has made.
+    pub fn delete_posts_for_user(&self, _user_id: UserId) -> Result<()> {
+        unimplemented!()
     }
 }

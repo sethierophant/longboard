@@ -30,7 +30,11 @@ fn main_res() -> Result<()> {
                         .help("The authority level of the staff member")
                         .required(true)
                         .takes_value(true)
-                        .possible_values(&["janitor", "moderator", "administrator"]),
+                        .possible_values(&[
+                            "janitor",
+                            "moderator",
+                            "administrator",
+                        ]),
                 )
                 .arg(
                     Arg::with_name("name")
@@ -74,12 +78,12 @@ fn main_res() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("add-staff") {
         let pass = matches.value_of("pass").unwrap().as_bytes();
-        let salt: [u8; 8] = thread_rng().gen();
+        let salt: [u8; 20] = thread_rng().gen();
 
         let conf = argon2::Config::default();
         let password_hash = argon2::hash_encoded(pass, &salt, &conf)?;
 
-        db.insert_staff(Staff {
+        db.insert_staff(&Staff {
             name: matches.value_of("name").unwrap().to_string(),
             role: matches.value_of("role").unwrap().parse().unwrap(),
             password_hash,

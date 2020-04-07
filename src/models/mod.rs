@@ -7,17 +7,17 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::{delete, insert_into, prelude::*, sql_query};
+use diesel::{delete, insert_into, prelude::*, sql_query, update};
 
 use rocket::uri;
 
 use serde::Serialize;
 
-use crate::schema::{file, post, report, thread};
+use crate::schema::{board, file, post, report, thread};
 use crate::Result;
 
 pub mod staff;
-pub use staff::{Role, Session, Staff};
+pub use staff::*;
 
 /// A thread ID.
 pub type ThreadId = i32;
@@ -27,7 +27,8 @@ pub type PostId = i32;
 pub type ReportId = i32;
 
 /// A collection of post threads about a similar topic.
-#[derive(Debug, Queryable, Serialize)]
+#[derive(Debug, Queryable, Serialize, Insertable)]
+#[table_name = "board"]
 pub struct Board {
     /// The unique name of the board.
     pub name: String,
@@ -81,11 +82,14 @@ pub struct Post {
     pub delete_hash: Option<String>,
     /// The board that this post was posted on.
     pub board_name: String,
+    /// The user that made the post.
+    pub user_id: UserId,
 }
 
 impl Post {
     pub fn uri(&self) -> String {
-        let uri = uri!(crate::routes::thread: &self.board_name, &self.thread_id);
+        let uri =
+            uri!(crate::routes::thread: &self.board_name, &self.thread_id);
         format!("{}#{}", uri, self.id)
     }
 }
@@ -113,9 +117,9 @@ impl File {
     }
 
     pub fn thumb_uri(&self) -> Option<String> {
-        self.thumb_name
-            .as_ref()
-            .map(|thumb_name| uri!(crate::routes::upload: PathBuf::from(thumb_name)).to_string())
+        self.thumb_name.as_ref().map(|thumb_name| {
+            uri!(crate::routes::upload: PathBuf::from(thumb_name)).to_string()
+        })
     }
 }
 
@@ -130,6 +134,8 @@ pub struct Report {
     pub reason: String,
     /// The post.
     pub post_id: PostId,
+    /// The user that made the report.
+    pub user_id: UserId,
 }
 
 /// A new thread to be inserted in the database.
@@ -151,6 +157,7 @@ pub struct NewPost {
     pub delete_hash: Option<String>,
     pub thread: ThreadId,
     pub board: String,
+    pub user_id: UserId,
 }
 
 /// A new file to be inserted in the database.
@@ -171,6 +178,7 @@ pub struct NewFile {
 pub struct NewReport {
     pub reason: String,
     pub post: PostId,
+    pub user_id: UserId,
 }
 
 /// A connection to the database. Used for creating and retrieving data.
@@ -223,6 +231,50 @@ impl Database {
             .first(&self.pool.get()?)?)
     }
 
+    /// Insert a new board into the database.
+    pub fn insert_board(&self, new_board: Board) -> Result<()> {
+        use crate::schema::board::dsl::board;
+
+        insert_into(board)
+            .values(&new_board)
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Update a board.
+    pub fn update_board<S>(
+        &self,
+        board_name: S,
+        new_description: S,
+    ) -> Result<()>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::board::columns::{description, name};
+        use crate::schema::board::dsl::board;
+
+        update(board.filter(name.eq(board_name.as_ref())))
+            .set(description.eq(new_description.as_ref()))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete a board.
+    pub fn delete_board<S>(&self, board_name: S) -> Result<()>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::board::columns::name;
+        use crate::schema::board::dsl::board;
+
+        delete(board.filter(name.eq(board_name.as_ref())))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
     /// Get threads on a board.
     pub fn threads_on_board<S>(&self, board_name: S) -> Result<Vec<Thread>>
     where
@@ -247,6 +299,47 @@ impl Database {
             .first(&self.pool.get()?)?)
     }
 
+    /// Insert a new thread into the database.
+    pub fn insert_thread(&self, new_thread: NewThread) -> Result<ThreadId> {
+        use crate::schema::thread::columns::id;
+        use crate::schema::thread::dsl::thread;
+
+        Ok(insert_into(thread)
+            .values(&new_thread)
+            .returning(id)
+            .get_result(&self.pool.get()?)?)
+    }
+
+    /// Delete a thread.
+    pub fn delete_thread(&self, thread_id: ThreadId) -> Result<()> {
+        let query = format!(
+            "DELETE FROM report R USING post P \
+                             WHERE R.post = P.id AND P.thread = {}",
+            thread_id
+        );
+        sql_query(query).execute(&self.pool.get()?)?;
+
+        let query = format!(
+            "DELETE FROM file F USING post P \
+                             WHERE F.post = P.id AND P.thread = {}",
+            thread_id
+        );
+        sql_query(query).execute(&self.pool.get()?)?;
+
+        {
+            use crate::schema::post::columns::thread;
+            use crate::schema::post::dsl::post;
+            delete(post.filter(thread.eq(thread_id)))
+                .execute(&self.pool.get()?)?;
+        }
+
+        use crate::schema::thread::columns::id;
+        use crate::schema::thread::dsl::thread;
+        delete(thread.filter(id.eq(thread_id))).execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
     /// Get all of the posts in a thread.
     pub fn posts_in_thread(&self, thread_id: ThreadId) -> Result<Vec<Post>> {
         use crate::schema::post::columns::{id, thread};
@@ -259,7 +352,11 @@ impl Database {
     }
 
     /// Get the first post and up to `limit` recent posts from a thread.
-    pub fn preview_thread(&self, thread_id: ThreadId, limit: u32) -> Result<Vec<Post>> {
+    pub fn preview_thread(
+        &self,
+        thread_id: ThreadId,
+        limit: u32,
+    ) -> Result<Vec<Post>> {
         use crate::schema::post::columns::{id, thread};
         use crate::schema::post::dsl::post;
 
@@ -292,6 +389,39 @@ impl Database {
             .filter(id.eq(post_id))
             .limit(1)
             .first(&self.pool.get()?)?)
+    }
+
+    /// Insert a new post into the database.
+    pub fn insert_post(&self, new_post: NewPost) -> Result<PostId> {
+        use crate::schema::post::columns::id;
+        use crate::schema::post::dsl::post;
+
+        Ok(insert_into(post)
+            .values(&new_post)
+            .returning(id)
+            .get_result(&self.pool.get()?)?)
+    }
+
+    /// Delete a post.
+    pub fn delete_post(&self, post_id: PostId) -> Result<()> {
+        {
+            use crate::schema::report::columns::post;
+            use crate::schema::report::dsl::report;
+            delete(report.filter(post.eq(post_id)))
+                .execute(&self.pool.get()?)?;
+        }
+
+        {
+            use crate::schema::file::columns::post;
+            use crate::schema::file::dsl::file;
+            delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
+        }
+
+        use crate::schema::post::columns::id;
+        use crate::schema::post::dsl::post;
+        delete(post.filter(id.eq(post_id))).execute(&self.pool.get()?)?;
+
+        Ok(())
     }
 
     /// Get the URI for a post.
@@ -375,6 +505,26 @@ impl Database {
         Ok(file.filter(post.eq(post_id)).load(&self.pool.get()?)?)
     }
 
+    /// Insert a new file into the database.
+    pub fn insert_file(&self, new_file: NewFile) -> Result<()> {
+        use crate::schema::file::dsl::file;
+
+        insert_into(file)
+            .values(&new_file)
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Delete all the files that belong to a post.
+    pub fn delete_files_of_post(&self, post_id: PostId) -> Result<()> {
+        use crate::schema::file::columns::post;
+        use crate::schema::file::dsl::file;
+        delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
     /// Get the number of threads in the database.
     pub fn num_threads(&self) -> Result<i64> {
         use crate::schema::thread::dsl::thread;
@@ -387,39 +537,6 @@ impl Database {
         use crate::schema::post::dsl::post;
 
         Ok(post.count().first(&self.pool.get()?)?)
-    }
-
-    /// Insert a new thread into the database.
-    pub fn insert_thread(&self, new_thread: NewThread) -> Result<ThreadId> {
-        use crate::schema::thread::columns::id;
-        use crate::schema::thread::dsl::thread;
-
-        Ok(insert_into(thread)
-            .values(&new_thread)
-            .returning(id)
-            .get_result(&self.pool.get()?)?)
-    }
-
-    /// Insert a new post into the database.
-    pub fn insert_post(&self, new_post: NewPost) -> Result<PostId> {
-        use crate::schema::post::columns::id;
-        use crate::schema::post::dsl::post;
-
-        Ok(insert_into(post)
-            .values(&new_post)
-            .returning(id)
-            .get_result(&self.pool.get()?)?)
-    }
-
-    /// Insert a new file into the database.
-    pub fn insert_file(&self, new_file: NewFile) -> Result<()> {
-        use crate::schema::file::dsl::file;
-
-        insert_into(file)
-            .values(&new_file)
-            .execute(&self.pool.get()?)?;
-
-        Ok(())
     }
 
     /// Get a report.
@@ -447,65 +564,6 @@ impl Database {
         insert_into(report)
             .values(&new_report)
             .execute(&self.pool.get()?)?;
-
-        Ok(())
-    }
-
-    /// Delete a thread.
-    pub fn delete_thread(&self, thread_id: ThreadId) -> Result<()> {
-        let query = format!(
-            "DELETE FROM report R USING post P \
-                             WHERE R.post = P.id AND P.thread = {}",
-            thread_id
-        );
-        sql_query(query).execute(&self.pool.get()?)?;
-
-        let query = format!(
-            "DELETE FROM file F USING post P \
-                             WHERE F.post = P.id AND P.thread = {}",
-            thread_id
-        );
-        sql_query(query).execute(&self.pool.get()?)?;
-
-        {
-            use crate::schema::post::columns::thread;
-            use crate::schema::post::dsl::post;
-            delete(post.filter(thread.eq(thread_id))).execute(&self.pool.get()?)?;
-        }
-
-        use crate::schema::thread::columns::id;
-        use crate::schema::thread::dsl::thread;
-        delete(thread.filter(id.eq(thread_id))).execute(&self.pool.get()?)?;
-
-        Ok(())
-    }
-
-    /// Delete a post.
-    pub fn delete_post(&self, post_id: PostId) -> Result<()> {
-        {
-            use crate::schema::report::columns::post;
-            use crate::schema::report::dsl::report;
-            delete(report.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
-        }
-
-        {
-            use crate::schema::file::columns::post;
-            use crate::schema::file::dsl::file;
-            delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
-        }
-
-        use crate::schema::post::columns::id;
-        use crate::schema::post::dsl::post;
-        delete(post.filter(id.eq(post_id))).execute(&self.pool.get()?)?;
-
-        Ok(())
-    }
-
-    /// Delete all the files that belong to a post.
-    pub fn delete_files_of_post(&self, post_id: PostId) -> Result<()> {
-        use crate::schema::file::columns::post;
-        use crate::schema::file::dsl::file;
-        delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
 
         Ok(())
     }

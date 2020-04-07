@@ -70,7 +70,9 @@ impl Fairing for LogFairing {
             write!(msg, " User-Agent \"{}\"", user_agent).unwrap();
         }
 
-        if let StatusClass::ClientError | StatusClass::ServerError = response.status().class() {
+        if let StatusClass::ClientError | StatusClass::ServerError =
+            response.status().class()
+        {
             warn!("{}", msg);
         } else {
             info!("{}", msg);
