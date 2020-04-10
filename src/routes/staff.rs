@@ -143,10 +143,7 @@ pub fn logout<'r>(
 
 /// Serve the overview for staff actions.
 #[get("/staff")]
-pub fn overview(
-    session: Session,
-    db: State<Database>,
-) -> Result<OverviewPage> {
+pub fn overview(session: Session, db: State<Database>) -> Result<OverviewPage> {
     OverviewPage::new(session.staff_name, &db)
 }
 

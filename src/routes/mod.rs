@@ -1,13 +1,21 @@
 //! Rocket HTTP routes.
 
+use std::collections::HashMap;
+use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::string::ToString;
 
 use argon2::verify_encoded;
 
+use pulldown_cmark::{html, Parser};
+
 use rocket::request::{Form, FromForm};
 use rocket::response::NamedFile;
 use rocket::{get, post, routes, uri, Route, State};
+
+use rocket_contrib::templates::Template;
+
+use serde_json::value::{to_value, Value as JsonValue};
 
 use crate::models::*;
 use crate::views::*;
@@ -24,6 +32,7 @@ pub fn routes() -> Vec<Route> {
         crate::routes::banner,
         crate::routes::style,
         crate::routes::upload,
+        crate::routes::custom_page,
         crate::routes::board,
         crate::routes::thread,
         crate::routes::post_preview,
@@ -118,6 +127,39 @@ pub fn upload(
     _user: User,
 ) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.upload_dir.join(file))?)
+}
+
+/// Serve a admin-created page.
+#[get("/page/<page_name>", rank = 1)]
+pub fn custom_page(
+    page_name: String,
+    config: State<Config>,
+) -> Result<Template> {
+    let page_path = config
+        .options
+        .resource_dir
+        .join("custom-pages")
+        .join(format!("{}.md", &page_name.to_lowercase()));
+
+    let page_contents = read_to_string(page_path)?;
+    let parser = Parser::new(&page_contents);
+
+    let mut page_html = String::new();
+    html::push_html(&mut page_html, parser);
+
+    let mut data = HashMap::new();
+    data.insert(
+        "page_info".to_string(),
+        to_value(PageInfo::new(&page_name))?,
+    );
+    data.insert(
+        "page_footer".to_string(),
+        to_value(PageFooter::new(&config))?,
+    );
+    data.insert("page_name".to_string(), JsonValue::String(page_name));
+    data.insert("content".to_string(), JsonValue::String(page_html));
+
+    Ok(Template::render("pages/custom-page", data))
 }
 
 /// Serve a board.

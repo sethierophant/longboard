@@ -50,13 +50,28 @@ pub struct PageInfo {
 }
 
 impl PageInfo {
-    fn new<S>(title: S) -> PageInfo
+    pub fn new<S>(title: S) -> PageInfo
     where
         S: Into<String>,
     {
         PageInfo {
             title: title.into(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+        }
+    }
+}
+
+/// Display information for a page footer.
+#[derive(Debug, Serialize)]
+pub struct PageFooter {
+    /// A list of admin-created pages.
+    pages: Vec<String>,
+}
+
+impl PageFooter {
+    pub fn new(config: &Config) -> PageFooter {
+        PageFooter {
+            pages: config.options.custom_pages.clone(),
         }
     }
 }
@@ -68,7 +83,7 @@ pub struct PageNav {
 }
 
 impl PageNav {
-    fn new(db: &Database, _config: &Config) -> Result<PageNav> {
+    pub fn new(db: &Database) -> Result<PageNav> {
         Ok(PageNav {
             boards: db.all_boards()?,
         })
@@ -399,6 +414,7 @@ impl RecentFile {
 pub struct HomePage {
     page_info: PageInfo,
     page_nav: PageNav,
+    page_footer: PageFooter,
     recent_posts: Vec<RecentPost>,
     recent_files: Vec<RecentFile>,
 }
@@ -407,7 +423,8 @@ impl HomePage {
     pub fn new(db: &Database, config: &Config) -> Result<HomePage> {
         Ok(HomePage {
             page_info: PageInfo::new("LONGBOARD"),
-            page_nav: PageNav::new(db, config)?,
+            page_nav: PageNav::new(db)?,
+            page_footer: PageFooter::new(config),
             recent_posts: RecentPost::load(db, 5)?,
             recent_files: RecentFile::load(db, 5)?,
         })
@@ -422,6 +439,7 @@ pub struct BoardPage {
     page_info: PageInfo,
     page_nav: PageNav,
     page_header: PageHeader,
+    page_footer: PageFooter,
     threads: Vec<DeepThread>,
     is_staff: bool,
 }
@@ -446,8 +464,9 @@ impl BoardPage {
 
         Ok(BoardPage {
             page_info: PageInfo::new(board_name),
-            page_nav: PageNav::new(db, config)?,
+            page_nav: PageNav::new(db)?,
             page_header: PageHeader::new(board_name, db, config)?,
+            page_footer: PageFooter::new(config),
             threads,
             is_staff,
         })
@@ -462,6 +481,7 @@ pub struct ThreadPage {
     page_info: PageInfo,
     page_nav: PageNav,
     page_header: PageHeader,
+    page_footer: PageFooter,
     thread: DeepThread,
     is_staff: bool,
 }
@@ -482,8 +502,9 @@ impl ThreadPage {
 
         Ok(ThreadPage {
             page_info: PageInfo::new(subject.clone()),
-            page_nav: PageNav::new(db, config)?,
+            page_nav: PageNav::new(db)?,
             page_header: PageHeader::new(board_name.as_ref(), db, config)?,
+            page_footer: PageFooter::new(config),
             thread,
             is_staff,
         })

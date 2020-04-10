@@ -1,0 +1,15 @@
+.custom-page {
+    margin: 3em auto 0;
+    width: 600px;
+    line-height: 1.6em;
+}
+
+h1 {
+    text-align: center;
+    font-size: 3em;
+}
+
+ol {
+    font-size: 1.4em;
+    font-weight: bold;
+}

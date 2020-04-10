@@ -14,3 +14,8 @@ filter_rules:
       replace_with: language enhancer
     - pattern: big dick
       replace_with: sizable dongus
+
+pages:
+    - Rules
+    - Stream
+    - IRC

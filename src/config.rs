@@ -151,6 +151,9 @@ pub struct Options {
     /// Filter rules to apply to posts.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub filter_rules: Vec<Rule>,
+    /// Custom admin-added pages.
+    #[serde(rename = "pages")]
+    pub custom_pages: Vec<String>,
 }
 
 impl Options {
@@ -181,6 +184,7 @@ impl Default for Options {
                 filter_rules: Vec::new(),
                 names_path: None,
                 notice_path: None,
+                custom_pages: Vec::new(),
             }
         } else {
             Options {
@@ -196,6 +200,7 @@ impl Default for Options {
                 filter_rules: Vec::new(),
                 names_path: None,
                 notice_path: None,
+                custom_pages: Vec::new(),
             }
         }
     }

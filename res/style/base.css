@@ -23,12 +23,15 @@ input[type="submit"]:hover {
     background-color: hsl(0, 100%, 60%);
 }
 
+html, body {
+    height: 100%;
+}
+
 body {
     font-family: 'Roboto Condensed';
     margin: 0 auto;
-    background-color: hsl(0, 0%, 4%);
+    background-color: hsl(0, 0%, 6%);
     color: hsl(0, 0%, 98%);
-    padding-bottom: 2em;
 }
 
 .error h1, .action h1 {
@@ -505,4 +508,44 @@ form.post-action input[type=submit]:hover {
 
 .row-3 {
     grid-row: 3;
+}
+
+.page-wrapper {
+    min-height: 100%;
+}
+
+.page-footer {
+    display: grid;
+    position: relative;
+
+    height: 100px;
+    margin-top: -100px;
+
+    padding: 1em;
+    background-color: hsl(0, 0%, 0%);
+
+    box-sizing: border-box;
+}
+
+.page-footer a {
+    color: inherit;
+    text-transform: uppercase;
+}
+
+.page-footer ul {
+    display: flex;
+    padding: 0;
+    flex-direction: row;
+    list-style: none;
+    justify-content: center;
+    align-self: center;
+}
+
+.page-footer li {
+    margin: 0 0.4em;
+}
+
+.page-footer .version {
+    font: 0.8em 'Roboto Mono';
+    justify-self: flex-end;
 }

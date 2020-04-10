@@ -10,6 +10,19 @@
         {{> head}}
     </head>
     <body>
-        {{> body}}
+        <section class="page-wrapper">
+            {{> body}}
+        </section>
+        <footer class="page-footer">
+            <section>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    {{#each page_footer.pages}}
+                        <li><a href="/page/{{this}}">{{this}}</a></li>
+                    {{/each}}
+                </ul>
+            </section>
+            <span class="version">longboard {{page_info.version}}</span>
+        </footer>
     </body>
 </html>

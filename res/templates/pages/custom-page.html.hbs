@@ -1,0 +1,9 @@
+{{#*inline "head"}}
+    <link rel="stylesheet" href="/file/style/custom-page.css">
+{{/inline}}
+{{#*inline "body"}}
+    <section class="custom-page custom-page-{{page_name}}">
+        {{{content}}}
+    </section>
+{{/inline}}
+{{> pages/page}}
