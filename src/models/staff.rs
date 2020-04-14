@@ -99,28 +99,17 @@ pub mod sql_types {
 pub struct User {
     /// The user's ID in the database.
     pub id: UserId,
-    /// The hash of the user's IP.
+    /// The hash of the user's IP address.
     pub hash: String,
     /// If the user is banned, when the user's ban expires.
     pub ban_expires: Option<DateTime<Utc>>,
     /// A note about a user by a moderator.
     pub note: Option<String>,
+    /// The user's IP address.
+    pub ip: String,
 }
 
 impl User {
-    /// Hash a user's IP address.
-    pub fn hash_ip(ip: IpAddr) -> String {
-        let salt = b"longboard-user";
-        let conf = argon2::Config::default();
-
-        match ip {
-            IpAddr::V4(v4_addr) => hash_encoded(&v4_addr.octets(), salt, &conf)
-                .expect("could not hash IP address with Argon2"),
-            IpAddr::V6(v6_addr) => hash_encoded(&v6_addr.octets(), salt, &conf)
-                .expect("could not hash IP address with Argon2"),
-        }
-    }
-
     /// Whether or not the user is banned.
     pub fn is_banned(&self) -> bool {
         self.ban_expires
@@ -136,16 +125,41 @@ pub struct NewUser {
     pub hash: String,
     pub ban_expires: Option<DateTime<Utc>>,
     pub note: Option<String>,
+    pub ip: String,
 }
 
 impl NewUser {
     /// Create a `NewUser` from an user's IP address.
     pub fn from_ip(ip: IpAddr) -> NewUser {
         NewUser {
-            hash: User::hash_ip(ip),
+            hash: NewUser::hash_ip(ip),
             ban_expires: None,
             note: None,
+            ip: ip.to_string(),
         }
+    }
+
+    /// The configuration to use for IP hashing.
+    fn ip_hash_config() -> argon2::Config<'static> {
+        argon2::Config {
+            mem_cost: 1024,
+            time_cost: 1,
+            ..argon2::Config::default()
+        }
+    }
+
+    /// Hash a user's IP address.
+    pub fn hash_ip(ip: IpAddr) -> String {
+        let salt = b"longboard-user";
+        let conf = Self::ip_hash_config();
+
+        let octets = match ip {
+            IpAddr::V4(v4_addr) => v4_addr.octets().to_vec(),
+            IpAddr::V6(v6_addr) => v6_addr.octets().to_vec(),
+        };
+
+        hash_encoded(&octets, salt, &conf)
+            .expect("could not hash IP address with Argon2")
     }
 }
 
@@ -263,12 +277,19 @@ impl Database {
     }
 
     /// Get a user by their IP.
-    pub fn user(&self, ip: IpAddr) -> Result<User> {
-        use crate::schema::anon_user::columns::hash;
+    pub fn user(&self, user_ip: IpAddr) -> Result<User> {
+        // It's more efficient to get every user from the database and then
+        // check each of them then it is to compute the hash of the IP address
+        // and then select only that user from the database.
+        //
+        // This is because it's much cheaper to verify an Argon2 hash than it
+        // is to compute an Argon2 hash.
+
         use crate::schema::anon_user::dsl::anon_user;
+        use crate::schema::anon_user::columns::ip;
 
         Ok(anon_user
-            .filter(hash.eq(User::hash_ip(ip)))
+            .filter(ip.eq(user_ip.to_string()))
             .limit(1)
             .first(&self.pool.get()?)?)
     }

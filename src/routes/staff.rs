@@ -45,7 +45,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
             .guard::<State<Database>>()
             .expect("expected database to be initialized");
 
-        let ip = request.client_ip().expect("client didn't have an ip");
+        // If we are using a local request (i.e., if we're running a test) then
+        // we might not have an IP address. In production, all requests should
+        // have an IP address.
+        let ip = if cfg!(debug_assertions) {
+            request.client_ip().unwrap_or("1.2.3.4".parse().unwrap())
+        } else {
+            request.client_ip().expect("expected client to have ip")
+        };
 
         match db.user(ip) {
             Ok(user) => {
@@ -59,8 +66,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                 } else {
                     Outcome::Success(user)
                 }
-            }
-            Err(_) => {
+            },
+            Err(Error::DatabaseError(diesel::result::Error::NotFound)) => {
                 let new_user = NewUser::from_ip(ip);
 
                 let user = db
@@ -68,7 +75,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                     .map_err(|err| Err((Status::InternalServerError, err)))?;
 
                 Outcome::Success(user)
-            }
+            },
+            Err(e) => {
+                Outcome::Failure((Status::InternalServerError, e))
+            },
         }
     }
 }

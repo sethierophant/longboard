@@ -1,9 +1,12 @@
 <section class="post" id="{{id}}">
     <header class="post-info">
-        <span class="post-author">{{author_name}}</span>
-        {{#if author_contact}}
-            <span class="post-contact">{{author_contact}}</span>
-        {{/if}}
+        <span class="post-author">
+            {{#if author_contact}}
+                <a href="{{author_contact}}">{{author_name}}</a>
+            {{else}}
+                {{author_name}}
+            {{/if}}
+        </span>
         {{#if author_ident}}
             <span class="post-ident" title="{{author_ident}}">
                 #{{author_ident}}

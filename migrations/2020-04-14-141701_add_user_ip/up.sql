@@ -1,0 +1,1 @@
+ALTER TABLE anon_user ADD COLUMN ip TEXT NOT NULL;

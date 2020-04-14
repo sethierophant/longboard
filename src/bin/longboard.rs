@@ -9,12 +9,8 @@ use fern::colors::{Color, ColoredLevelConfig};
 
 use log::{debug, info};
 
-use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
-
-use rocket_contrib::templates::Template;
-
 use longboard::config::Options;
-use longboard::{Config, Database, LogFairing, Result};
+use longboard::{Config, Result, new_instance};
 
 fn main_res() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -120,23 +116,7 @@ fn main_res() -> Result<()> {
         }
     }
 
-    let template_dir = conf.options.resource_dir.join("templates");
-
-    let rocket_conf = RocketConfig::build(Environment::Development)
-        .address(&conf.options.address)
-        .port(conf.options.port)
-        .log_level(LoggingLevel::Off)
-        .extra("template_dir", template_dir.display().to_string())
-        .finalize()
-        .unwrap();
-
-    rocket::custom(rocket_conf)
-        .mount("/", longboard::routes::routes())
-        .manage(Database::open(&conf.options.database_url)?)
-        .manage(conf)
-        .attach(Template::fairing())
-        .attach(LogFairing)
-        .launch();
+    new_instance(conf)?.launch();
 
     Ok(())
 }

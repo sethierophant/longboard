@@ -221,9 +221,9 @@ fn parse_body<S>(body: S, conf: &Config, db: &Database) -> Result<String>
 where
     S: AsRef<str>,
 {
-    // TODO: This is definitely not the most efficient way to do this.
+    // FIXME: This is definitely not the most efficient way to do this.
 
-    // First pass: replace post references with links and run word filters
+    // First pass: replace post references with links
     let re = Regex::new(r">>(?P<id>\d+)").unwrap();
     let mut body = re
         .replace_all(body.as_ref(), |captures: &Captures| {
@@ -240,13 +240,14 @@ where
         })
         .into_owned();
 
+    // Second pass: run wordfilters
     for rule in &conf.options.filter_rules {
         body = Regex::new(&rule.pattern)?
             .replace_all(&body, rule.replace_with.as_str())
             .into_owned();
     }
 
-    // Second pass: parse markdown
+    // Third pass: parse markdown
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_TABLES);
     opts.insert(Options::ENABLE_STRIKETHROUGH);
@@ -254,7 +255,7 @@ where
     let mut html = String::new();
     push_html(&mut html, Parser::new_ext(&body, opts));
 
-    // Third pass: sanitize HTML
+    // Fourth pass: sanitize HTML
     Ok(ammonia::Builder::new()
         .link_rel(Some("noopener noreferrer nofollow"))
         .allowed_classes(hashmap! { "a" => hashset!["post-ref"] })

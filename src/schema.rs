@@ -4,6 +4,7 @@ table! {
         hash -> Text,
         ban_expires -> Nullable<Timestamptz>,
         note -> Nullable<Text>,
+        ip -> Text,
     }
 }
 
@@ -87,5 +88,12 @@ joinable!(session -> staff (staff_name));
 joinable!(thread -> board (board));
 
 allow_tables_to_appear_in_same_query!(
-    anon_user, board, file, post, report, session, staff, thread,
+    anon_user,
+    board,
+    file,
+    post,
+    report,
+    session,
+    staff,
+    thread,
 );

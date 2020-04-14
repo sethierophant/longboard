@@ -1,5 +1,7 @@
 //! Error types.
 
+use std::net::IpAddr;
+
 use log::{error, warn};
 
 use maplit::hashmap;
@@ -18,6 +20,8 @@ use crate::models::{PostId, ThreadId};
 pub enum Error {
     #[display(fmt = "Banned user {} attempted to access page", user_hash)]
     UserIsBanned { user_hash: String },
+    #[display(fmt = "User with ip {} was not found in the database", ip_addr)]
+    UserNotFound { ip_addr: IpAddr },
     #[display(fmt = "Board '{}' not found", board_name)]
     BoardNotFound { board_name: String },
     #[display(

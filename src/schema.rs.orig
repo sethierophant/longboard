@@ -4,6 +4,7 @@ table! {
         hash -> Text,
         ban_expires -> Nullable<Timestamptz>,
         note -> Nullable<Text>,
+        ip -> Text,
     }
 }
 

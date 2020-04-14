@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Roboto+Mono|Oswald:700&display=swap');
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700|Roboto+Mono|Oswald:700&display=swap');
 
 pre {
     overflow-x: scroll;
@@ -29,8 +29,8 @@ html, body {
 
 body {
     font-family: 'Roboto Condensed';
+    font-size: 14px;
     margin: 0 auto;
-    background-color: hsl(0, 0%, 6%);
     color: hsl(0, 0%, 98%);
 }
 
@@ -95,15 +95,15 @@ nav.boards a {
 }
 
 .new-item-form {
-    margin: 1em auto;
+    margin: 1em auto 2em;
     padding: 0.6em;
     display: grid;
     grid-template-columns: 6em auto;
-    width: 20em;
+    width: 350px;
     grid-gap: 0.2em;
 
     background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 15%);
+    border: thin solid hsl(0, 0%, 22%);
     box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 }
 
@@ -131,11 +131,16 @@ nav.boards a {
     grid-column: 1 / span 2;
 }
 
+.new-item-form input[type=checkbox] {
+    justify-self: flex-start;
+    border: 0;
+}
+
 .notice {
-    margin: 1em 1em -1em;
+    margin: 1em 0 -1em;
 
     align-self: stretch;
-    border-top: thin solid hsl(0, 0%, 15%);
+    border-top: thin dashed hsl(0, 0%, 15%);
 
     display: flex;
     flex-flow: column nowrap;
@@ -143,34 +148,38 @@ nav.boards a {
 }
 
 .thread {
-    margin: 1em;
+    margin: 1em 0;
+    padding: 1em 1em 0;
 
     display: flex;
     flex-flow: column nowrap;
     align-items: flex-start;
 
-    padding-top: 1em;
-    border-top: thin solid hsl(0, 0%, 15%);
+    border-top: thin dashed hsl(0, 0%, 15%);
 
     box-sizing: border-box;
 }
 
-.thread .subject {
+.thread > header {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.thread > header a {
+    color: hsl(0, 0%, 98%);
+    text-decoration: none;
+}
+
+.thread > header .subject {
     font: bold 1em 'Oswald';
 
     background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 15%);
+    border: thin solid hsl(0, 0%, 22%);
     box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 
     padding: 0.4em;
-    margin-left: 0.4em;
-
-    align-self: center;
-}
-
-.thread .subject a {
-    color: hsl(0, 0%, 98%);
-    text-decoration: none;
 }
 
 .thread .post:first-of-type {
@@ -206,29 +215,42 @@ nav.boards a {
 
 .post-info {
     display: flex;
+    flex-flow: row;
     font-size: 0.9em;
 }
 
 .post-info * {
-    display: flex;
-    margin: 0 0.2em;
+    margin: 0 1em;
 }
 
-.post-info > :first-child {
-    margin-left: 0;
+.post-info .post-ident {
+    margin: 0;
+    color: hsl(0, 100%, 60%);
 }
 
-.post-info > :last-child {
-    margin-right: 0;
+.post-info :first-child, .post-info :last-child {
+    margin: 0;
+}
+
+.post-author, .post-timestamp::before {
+    content: "Posted on ";
 }
 
 .post-author, .post-timestamp {
     opacity: 0.5;
 }
 
+.post-id {
+    margin-left: auto;
+}
+
 .post .body {
     box-sizing: border-box;
     margin: 0.4em;
+}
+
+.post .body-contents {
+    display: inline-block;
 }
 
 .post .body-contents > :first-child {
@@ -237,6 +259,15 @@ nav.boards a {
 
 .post .body-contents > :last-child {
     margin-bottom: 0;
+}
+
+.post .body-contents ul, .post .body-contents ol {
+    /* So that padding is respected when next to a floating image. */
+    overflow: hidden;
+}
+
+.post .body-contents * {
+    margin: 0.5em 0;
 }
 
 .post-image {
@@ -266,6 +297,7 @@ nav.boards a {
     position: absolute;
     left: 0;
     right: 0;
+    bottom: 0;
 
     max-width: 100%;
 
@@ -275,7 +307,7 @@ nav.boards a {
 }
 
 .post-image img {
-    margin-top: 1.2em;
+    margin-bottom: 1.3em;
 }
 
 .post-image.spoiler img {
@@ -301,7 +333,7 @@ nav.boards a {
     margin: 0 0.4em;
     color: hsl(0, 0%, 50%);
     text-decoration: none;
-    font-size: 0.8em;
+    font-size: 0.9em;
 }
 
 .post .actions .post-action:hover {
@@ -341,7 +373,6 @@ form.post-action input[type=submit]:hover {
 .action-form textarea {
     padding: 0.2em;
     height: 4em;
-    width: 20em;
 }
 
 .action-form textarea, .action-form input[type=submit] {
@@ -511,7 +542,14 @@ form.post-action input[type=submit]:hover {
 }
 
 .page-wrapper {
-    min-height: 100%;
+    min-height: calc(100% - 100px);
+    margin-bottom: 100px;
+
+    padding-top: 1em;
+    padding-bottom: 2em;
+
+    background-image: linear-gradient(hsl(10, 10%, 14%), hsl(0, 0%, 0%));
+    background-repeat: no-repeat;
 }
 
 .page-footer {
@@ -520,6 +558,8 @@ form.post-action input[type=submit]:hover {
 
     height: 100px;
     margin-top: -100px;
+
+    border-top: thin dashed hsl(0, 0%, 12%);
 
     padding: 1em;
     background-color: hsl(0, 0%, 0%);
@@ -530,6 +570,9 @@ form.post-action input[type=submit]:hover {
 .page-footer a {
     color: inherit;
     text-transform: uppercase;
+
+    font: bold 1em 'Roboto Condensed';
+    text-decoration: none;
 }
 
 .page-footer ul {
@@ -542,7 +585,7 @@ form.post-action input[type=submit]:hover {
 }
 
 .page-footer li {
-    margin: 0 0.4em;
+    margin: 0 0.6em;
 }
 
 .page-footer .version {

@@ -13,6 +13,9 @@ use std::string::ToString;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::StatusClass;
 use rocket::{Request, Response, Rocket};
+use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
+
+use rocket_contrib::templates::Template;
 
 use log::{info, warn};
 
@@ -90,4 +93,24 @@ impl Fairing for LogFairing {
 pub mod sql_types {
     //! Re-exports from `models::sql_types`.
     pub use crate::models::staff::sql_types::Role;
+}
+
+/// Create a new rocket instance for our application.
+pub fn new_instance(conf: Config) -> Result<Rocket> {
+    let template_dir = conf.options.resource_dir.join("templates");
+
+    let rocket_conf = RocketConfig::build(Environment::Development)
+        .address(&conf.options.address)
+        .port(conf.options.port)
+        .log_level(LoggingLevel::Off)
+        .extra("template_dir", template_dir.display().to_string())
+        .finalize()
+        .unwrap();
+
+    Ok(rocket::custom(rocket_conf)
+        .mount("/", crate::routes::routes())
+        .manage(Database::open(&conf.options.database_url)?)
+        .manage(conf)
+        .attach(Template::fairing())
+        .attach(LogFairing))
 }
