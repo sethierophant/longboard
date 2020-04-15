@@ -151,7 +151,7 @@ nav.boards a {
     padding: 1em 1em 0;
 
     display: flex;
-    flex-flow: column nowrap;
+    flex-direction: column;
     align-items: flex-start;
 
     border-top: thin dashed hsl(0, 0%, 15%);
@@ -188,7 +188,6 @@ nav.boards a {
 }
 
 .post {
-    display: inline;
     padding: 0.4em;
     margin: 0.4em 0;
     background-color: hsl(0, 0%, 10%);
@@ -196,6 +195,7 @@ nav.boards a {
     line-height: 1.45;
     overflow: hidden;
     box-sizing: border-box;
+    max-width: 100%;
 }
 
 .post:target {
@@ -249,7 +249,8 @@ nav.boards a {
 }
 
 .post .body-contents {
-    display: inline-block;
+    width: max-content;
+    max-width: 100%;
 }
 
 .post .body-contents > :first-child {
