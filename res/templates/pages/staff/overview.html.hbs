@@ -67,11 +67,13 @@
         <section class="user-table">
             <span class="table-header">ID</span>
             <span class="table-header">Hash</span>
+            <span class="table-header">Post Count</span>
             <span class="table-header">Is Banned?</span>
             <span class="table-header">Ban Expires</span>
             {{#each users}}
                 <span>{{id}}</span>
                 <span title="{{hash}}">{{hash}}</span>
+                <span>{{post_count}}</span>
                 <span>
                     {{#if ban_expires}}
                         Yes
@@ -93,6 +95,12 @@
             <label class="row-3" for="duration">Duration</label>
             <input class="row-3" type="datetime" name="duration">
             <input class="row-3" type="submit" value="Ban">
+        </form>
+        <form action="/staff/unban-user/" method="POST">
+            <h2>Unban User</h2>
+            <label class="row-2" for="id">User ID</label>
+            <input class="row-2" type="number" name="id">
+            <input class="row-2" type="submit" value="Unban">
         </form>
         <form action="/staff/add-note/" method="POST">
             <h2>Add Note</h2>

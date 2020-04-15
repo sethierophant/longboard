@@ -291,6 +291,28 @@ pub fn ban_user(
     Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
 }
 
+/// Form data for unbanning a user.
+#[derive(FromForm)]
+pub struct UnbanUserData {
+    id: UserId,
+}
+
+/// Unban a user.
+#[post("/staff/unban-user", data = "<unban_data>")]
+pub fn unban_user(
+    unban_data: Form<UnbanUserData>,
+    db: State<Database>,
+    _session: Session,
+) -> Result<ActionSuccessPage> {
+    let UnbanUserData { id } = unban_data.into_inner();
+
+    let msg = format!("Unbanned user {} successfully.", id);
+
+    db.unban_user(id)?;
+
+    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+}
+
 /// Form data for adding a note to a user.
 #[derive(FromForm)]
 pub struct AddNoteData {

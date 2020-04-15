@@ -443,8 +443,8 @@ impl HomePage {
             page_info: PageInfo::new("LONGBOARD"),
             page_nav: PageNav::new(db)?,
             page_footer: PageFooter::new(config),
-            recent_posts: RecentPost::load(db, 5)?,
-            recent_files: RecentFile::load(db, 5)?,
+            recent_posts: RecentPost::load(db, crate::DEFAULT_RECENT_POSTS)?,
+            recent_files: RecentFile::load(db, crate::DEFAULT_RECENT_FILES)?,
         })
     }
 }

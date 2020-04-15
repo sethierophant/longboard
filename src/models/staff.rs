@@ -2,6 +2,7 @@
 
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::convert::TryInto;
 
 use argon2::hash_encoded;
 
@@ -301,6 +302,19 @@ impl Database {
         Ok(anon_user.load(&self.pool.get()?)?)
     }
 
+    /// Get the total number of posts a user has made.
+    pub fn user_post_count(&self, user_id: UserId) -> Result<u32> {
+        use crate::schema::post::dsl::post;
+        use crate::schema::post::columns::user_id as column_user_id;
+
+        let count: i64 = post
+           .filter(column_user_id.eq(user_id))
+           .count()
+           .first(&self.pool.get()?)?;
+
+        Ok(count.try_into().unwrap())
+    }
+
     /// Insert a user.
     pub fn insert_user(&self, new_user: &NewUser) -> Result<User> {
         use crate::schema::anon_user::dsl::anon_user;
@@ -323,6 +337,18 @@ impl Database {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(ban_expires.eq(Some(Utc::now() + ban_duration)))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
+    }
+
+    /// Unban a user.
+    pub fn unban_user(&self, user_id: UserId) -> Result<()> {
+        use crate::schema::anon_user::columns::{ban_expires, id};
+        use crate::schema::anon_user::dsl::anon_user;
+
+        update(anon_user.filter(id.eq(user_id)))
+            .set(ban_expires.eq::<Option<DateTime<Utc>>>(None))
             .execute(&self.pool.get()?)?;
 
         Ok(())

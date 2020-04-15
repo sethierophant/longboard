@@ -53,6 +53,7 @@ pub fn routes() -> Vec<Route> {
         crate::routes::staff::edit_board,
         crate::routes::staff::delete_board,
         crate::routes::staff::ban_user,
+        crate::routes::staff::unban_user,
         crate::routes::staff::add_note,
         crate::routes::staff::remove_note,
         crate::routes::staff::delete_posts_for_user,
@@ -69,7 +70,6 @@ pub fn routes() -> Vec<Route> {
 pub fn home(
     config: State<Config>,
     db: State<Database>,
-    _user: User,
 ) -> Result<HomePage> {
     HomePage::new(&db, &config)
 }
@@ -79,7 +79,6 @@ pub fn home(
 pub fn static_file(
     file: PathBuf,
     config: State<Config>,
-    _user: User,
 ) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.resource_dir.join(file))?)
 }
@@ -89,7 +88,6 @@ pub fn static_file(
 pub fn style(
     file: PathBuf,
     config: State<Config>,
-    _user: User,
 ) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("style").join(file),
@@ -101,7 +99,6 @@ pub fn style(
 pub fn script(
     file: PathBuf,
     config: State<Config>,
-    _user: User,
 ) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("script").join(file),
@@ -113,7 +110,6 @@ pub fn script(
 pub fn banner(
     file: PathBuf,
     config: State<Config>,
-    _user: User,
 ) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("banners").join(file),
@@ -125,7 +121,6 @@ pub fn banner(
 pub fn upload(
     file: PathBuf,
     config: State<Config>,
-    _user: User,
 ) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.upload_dir.join(file))?)
 }

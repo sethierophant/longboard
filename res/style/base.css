@@ -556,7 +556,7 @@ form.post-action input[type=submit]:hover {
 }
 
 .user-table {
-    grid-template-columns: min-content auto max-content max-content;
+    grid-template-columns: min-content auto max-content max-content max-content;
 }
 
 .table-header {

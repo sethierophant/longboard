@@ -48,7 +48,10 @@ impl Serialize for ReportView {
 }
 
 #[derive(Debug)]
-pub struct UserView(User);
+pub struct UserView {
+    user: User,
+    post_count: u32,
+}
 
 impl Serialize for UserView {
     fn serialize<S>(
@@ -59,16 +62,17 @@ impl Serialize for UserView {
         S: Serializer,
     {
         let ban_expires = self
-            .0
+            .user
             .ban_expires
             .as_ref()
             .map(|time| time.format("%F %R").to_string());
-        let hash = self.0.hash.split('$').last().unwrap().to_string();
+        let hash = self.user.hash.split('$').last().unwrap().to_string();
 
-        let mut data = to_value(&self.0).expect("could not serialize user");
+        let mut data = to_value(&self.user).expect("could not serialize user");
 
         let obj = data.as_object_mut().unwrap();
         obj.insert("hash".into(), JsonValue::String(hash));
+        obj.insert("post_count".into(), JsonValue::from(self.post_count));
 
         if let Some(ban_expires) = ban_expires {
             obj.insert("ban_expires".into(), JsonValue::String(ban_expires));
@@ -92,6 +96,13 @@ impl OverviewPage {
     where
         S: AsRef<str>,
     {
+        let users = db.all_users()?.into_iter().map(|user| {
+            Ok(UserView {
+                post_count: db.user_post_count(user.id)?,
+                user,
+            })
+        }).collect::<Result<_>>()?;
+
         Ok(OverviewPage {
             page_info: PageInfo::new("Overview"),
             staff: db.staff(user_name)?,
@@ -101,7 +112,7 @@ impl OverviewPage {
                 .map(|report| ReportView::new(report.id, db))
                 .collect::<Result<_>>()?,
             boards: db.all_boards()?,
-            users: db.all_users()?.into_iter().map(UserView).collect(),
+            users,
         })
     }
 }
