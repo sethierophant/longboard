@@ -10,7 +10,7 @@ use fern::colors::{Color, ColoredLevelConfig};
 use log::{debug, info};
 
 use longboard::config::Options;
-use longboard::{Config, Result, new_instance};
+use longboard::{new_instance, Config, Result};
 
 fn main_res() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))

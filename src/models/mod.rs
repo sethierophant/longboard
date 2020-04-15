@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use chrono::offset::Utc;
 use chrono::DateTime;
 
+use diesel::dsl::count;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{delete, insert_into, prelude::*, sql_query, update};
 
@@ -38,7 +39,7 @@ pub struct Board {
 
 impl Board {
     pub fn uri(&self) -> String {
-        uri!(crate::routes::board: &self.name).to_string()
+        uri!(crate::routes::board: &self.name, 1).to_string()
     }
 }
 
@@ -187,6 +188,23 @@ pub struct NewReport {
     pub user_id: UserId,
 }
 
+/// A page location.
+pub struct Page {
+    /// The page number.
+    pub num: u32,
+    /// How many items can fit in a page.
+    pub width: u32,
+}
+
+impl Page {
+    /// The offset in items to the start of the page.
+    ///
+    /// The offset to page 1 is 0.
+    pub fn offset(&self) -> u32 {
+        (self.num - 1) * self.width
+    }
+}
+
 /// A connection to the database. Used for creating and retrieving data.
 pub struct Database {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -281,19 +299,6 @@ impl Database {
         Ok(())
     }
 
-    /// Get threads on a board.
-    pub fn threads_on_board<S>(&self, board_name: S) -> Result<Vec<Thread>>
-    where
-        S: AsRef<str>,
-    {
-        use crate::schema::thread::columns::board;
-        use crate::schema::thread::dsl::thread;
-
-        Ok(thread
-            .filter(board.eq(board_name.as_ref()))
-            .load(&self.pool.get()?)?)
-    }
-
     /// Get a thread.
     pub fn thread(&self, thread_id: ThreadId) -> Result<Thread> {
         use crate::schema::thread::columns::id;
@@ -303,6 +308,46 @@ impl Database {
             .filter(id.eq(thread_id))
             .limit(1)
             .first(&self.pool.get()?)?)
+    }
+
+    /// Get a single page of threads on a board.
+    pub fn thread_page<S>(
+        &self,
+        board_name: S,
+        page: Page,
+    ) -> Result<Vec<Thread>>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::thread::columns::{board, id};
+        use crate::schema::thread::dsl::thread;
+
+        Ok(thread
+            .filter(board.eq(board_name.as_ref()))
+            .order(id.asc())
+            .limit(page.width as i64)
+            .offset(page.offset() as i64)
+            .load(&self.pool.get()?)?)
+    }
+
+    /// How many pages of threads there are total.
+    pub fn thread_page_count<S>(
+        &self,
+        board_name: S,
+        page_width: u32,
+    ) -> Result<u32>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::thread::columns::{board, id};
+        use crate::schema::thread::dsl::thread;
+
+        let thread_count: i64 = thread
+            .filter(board.eq(board_name.as_ref()))
+            .select(count(id))
+            .first(&self.pool.get()?)?;
+
+        Ok((thread_count as f64 / page_width as f64).ceil() as u32)
     }
 
     /// Insert a new thread into the database.

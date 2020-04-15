@@ -285,8 +285,8 @@ impl Database {
         // This is because it's much cheaper to verify an Argon2 hash than it
         // is to compute an Argon2 hash.
 
-        use crate::schema::anon_user::dsl::anon_user;
         use crate::schema::anon_user::columns::ip;
+        use crate::schema::anon_user::dsl::anon_user;
 
         Ok(anon_user
             .filter(ip.eq(user_ip.to_string()))

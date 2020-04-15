@@ -10,10 +10,10 @@ extern crate diesel;
 use std::fmt::Write;
 use std::string::ToString;
 
+use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::StatusClass;
 use rocket::{Request, Response, Rocket};
-use rocket::config::{Config as RocketConfig, Environment, LoggingLevel};
 
 use rocket_contrib::templates::Template;
 
@@ -114,3 +114,6 @@ pub fn new_instance(conf: Config) -> Result<Rocket> {
         .attach(Template::fairing())
         .attach(LogFairing))
 }
+
+pub static DEFAULT_PAGE_WIDTH: u32 = 6;
+pub static DEFAULT_PREVIEW_LIMIT: u32 = 3;

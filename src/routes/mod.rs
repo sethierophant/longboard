@@ -163,9 +163,10 @@ pub fn custom_page(
 }
 
 /// Serve a board.
-#[get("/<board_name>", rank = 2)]
+#[get("/<board_name>?<page>", rank = 2)]
 pub fn board(
     board_name: String,
+    page: Option<u32>,
     config: State<Config>,
     db: State<Database>,
     session: Option<Session>,
@@ -175,7 +176,13 @@ pub fn board(
         return Err(Error::BoardNotFound { board_name });
     }
 
-    BoardPage::new(board_name, &db, &config, session.is_some())
+    BoardPage::new(
+        board_name,
+        page.unwrap_or(1),
+        &db,
+        &config,
+        session.is_some(),
+    )
 }
 
 /// Serve a thread.
@@ -349,7 +356,7 @@ pub fn handle_delete(
     };
 
     let redirect_uri = if delete_thread {
-        uri!(board: thread.board_name)
+        uri!(board: thread.board_name, 1)
     } else {
         uri!(thread: thread.board_name, thread.id)
     };

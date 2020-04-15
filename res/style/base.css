@@ -49,7 +49,6 @@ body {
 }
 
 .banner {
-    border: thin solid black;
     margin: 1em 0;
 }
 
@@ -384,6 +383,33 @@ form.post-action input[type=submit]:hover {
     background-color: hsl(0, 0%, 10%);
     border: thin solid hsl(0, 0%, 15%);
     align-self: center;
+}
+
+.board .page-nums {
+    margin: 0 auto;
+    width: max-content;
+
+    padding: 0.4em;
+
+    background-color: hsl(0, 0%, 12%);
+    border: thin solid hsl(0, 0%, 22%);
+    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
+}
+
+.board .page-num-link {
+    margin: 0 0.4em;
+}
+
+.board .page-num-link.current {
+    color: hsl(0, 0%, 60%);
+}
+
+.board .page-num-link.current::before {
+    content: "[";
+}
+
+.board .page-num-link.current::after {
+    content: "]";
 }
 
 .home {

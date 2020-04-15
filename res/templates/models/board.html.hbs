@@ -2,4 +2,13 @@
     {{#each threads}}
         {{> models/thread}}
     {{/each}}
+    <section class="page-nums">
+        {{#each page_num_links}}
+            {{#if current}}
+                <a class="page-num-link current" href="?page={{num}}">{{num}}</a>
+            {{else}}
+                <a class="page-num-link" href="?page={{num}}">{{num}}</a>
+            {{/if}}
+        {{/each}}
+    </section>
 </section>

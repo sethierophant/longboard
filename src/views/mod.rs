@@ -334,9 +334,27 @@ impl Serialize for DeepPost {
 pub struct DeepThread(ThreadView, Vec<DeepPost>);
 
 impl DeepThread {
+    /// Load a thread and its posts from the database.
     fn new(thread_id: ThreadId, db: &Database) -> Result<DeepThread> {
         let thread = ThreadView(db.thread(thread_id)?);
         let posts = db.posts_in_thread(thread_id)?;
+
+        let deep_posts = posts
+            .into_iter()
+            .map(|post| {
+                let file = db.files_in_post(post.id)?.pop();
+                Ok(DeepPost(PostView(post), file.map(FileView)))
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(DeepThread(thread, deep_posts))
+    }
+
+    /// Load a thread and a preview of its posts from the database.
+    fn new_preview(thread_id: ThreadId, db: &Database) -> Result<DeepThread> {
+        let thread = ThreadView(db.thread(thread_id)?);
+        let posts =
+            db.preview_thread(thread_id, crate::DEFAULT_PREVIEW_LIMIT)?;
 
         let deep_posts = posts
             .into_iter()
@@ -433,6 +451,27 @@ impl HomePage {
 
 impl_template_responder!(HomePage, "pages/home");
 
+/// Information about a link to another page.
+#[derive(Debug, Serialize)]
+pub struct PageNumLink {
+    /// The page number that we're linking to.
+    num: u32,
+    /// Whether or not this link points to the current page.
+    current: bool,
+}
+
+impl PageNumLink {
+    /// Generate a list of links to all pages.
+    pub fn generate(page_count: u32, current_page: u32) -> Vec<PageNumLink> {
+        (1..=page_count)
+            .map(|num| PageNumLink {
+                num,
+                current: num == current_page,
+            })
+            .collect()
+    }
+}
+
 /// A page for a board.
 #[derive(Debug, Serialize)]
 pub struct BoardPage {
@@ -441,12 +480,14 @@ pub struct BoardPage {
     page_header: PageHeader,
     page_footer: PageFooter,
     threads: Vec<DeepThread>,
+    page_num_links: Vec<PageNumLink>,
     is_staff: bool,
 }
 
 impl BoardPage {
     pub fn new<S>(
         board_name: S,
+        page_num: u32,
         db: &Database,
         config: &Config,
         is_staff: bool,
@@ -455,12 +496,23 @@ impl BoardPage {
         S: AsRef<str>,
     {
         let board_name = board_name.as_ref();
+        let page_width = crate::DEFAULT_PAGE_WIDTH;
 
         let threads = db
-            .threads_on_board(board_name)?
+            .thread_page(
+                board_name,
+                Page {
+                    num: page_num,
+                    width: page_width,
+                },
+            )?
             .into_iter()
-            .map(|thread| DeepThread::new(thread.id, &db))
+            .map(|thread| DeepThread::new_preview(thread.id, &db))
             .collect::<Result<_>>()?;
+
+        let page_count = db.thread_page_count(board_name, page_width)?;
+
+        log::debug!("page count: {:?}", page_count);
 
         Ok(BoardPage {
             page_info: PageInfo::new(board_name),
@@ -468,6 +520,7 @@ impl BoardPage {
             page_header: PageHeader::new(board_name, db, config)?,
             page_footer: PageFooter::new(config),
             threads,
+            page_num_links: PageNumLink::generate(page_count, page_num),
             is_staff,
         })
     }

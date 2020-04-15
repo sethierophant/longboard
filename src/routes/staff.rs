@@ -66,7 +66,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                 } else {
                     Outcome::Success(user)
                 }
-            },
+            }
             Err(Error::DatabaseError(diesel::result::Error::NotFound)) => {
                 let new_user = NewUser::from_ip(ip);
 
@@ -75,10 +75,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                     .map_err(|err| Err((Status::InternalServerError, err)))?;
 
                 Outcome::Success(user)
-            },
-            Err(e) => {
-                Outcome::Failure((Status::InternalServerError, e))
-            },
+            }
+            Err(e) => Outcome::Failure((Status::InternalServerError, e)),
         }
     }
 }
@@ -479,7 +477,7 @@ pub fn staff_delete(
     };
 
     let redirect_uri = if delete_thread {
-        uri!(crate::routes::board: thread.board_name)
+        uri!(crate::routes::board: thread.board_name, 1)
     } else {
         uri!(crate::routes::thread: thread.board_name, thread.id)
     };
