@@ -1,0 +1,14 @@
+{{#*inline "body"}}
+    <header class="page-header">
+        {{#with page_nav}}
+            {{> page-nav}}
+        {{/with}}
+        <h1 class="board-name">/{{page_header.board.name}}/ - Catalog</h1>
+    </header>
+    <section class="catalog">
+        {{#each items}}
+            {{> models/board-catalog-item}}
+        {{/each}}
+    </section>
+{{/inline}}
+{{> pages/page}}

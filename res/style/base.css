@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700|Roboto+Mono|Oswald:700&display=swap');
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700:900|Roboto+Mono|Oswald:700&display=swap');
 
 pre {
     overflow-x: scroll;
@@ -39,6 +39,7 @@ body {
 }
 
 .site-name {
+    font-family: 'Oswald';
     text-align: center;
 }
 
@@ -185,17 +186,19 @@ nav.boards a {
     background: none;
     border: none;
     align-self: stretch;
+    box-shadow: none;
 }
 
 .post {
     padding: 0.4em;
     margin: 0.4em 0;
-    background-color: hsl(0, 0%, 10%);
-    border: thin solid hsl(0, 0%, 15%);
+    background-color: hsl(0, 0%, 12%);
+    border: thin solid hsl(0, 0%, 22%);
     line-height: 1.45;
     overflow: hidden;
     box-sizing: border-box;
     max-width: 100%;
+    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 }
 
 .post:target {
@@ -413,6 +416,36 @@ form.post-action input[type=submit]:hover {
     content: "]";
 }
 
+.catalog {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+    margin-top: 2em;
+}
+
+.catalog-item {
+    width: 180px;
+    max-height: 300px;
+    margin: 0.4em;
+    padding: 0.6em;
+
+    text-align: center;
+
+    overflow-y: auto;
+
+    background-color: hsl(0, 0%, 12%);
+    border: thin solid hsl(0, 0%, 22%);
+}
+
+.catalog-item img {
+    max-width: 180px;
+    max-height: 140px;
+}
+
+.catalog-item .item-stats {
+    font-weight: 900;
+}
+
 .home {
     max-width: 800px;
     margin: 0 auto;
@@ -504,7 +537,8 @@ form.post-action input[type=submit]:hover {
 }
 
 .overview-item {
-    border-top: thin solid hsl(0, 0%, 8%);
+    border-top: thin dashed hsl(0, 0%, 22%);
+    margin-top: 2em;
     padding-bottom: 1em;
 }
 
@@ -543,8 +577,8 @@ form.post-action input[type=submit]:hover {
     margin-top: 0.8em;
     grid-gap: 0.5em 1em;
     grid-template-columns: 7em auto 10em;
-    background-color: hsl(0, 0%, 8%);
-    border-color: hsl(0, 0%, 14%);
+    background-color: hsl(0, 0%, 12%);
+    border: thin solid hsl(0, 0%, 22%);
     border-radius: 4px;
 }
 

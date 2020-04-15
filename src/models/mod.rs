@@ -1,5 +1,6 @@
 //! Models and types related to the database.
 
+use std::convert::TryInto;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
@@ -350,6 +351,22 @@ impl Database {
         Ok((thread_count as f64 / page_width as f64).ceil() as u32)
     }
 
+    /// All of the first posts of threads in the database.
+    pub fn all_first_posts<S>(&self, board_name: S) -> Result<Vec<Post>>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::post::columns::{board, id, thread};
+        use crate::schema::post::dsl::post;
+
+        Ok(post
+            .distinct_on(thread)
+            .filter(board.eq(board_name.as_ref()))
+            .order_by(thread.asc())
+            .then_order_by(id.asc())
+            .load(&self.pool.get()?)?)
+    }
+
     /// Insert a new thread into the database.
     pub fn insert_thread(&self, new_thread: NewThread) -> Result<ThreadId> {
         use crate::schema::thread::columns::id;
@@ -400,6 +417,35 @@ impl Database {
             .filter(thread.eq(thread_id))
             .order(id.asc())
             .load(&self.pool.get()?)?)
+    }
+
+    /// Get the number of posts in a thread.
+    pub fn thread_post_count(&self, thread_id: ThreadId) -> Result<u32> {
+        use crate::schema::post::columns::thread;
+        use crate::schema::post::dsl::post;
+
+        let count: i64 = post
+            .filter(thread.eq(thread_id))
+            .count()
+            .first(&self.pool.get()?)?;
+
+        Ok(count.try_into().unwrap())
+    }
+
+    /// Get the number of files in a thread.
+    pub fn thread_file_count(&self, thread_id: ThreadId) -> Result<u32> {
+        use crate::schema::file::dsl::file;
+        use crate::schema::post::dsl::post;
+        use crate::schema::thread::columns::id;
+        use crate::schema::thread::dsl::thread;
+
+        let count: i64 = thread
+            .inner_join(post.inner_join(file))
+            .filter(id.eq(thread_id))
+            .count()
+            .first(&self.pool.get()?)?;
+
+        Ok(count.try_into().unwrap())
     }
 
     /// Get the first post and up to `limit` recent posts from a thread.

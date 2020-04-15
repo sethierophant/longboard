@@ -512,8 +512,6 @@ impl BoardPage {
 
         let page_count = db.thread_page_count(board_name, page_width)?;
 
-        log::debug!("page count: {:?}", page_count);
-
         Ok(BoardPage {
             page_info: PageInfo::new(board_name),
             page_nav: PageNav::new(db)?,
@@ -527,6 +525,77 @@ impl BoardPage {
 }
 
 impl_template_responder!(BoardPage, "pages/models/board");
+
+/// A catalog item.
+#[derive(Debug, Serialize)]
+pub struct CatalogItem {
+    thumb_uri: String,
+    thread_uri: String,
+    body: String,
+    num_posts: u32,
+    num_files: u32,
+}
+
+/// A page for a board catalog.
+#[derive(Debug, Serialize)]
+pub struct BoardCatalogPage {
+    page_info: PageInfo,
+    page_nav: PageNav,
+    page_header: PageHeader,
+    page_footer: PageFooter,
+    items: Vec<CatalogItem>,
+}
+
+impl BoardCatalogPage {
+    pub fn new<S>(
+        board_name: S,
+        db: &Database,
+        config: &Config,
+    ) -> Result<BoardCatalogPage>
+    where
+        S: AsRef<str>,
+    {
+        let board_name = board_name.as_ref();
+
+        let first_posts = db.all_first_posts(board_name)?;
+        let items = first_posts
+            .into_iter()
+            .map(|post| {
+                let files = db.files_in_post(post.id)?;
+
+                let thumb_uri = files
+                    .first()
+                    .and_then(|file| file.thumb_uri())
+                    .unwrap_or(String::new());
+
+                let thread_uri = uri!(
+                    crate::routes::thread:
+                    post.board_name,
+                    post.thread_id
+                )
+                .to_string();
+
+                Ok(CatalogItem {
+                    thumb_uri,
+                    thread_uri,
+                    body: post.body,
+                    num_posts: db.thread_post_count(post.thread_id)?,
+                    num_files: db.thread_file_count(post.thread_id)?,
+                })
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(BoardCatalogPage {
+            page_info: PageInfo::new(board_name),
+            page_nav: PageNav::new(db)?,
+            page_header: PageHeader::new(board_name, db, config)?,
+            page_footer: PageFooter::new(config),
+            items,
+        })
+    }
+}
+
+impl_template_responder!(BoardCatalogPage, "pages/models/board-catalog");
 
 /// A page for a thread.
 #[derive(Debug, Serialize)]

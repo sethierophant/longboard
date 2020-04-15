@@ -34,6 +34,7 @@ pub fn routes() -> Vec<Route> {
         crate::routes::upload,
         crate::routes::custom_page,
         crate::routes::board,
+        crate::routes::board_catalog,
         crate::routes::thread,
         crate::routes::post_preview,
         crate::routes::new::new_thread,
@@ -185,8 +186,25 @@ pub fn board(
     )
 }
 
+/// Serve a board catalog.
+#[get("/<board_name>/catalog", rank = 2)]
+pub fn board_catalog(
+    board_name: String,
+    config: State<Config>,
+    db: State<Database>,
+    _user: User,
+) -> Result<BoardCatalogPage> {
+    if let Err(Error::DatabaseError(diesel::result::Error::NotFound)) =
+        db.board(&board_name)
+    {
+        return Err(Error::BoardNotFound { board_name });
+    }
+
+    BoardCatalogPage::new(board_name, &db, &config)
+}
+
 /// Serve a thread.
-#[get("/<board_name>/<thread_id>", rank = 2)]
+#[get("/<board_name>/<thread_id>", rank = 3)]
 pub fn thread(
     board_name: String,
     thread_id: ThreadId,
