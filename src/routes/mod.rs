@@ -67,28 +67,19 @@ pub fn routes() -> Vec<Route> {
 
 /// Serve the home page.
 #[get("/", rank = 0)]
-pub fn home(
-    config: State<Config>,
-    db: State<Database>,
-) -> Result<HomePage> {
+pub fn home(config: State<Config>, db: State<Database>) -> Result<HomePage> {
     HomePage::new(&db, &config)
 }
 
 /// Serve a static file.
 #[get("/file/<file..>", rank = 1)]
-pub fn static_file(
-    file: PathBuf,
-    config: State<Config>,
-) -> Result<NamedFile> {
+pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.resource_dir.join(file))?)
 }
 
 /// Serve a stylesheet.
 #[get("/file/style/<file..>", rank = 0)]
-pub fn style(
-    file: PathBuf,
-    config: State<Config>,
-) -> Result<NamedFile> {
+pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("style").join(file),
     )?)
@@ -96,10 +87,7 @@ pub fn style(
 
 /// Serve a script.
 #[get("/file/script/<file..>", rank = 0)]
-pub fn script(
-    file: PathBuf,
-    config: State<Config>,
-) -> Result<NamedFile> {
+pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("script").join(file),
     )?)
@@ -107,10 +95,7 @@ pub fn script(
 
 /// Serve a banner.
 #[get("/file/banner/<file..>", rank = 0)]
-pub fn banner(
-    file: PathBuf,
-    config: State<Config>,
-) -> Result<NamedFile> {
+pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(
         config.options.resource_dir.join("banners").join(file),
     )?)
@@ -118,10 +103,7 @@ pub fn banner(
 
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
-pub fn upload(
-    file: PathBuf,
-    config: State<Config>,
-) -> Result<NamedFile> {
+pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.upload_dir.join(file))?)
 }
 

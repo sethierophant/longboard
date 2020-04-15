@@ -1,8 +1,8 @@
 //! Types for staff roles and moderation actions.
 
+use std::convert::TryInto;
 use std::net::IpAddr;
 use std::str::FromStr;
-use std::convert::TryInto;
 
 use argon2::hash_encoded;
 
@@ -304,13 +304,13 @@ impl Database {
 
     /// Get the total number of posts a user has made.
     pub fn user_post_count(&self, user_id: UserId) -> Result<u32> {
-        use crate::schema::post::dsl::post;
         use crate::schema::post::columns::user_id as column_user_id;
+        use crate::schema::post::dsl::post;
 
         let count: i64 = post
-           .filter(column_user_id.eq(user_id))
-           .count()
-           .first(&self.pool.get()?)?;
+            .filter(column_user_id.eq(user_id))
+            .count()
+            .first(&self.pool.get()?)?;
 
         Ok(count.try_into().unwrap())
     }

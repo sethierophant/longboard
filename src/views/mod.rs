@@ -481,6 +481,7 @@ pub struct BoardPage {
     page_footer: PageFooter,
     threads: Vec<DeepThread>,
     page_num_links: Vec<PageNumLink>,
+    catalog_uri: String,
     is_staff: bool,
 }
 
@@ -512,6 +513,9 @@ impl BoardPage {
 
         let page_count = db.thread_page_count(board_name, page_width)?;
 
+        let catalog_uri =
+            uri!(crate::routes::board_catalog: board_name).to_string();
+
         Ok(BoardPage {
             page_info: PageInfo::new(board_name),
             page_nav: PageNav::new(db)?,
@@ -519,6 +523,7 @@ impl BoardPage {
             page_footer: PageFooter::new(config),
             threads,
             page_num_links: PageNumLink::generate(page_count, page_num),
+            catalog_uri,
             is_staff,
         })
     }

@@ -96,12 +96,16 @@ impl OverviewPage {
     where
         S: AsRef<str>,
     {
-        let users = db.all_users()?.into_iter().map(|user| {
-            Ok(UserView {
-                post_count: db.user_post_count(user.id)?,
-                user,
+        let users = db
+            .all_users()?
+            .into_iter()
+            .map(|user| {
+                Ok(UserView {
+                    post_count: db.user_post_count(user.id)?,
+                    user,
+                })
             })
-        }).collect::<Result<_>>()?;
+            .collect::<Result<_>>()?;
 
         Ok(OverviewPage {
             page_info: PageInfo::new("Overview"),
