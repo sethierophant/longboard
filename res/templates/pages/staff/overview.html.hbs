@@ -1,10 +1,10 @@
 {{#*inline "content"}}
     <header class="overview-header">
-        <h1>Dashboard</h1>
         <section class="login-actions">
             <span class="staff-name">Logged in as {{staff.name}}.</span>
             <span class="staff-logout"><a href="/staff/logout">Logout</a></span>
         </section>
+        <h1>Dashboard</h1>
     </header>
     <section class="overview-item reports">
         <h1>Reports</h1>
@@ -22,11 +22,11 @@
                 </span>
             {{/each}}
         </section>
-        <form action="/staff/close-report" method="POST">
+        <form class="overview-action" action="/staff/close-report" method="POST">
             <h2>Close Report</h2>
-            <label class="row-2" for="id">Report ID</label>
-            <input class="row-2" name="id" type="number">
-            <input class="row-2" value="Close" type="submit">
+            <label for="id">Report ID</label>
+            <input name="id" type="number">
+            <input value="Close" type="submit">
         </form>
     </section>
     <section class="overview-item boards">
@@ -39,27 +39,27 @@
                 <span class="board-description">{{description}}</span>
             {{/each}}
         </section>
-        <form action="/staff/create-board" method="POST">
+        <form class="overview-action" action="/staff/create-board" method="POST">
             <h2>Create Board</h2>
-            <label class="row-2" for="name">Name</label>
-            <input class="row-2" name="name" type="text">
-            <label class="row-3" for="description">Description</label>
-            <input class="row-3" name="description" type="text">
-            <input class="row-3" value="Create" type="submit">
+            <label for="name">Name</label>
+            <input name="name" type="text">
+            <label for="description">Description</label>
+            <input name="description" type="text">
+            <input value="Create" type="submit">
         </form>
-        <form action="/staff/edit-board" method="POST">
+        <form class="overview-action" action="/staff/edit-board" method="POST">
             <h2>Edit Board</h2>
-            <label class="row-2" for="name">Name</label>
-            <input class="row-2" name="name" type="text">
-            <label class="row-3" for="description">New Description</label>
-            <input class="row-3" name="description" type="text">
-            <input class="row-3" value="Edit" type="submit">
+            <label for="name">Name</label>
+            <input name="name" type="text">
+            <label for="description">New Description</label>
+            <input name="description" type="text">
+            <input value="Edit" type="submit">
         </form>
-        <form action="/staff/delete-board" method="POST">
+        <form class="overview-action" action="/staff/delete-board" method="POST">
             <h2>Delete Board</h2>
-            <label class="row-2" for="name">Name</label>
-            <input class="row-2" name="name" type="text">
-            <input class="row-2" value="Delete" type="submit">
+            <label for="name">Name</label>
+            <input name="name" type="text">
+            <input value="Delete" type="submit">
         </form>
     </section>
     <section class="overview-item users">
@@ -72,7 +72,7 @@
             <span class="table-header">Ban Expires</span>
             {{#each users}}
                 <span>{{id}}</span>
-                <span title="{{hash}}">{{hash}}</span>
+                <span title="{{hash}}" class="user-hash">{{hash}}</span>
                 <span>{{post_count}}</span>
                 <span>
                     {{#if ban_expires}}
@@ -88,39 +88,39 @@
                 {{/if}}
             {{/each}}
         </section>
-        <form action="/staff/ban-user/" method="POST">
+        <form class="overview-action" action="/staff/ban-user/" method="POST">
             <h2>Ban User</h2>
-            <label class="row-2" for="id">User ID</label>
-            <input class="row-2" type="number" name="id">
-            <label class="row-3" for="duration">Duration</label>
-            <input class="row-3" type="datetime" name="duration">
-            <input class="row-3" type="submit" value="Ban">
+            <label for="id">User ID</label>
+            <input type="number" name="id">
+            <label for="duration">Duration</label>
+            <input type="text" name="duration">
+            <input type="submit" value="Ban">
         </form>
-        <form action="/staff/unban-user/" method="POST">
+        <form class="overview-action" action="/staff/unban-user/" method="POST">
             <h2>Unban User</h2>
-            <label class="row-2" for="id">User ID</label>
-            <input class="row-2" type="number" name="id">
-            <input class="row-2" type="submit" value="Unban">
+            <label for="id">User ID</label>
+            <input type="number" name="id">
+            <input type="submit" value="Unban">
         </form>
-        <form action="/staff/add-note/" method="POST">
+        <form class="overview-action" action="/staff/add-note/" method="POST">
             <h2>Add Note</h2>
-            <label class="row-2" for="id">User ID</label>
-            <input class="row-2" type="number" name="id">
-            <label class="row-3" for="note">Note</label>
-            <input class="row-3" type="text" name="note">
-            <input class="row-3" type="submit" value="Add">
+            <label for="id">User ID</label>
+            <input type="number" name="id">
+            <label for="note">Note</label>
+            <input type="text" name="note">
+            <input type="submit" value="Add">
         </form>
-        <form action="/staff/remove-note/" method="POST">
+        <form class="overview-action" action="/staff/remove-note/" method="POST">
             <h2>Remove Note</h2>
-            <label class="row-2" for="id">User ID</label>
-            <input class="row-2" type="number" name="id">
-            <input class="row-2" type="submit" value="Remove">
+            <label for="id">User ID</label>
+            <input type="number" name="id">
+            <input type="submit" value="Remove">
         </form>
-        <form action="/staff/delete-posts-for-user/" method="POST">
+        <form class="overview-action" action="/staff/delete-posts-for-user/" method="POST">
             <h2>Delete All Posts</h2>
-            <label class="row-2" for="id">User ID</label>
-            <input class="row-2" type="number" name="id">
-            <input class="row-2" type="submit" value="Delete All">
+            <label for="id">User ID</label>
+            <input type="number" name="id">
+            <input type="submit" value="Delete All">
         </form>
     </section>
 {{/inline}}

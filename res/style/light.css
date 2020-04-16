@@ -2,3 +2,10 @@
 @import url('/file/style/light-colors.css');
 @import url('/file/style/base-colors.css');
 
+input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    textarea
+{
+    border: thin solid var(--border-color);
+}

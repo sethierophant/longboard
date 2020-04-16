@@ -33,7 +33,7 @@ pub struct UserOptions {
 impl Default for UserOptions {
     fn default() -> UserOptions {
         UserOptions {
-            style: "default".into(),
+            style: "light".into(),
         }
     }
 }
@@ -48,6 +48,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for UserOptions {
             style: cookies
                 .get("option-style")
                 .map(|cookie| cookie.value().to_string())
+                .filter(|s| !s.is_empty())
                 .unwrap_or(UserOptions::default().style),
         })
     }

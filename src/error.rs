@@ -6,8 +6,9 @@ use log::{error, warn};
 
 use maplit::hashmap;
 
-use rocket::http::Status;
-use rocket::{response::Responder, Request};
+use rocket::http::{hyper::header::Location, Status};
+use rocket::response::{Responder, Response};
+use rocket::{uri, Request};
 
 use rocket_contrib::templates::Template;
 
@@ -61,6 +62,8 @@ pub enum Error {
     ReportTooLong,
     #[display(fmt = "Cannot add a post to a locked thread.")]
     ThreadLocked,
+    #[display(fmt = "Tried to access a staff page without authentication.")]
+    NotAuthenticated,
     #[display(fmt = "Couldn't create regex: {}", _0)]
     #[from]
     RegexError(regex::Error),
@@ -161,6 +164,18 @@ impl<'r> Responder<'r> for Error {
                 res.set_status(Status::NotFound);
 
                 Ok(res)
+            }
+
+            Error::NotAuthenticated => {
+                // If the client isn't authenticated, just redirect them to the
+                // staff login page.
+
+                let login_uri = uri!(crate::routes::staff::login);
+
+                Ok(Response::build()
+                    .status(Status::SeeOther)
+                    .header(Location(login_uri.to_string()))
+                    .finalize())
             }
 
             _ => {

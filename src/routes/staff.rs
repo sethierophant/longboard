@@ -153,17 +153,28 @@ pub fn logout<'r>(
 /// Serve the overview for staff actions.
 #[get("/staff")]
 pub fn overview(
-    session: Session,
     db: State<Database>,
     options: UserOptions,
+    session: Option<Session>,
 ) -> Result<OverviewPage> {
-    OverviewPage::new(session.staff_name, &db, &options)
+    if let Some(session) = session {
+        OverviewPage::new(session.staff_name, &db, &options)
+    } else {
+        Err(Error::NotAuthenticated)
+    }
 }
 
 /// Serve the history for staff actions.
 #[get("/staff/history")]
-pub fn history(options: UserOptions, _session: Session) -> Result<HistoryPage> {
-    HistoryPage::new(&options)
+pub fn history(
+    options: UserOptions,
+    session: Option<Session>,
+) -> Result<HistoryPage> {
+    if session.is_none() {
+        Err(Error::NotAuthenticated)
+    } else {
+        HistoryPage::new(&options)
+    }
 }
 
 /// Form data for closing a report.

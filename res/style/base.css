@@ -39,7 +39,8 @@ body {
 }
 
 .banner {
-    margin: 1em 0;
+    margin: 1em;
+    max-width: 100%;
 }
 
 .page-header .board-name, .page-header .board-description {
@@ -88,8 +89,18 @@ nav.boards a {
     padding: 0.6em;
     display: grid;
     grid-template-columns: 6em auto;
-    width: 350px;
+    width: 25em;
     grid-gap: 0.2em;
+}
+
+@media (max-width: 400px) {
+    .new-item-form {
+        max-width: 85%;
+    }
+
+    .new-item-form input, .new-item-form textarea, .new-item-form select {
+        width: calc(100% - 1.2em);
+    }
 }
 
 .new-item-form label {
@@ -381,6 +392,18 @@ form.post-action input[type=submit]:hover {
     max-height: 140px;
 }
 
+@media (max-width: 600px) {
+    .catalog-item {
+        width: 120px;
+        max-height: 200px;
+    }
+
+    .catalog-item img {
+        max-width: 120px;
+        max-height: 90px;
+    }
+}
+
 .catalog-item .item-stats {
     font-weight: 900;
 }
@@ -391,26 +414,20 @@ form.post-action input[type=submit]:hover {
 }
 
 .recent {
-    display: grid;
-    grid-template-columns: auto auto;
-}
-
-.recent .recent-posts, .recent .recent-files {
-    margin: 1em 4em;
-}
-
-.recent .recent-files {
-    grid-column: 1;
     display: flex;
-    flex-flow: column nowrap;
-    align-items: center;
+    flex-flow: row wrap;
+    justify-content: center;
 }
 
 .recent .recent-posts {
-    grid-column: 2;
+    max-width: 300px;
+}
+
+.recent .recent-posts, .recent .recent-files {
     display: flex;
     flex-flow: column nowrap;
     align-items: center;
+    margin: 1em 4em;
 }
 
 .recent .recent-posts .post-preview, .recent .recent-files .file-preview {
@@ -431,7 +448,7 @@ form.post-action input[type=submit]:hover {
     padding: 0.6em;
     display: grid;
     grid-template-columns: 6em auto;
-    width: 350px;
+    width: 25em;
     grid-gap: 0.2em;
 }
 
@@ -489,20 +506,18 @@ form.post-action input[type=submit]:hover {
 
 .overview-header {
     align-self: stretch;
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .overview-header h1 {
-    grid-row: 1;
-    grid-column: 1;
-    justify-self: center;
-    margin: 0.4em;
+    margin-bottom: 2em;
 }
 
 .overview-header .login-actions {
-    grid-row: 1;
-    grid-column: 1;
-    justify-self: end;
+    margin-left: auto;
+    margin-bottom: 2em;
 }
 
 .overview-header .login-actions > * {
@@ -510,8 +525,8 @@ form.post-action input[type=submit]:hover {
 }
 
 .overview-item {
-    margin-top: 2em;
-    padding-bottom: 1em;
+    margin: 1em 1em;
+    padding: 1em 0;
 }
 
 .report-table, .board-table, .user-table {
@@ -535,6 +550,11 @@ form.post-action input[type=submit]:hover {
     font-weight: bold;
 }
 
+.user-hash {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .user-note {
     grid-column: 1 / 5;
     font-style: italic;
@@ -542,7 +562,7 @@ form.post-action input[type=submit]:hover {
     margin-bottom: 0.2em;
 }
 
-.overview-item form {
+.overview-action {
     display: grid;
     padding: 0.8em;
     margin-top: 0.8em;
@@ -551,7 +571,7 @@ form.post-action input[type=submit]:hover {
     border-radius: 4px;
 }
 
-.overview-item form h2 {
+.overview-action h2 {
     font: 1em 'Oswald';
     text-align: center;
     grid-row: 1;
@@ -559,35 +579,68 @@ form.post-action input[type=submit]:hover {
     margin: 0 0 0.4em;
 }
 
-.overview-item form input[type="number"] {
+.overview-action input[type="number"] {
     width: 100%;
 }
 
-.row-2 {
-    grid-row: 2;
+.overview-action label {
+    grid-column: 1;
 }
 
-.row-3 {
-    grid-row: 3;
+.overview-action input {
+    grid-column: 2;
+}
+
+.overview-action input[type="submit"] {
+    grid-column: 3;
+}
+
+@media (max-width: 400px) {
+    .overview-action {
+        grid-template-columns: 7em auto;
+    }
+
+    .overview-action input {
+        width: 100%;
+    }
+
+    .overview-action h2 {
+        grid-column: 1 / 3;
+    }
+
+    .overview-action input[type="submit"] {
+        grid-column: 1 / 3;
+    }
+}
+
+.page-wrapper {
+    min-height: 100%;
+    display: flex;
+    flex-flow: column nowrap;
+    max-width: 100%;
 }
 
 .page-body {
     max-width: 1000px;
     margin: 0 auto;
 
-    min-height: calc(100% - 100px);
-    margin-bottom: 100px;
-
     padding-top: 1em;
     padding-bottom: 2em;
 }
 
+@media (max-width: 400px) {
+    .page-body {
+        max-width: 100%;
+    }
+}
+
 .page-footer {
-    display: grid;
-    position: relative;
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
 
     height: 100px;
-    margin-top: -100px;
+    margin-top: auto;
 
     padding: 1em;
 
@@ -606,8 +659,6 @@ form.post-action input[type=submit]:hover {
     padding: 0;
     flex-direction: row;
     list-style: none;
-    justify-content: center;
-    align-self: center;
 }
 
 .page-footer li {
@@ -616,5 +667,5 @@ form.post-action input[type=submit]:hover {
 
 .page-footer .version {
     font: 0.8em 'Roboto Condensed';
-    justify-self: flex-end;
+    margin-left: auto;
 }

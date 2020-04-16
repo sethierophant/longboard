@@ -296,20 +296,20 @@ fn create_new_models(
             let salt: [u8; 20] = thread_rng().gen();
             let hash = hash_encoded(
                 ident.as_bytes(),
-                &salt, &argon2::Config::default()
-            ).expect("could not hash ident with Argon2");
+                &salt,
+                &argon2::Config::default(),
+            )
+            .expect("could not hash ident with Argon2");
 
             Some(hash)
         }
-        None => {
-            entries.param("staff-ident").and_then(|ident| {
-                if ident == "Anonymous" {
-                    None
-                } else {
-                    Some(ident.to_string())
-                }
-            })
-        },
+        None => entries.param("staff-ident").and_then(|ident| {
+            if ident == "Anonymous" {
+                None
+            } else {
+                Some(ident.to_string())
+            }
+        }),
     };
 
     let delete_hash = entries.param("delete-pass").map(|pass| {

@@ -4,14 +4,16 @@
             {{> page-nav}}
         {{/with}}
         {{#with page_header.banner }}
-            {{> banner}}
+            <img class="banner" src="{{uri}}">
         {{/with}}
         <h1 class="board-name">/{{page_header.board.name}}/</h1>
         <h2 class="board-description">{{page_header.board.description}}</h2>
         {{> new-form}}
-        {{#with page_header.notice_html}}
-            {{> view/notice}}
-        {{/with}}
+        {{#if page_header.notice_html}}
+            <section class="notice">
+                {{{page_header.notice_html}}}
+            </section>
+        {{/if}}
     </header>
     {{> content}}
 {{/inline}}
