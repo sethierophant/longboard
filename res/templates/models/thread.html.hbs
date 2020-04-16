@@ -2,19 +2,7 @@
     <script src="/file/script/thread.js">
 {{/inline}}
 <section class="thread">
-    <header>
-        <a href="{{uri}}">
-            <h1 class="subject">
-                {{subject}}
-            </h1>
-        </a>
-        {{#if pinned}}
-            <span class="thread-pin">&#128204;</span>
-        {{/if}}
-        {{#if locked}}
-            <span class="thread-lock">&#128274;</span>
-        {{/if}}
-    </header>
+    {{> models/thread-subject.html.hbs}}
     {{#each posts}}
         {{> models/post}}
     {{/each}}

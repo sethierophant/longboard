@@ -26,49 +26,36 @@
     {{#unless hide_actions}}
         <footer class="actions">
             {{#if @root.staff}}
-                {{#if @first}}
-                    {{#unless ../pinned}}
-                        <form class="post-action" method="POST"
-                              action="{{pin_uri}}">
-                            <input type="hidden" name="id" value="{{id}}">
-                            <input type="submit" value="Pin">
-                        </form>
-                    {{else}}
-                        <form class="post-action" method="POST"
-                              action="{{unpin_uri}}">
-                            <input type="hidden" name="id" value="{{id}}">
-                            <input type="submit" value="Unpin">
-                        </form>
-                    {{/unless}}
+                <form class="post-action" method="POST">
+                    <label for="reason">Reason</label>
+                    <input type="text" name="reason">
 
-                    {{#unless ../locked}}
-                        <form class="post-action" method="POST"
-                              action="{{lock_uri}}">
-                            <input type="hidden" name="id" value="{{id}}">
-                            <input type="submit" value="Lock">
-                        </form>
-                    {{else}}
-                        <form class="post-action" method="POST"
-                              action="{{unlock_uri}}">
-                            <input type="hidden" name="id" value="{{id}}">
-                            <input type="submit" value="Unock">
-                        </form>
-                    {{/unless}}
-                {{/if}}
+                    {{#if @first}}
+                        {{#unless ../pinned}}
+                            <input type="submit" value="Pin"
+                                                 formaction="{{pin_uri}}">
+                        {{else}}
+                            <input type="submit" value="Unpin"
+                                                 formaction="{{unpin_uri}}">
+                        {{/unless}}
+                        {{#unless ../locked}}
+                            <input type="submit" value="Lock"
+                                                 formaction="{{lock_uri}}">
+                        {{else}}
+                            <input type="submit" value="Unock"
+                                                 formaction="{{unlock_uri}}">
+                        {{/unless}}
+                    {{/if}}
 
-                <form class="post-action" method="POST"
-                      action="{{staff_delete_uri}}">
-                    <input type="hidden" name="id" value="{{id}}">
-                    <input type="submit" value="Delete">
+                    <input type="submit" value="Delete"
+                                         formaction="{{staff_delete_uri}}">
                 </form>
-            {{/if}}
-
-            {{#unless @root.staff}}
+            {{else}}
                 <a class="post-action action-report"
                    href="{{report_uri}}">Report</a>
                 <a class="post-action action-delete"
                    href="{{delete_uri}}">Delete</a>
-            {{/unless}}
+            {{/if}}
         </footer>
     {{/unless}}
 </section>

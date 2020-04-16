@@ -12,6 +12,7 @@
     --footer-background-color: hsl(100, 100%, 95%);
     --background-gradient-start: white;
     --background-gradient-end: hsl(100, 100%, 95%);
-    --post-action-color: hsl(0, 0%, 50%);
-    --post-action-hover-color: hsl(0, 0%, 70%);
+    --post-action-color: hsl(0, 0%, 4%);
+    --post-action-hover-color: hsl(0, 0%, 50%);
+    --post-action-reason-color: hsl(0, 0%, 80%);
 }

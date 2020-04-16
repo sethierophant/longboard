@@ -53,6 +53,20 @@ body {
     animation: 1.0s ease-out 0s highlight;
 }
 
+form.post-action input[type="submit"], a.post-action {
+    color: var(--post-action-color);
+    background: none;
+}
+
+form.post-action input[type="submit"]:hover, a.post-action:hover{
+    color: var(--post-action-hover-color);
+}
+
+form.post-action input[type=text] {
+    color: var(--text-color);
+    background-color: var(--post-action-reason-color);
+}
+
 @keyframes highlight {
     from {
         background-color: var(--background-color-highlight)
@@ -69,14 +83,6 @@ body {
 
 .post-author, .post-timestamp {
     opacity: 0.5;
-}
-
-.post .actions .post-action {
-    color: var(--post-action-color);
-}
-
-.post .actions .post-action:hover {
-    color: var(--post-action-hover-color);
 }
 
 .action .post {

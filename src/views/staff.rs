@@ -5,10 +5,9 @@ use serde::{Serialize, Serializer};
 use serde_json::value::{to_value, Value as JsonValue};
 
 use crate::impl_template_responder;
-use crate::models::staff::{Role, Staff, User};
+use crate::models::staff::{Role, Staff, StaffAction, User};
 use crate::models::{Board, Report};
-use crate::routes::UserOptions;
-use crate::views::PageInfo;
+use crate::views::{Context, PageFooter, PageInfo};
 use crate::{Database, Result};
 
 #[derive(Debug)]
@@ -111,6 +110,7 @@ impl Serialize for UserView {
 #[derive(Debug, Serialize)]
 pub struct OverviewPage {
     page_info: PageInfo,
+    page_footer: PageFooter,
     staff: StaffView,
     reports: Vec<ReportView>,
     boards: Vec<Board>,
@@ -118,34 +118,30 @@ pub struct OverviewPage {
 }
 
 impl OverviewPage {
-    pub fn new<S>(
-        user_name: S,
-        db: &Database,
-        options: &UserOptions,
-    ) -> Result<OverviewPage>
-    where
-        S: AsRef<str>,
-    {
-        let users = db
+    pub fn new(context: &Context) -> Result<OverviewPage> {
+        let users = context
+            .database
             .all_users()?
             .into_iter()
             .map(|user| {
                 Ok(UserView {
-                    post_count: db.user_post_count(user.id)?,
+                    post_count: context.database.user_post_count(user.id)?,
                     user,
                 })
             })
             .collect::<Result<_>>()?;
 
         Ok(OverviewPage {
-            page_info: PageInfo::new("Overview", options),
-            staff: StaffView(db.staff(user_name)?),
-            reports: db
+            page_info: PageInfo::new("Overview", context),
+            page_footer: PageFooter::new(context),
+            staff: StaffView(context.staff.clone().unwrap()),
+            reports: context
+                .database
                 .all_reports()?
                 .into_iter()
-                .map(|report| ReportView::new(report.id, db))
+                .map(|report| ReportView::new(report.id, context.database))
                 .collect::<Result<_>>()?,
-            boards: db.all_boards()?,
+            boards: context.database.all_boards()?,
             users,
         })
     }
@@ -155,13 +151,15 @@ impl_template_responder!(OverviewPage, "pages/staff/overview");
 
 #[derive(Debug, Serialize)]
 pub struct LoginPage {
-    page_info: PageInfo,
+    pub page_info: PageInfo,
+    pub page_footer: PageFooter,
 }
 
 impl LoginPage {
-    pub fn new(options: &UserOptions) -> Result<LoginPage> {
+    pub fn new(context: &Context) -> Result<LoginPage> {
         Ok(LoginPage {
-            page_info: PageInfo::new("Login", options),
+            page_info: PageInfo::new("Login", context),
+            page_footer: PageFooter::new(context),
         })
     }
 }
@@ -171,14 +169,18 @@ impl_template_responder!(LoginPage, "pages/staff/login");
 #[derive(Debug, Serialize)]
 pub struct HistoryPage {
     page_info: PageInfo,
+    page_footer: PageFooter,
+    staff_actions: Vec<StaffAction>,
 }
 
 impl HistoryPage {
-    pub fn new(options: &UserOptions) -> Result<HistoryPage> {
+    pub fn new(context: &Context) -> Result<HistoryPage> {
         Ok(HistoryPage {
-            page_info: PageInfo::new("Moderation History", options),
+            page_info: PageInfo::new("Moderation History", context),
+            page_footer: PageFooter::new(context),
+            staff_actions: context.database.all_staff_actions()?,
         })
     }
 }
 
-impl_template_responder!(HistoryPage, "pages/staff/log");
+impl_template_responder!(HistoryPage, "pages/staff/history");

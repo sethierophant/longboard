@@ -25,7 +25,7 @@ use crate::{config::Config, Error, Result};
 pub mod new;
 pub mod staff;
 
-#[derive(FromForm)]
+#[derive(FromForm, Clone)]
 pub struct UserOptions {
     pub style: String,
 }
@@ -135,12 +135,8 @@ pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 
 /// Serve the home page.
 #[get("/", rank = 0)]
-pub fn home(
-    config: State<Config>,
-    db: State<Database>,
-    options: UserOptions,
-) -> Result<HomePage> {
-    HomePage::new(&db, &config, &options)
+pub fn home(context: Context) -> Result<HomePage> {
+    HomePage::new(&context)
 }
 
 /// Serve a admin-created page.
@@ -148,7 +144,7 @@ pub fn home(
 pub fn custom_page(
     page_name: String,
     config: State<Config>,
-    options: UserOptions,
+    context: Context,
 ) -> Result<Template> {
     let page_path = config
         .options
@@ -165,11 +161,11 @@ pub fn custom_page(
     let mut data = HashMap::new();
     data.insert(
         "page_info".to_string(),
-        to_value(PageInfo::new(&page_name, &options))?,
+        to_value(PageInfo::new(&page_name, &context))?,
     );
     data.insert(
         "page_footer".to_string(),
-        to_value(PageFooter::new(&config))?,
+        to_value(PageFooter::new(&context))?,
     );
     data.insert("page_name".to_string(), JsonValue::String(page_name));
     data.insert("content".to_string(), JsonValue::String(page_html));
@@ -179,12 +175,8 @@ pub fn custom_page(
 
 /// Serve the user options page.
 #[get("/options", rank = 0)]
-pub fn options(
-    db: State<Database>,
-    config: State<Config>,
-    options: UserOptions,
-) -> Result<OptionsPage> {
-    OptionsPage::new(&db, &config, &options)
+pub fn options(context: Context) -> Result<OptionsPage> {
+    OptionsPage::new(&context)
 }
 
 /// Update user options.
@@ -208,33 +200,23 @@ pub fn update_options<'r>(
 pub fn board(
     board_name: String,
     page: Option<u32>,
-    config: State<Config>,
     db: State<Database>,
-    options: UserOptions,
-    session: Option<Session>,
+    context: Context,
     _user: User,
 ) -> Result<BoardPage> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
 
-    BoardPage::new(
-        board_name,
-        page.unwrap_or(1),
-        &db,
-        &config,
-        &options,
-        session.and_then(|session| db.staff(&session.staff_name).ok()),
-    )
+    BoardPage::new(board_name, page.unwrap_or(1), &context)
 }
 
 /// Serve a board catalog.
 #[get("/<board_name>/catalog", rank = 2)]
 pub fn board_catalog(
     board_name: String,
-    config: State<Config>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _user: User,
 ) -> Result<BoardCatalogPage> {
     if let Err(Error::DatabaseError(diesel::result::Error::NotFound)) =
@@ -243,7 +225,7 @@ pub fn board_catalog(
         return Err(Error::BoardNotFound { board_name });
     }
 
-    BoardCatalogPage::new(board_name, &db, &config, &options)
+    BoardCatalogPage::new(board_name, &context)
 }
 
 /// Serve a thread.
@@ -251,10 +233,8 @@ pub fn board_catalog(
 pub fn thread(
     board_name: String,
     thread_id: ThreadId,
-    config: State<Config>,
     db: State<Database>,
-    options: UserOptions,
-    session: Option<Session>,
+    context: Context,
     _user: User,
 ) -> Result<ThreadPage> {
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
@@ -264,14 +244,7 @@ pub fn thread(
         });
     }
 
-    ThreadPage::new(
-        board_name,
-        thread_id,
-        &db,
-        &config,
-        &options,
-        session.and_then(|session| db.staff(&session.staff_name).ok()),
-    )
+    ThreadPage::new(board_name, thread_id, &context)
 }
 
 /// Serve a post preview.
@@ -300,7 +273,7 @@ pub fn report(
     thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _user: User,
 ) -> Result<ReportPage> {
     if db.board(board_name).is_err()
@@ -310,7 +283,7 @@ pub fn report(
         return Err(Error::PostNotFound { post_id });
     }
 
-    ReportPage::new(post_id, &db, &options)
+    ReportPage::new(post_id, &context)
 }
 
 /// Form data for reporting a post.
@@ -327,7 +300,7 @@ pub fn new_report(
     post_id: PostId,
     report_data: Form<ReportData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     user: User,
 ) -> Result<ActionSuccessPage> {
     if db.board(board_name).is_err()
@@ -353,7 +326,7 @@ pub fn new_report(
 
     let msg = format!("Reported post {} successfully.", post_id);
     let uri = uri!(thread: thread.board_name, thread.id).to_string();
-    Ok(ActionSuccessPage::new(msg, uri, &options))
+    Ok(ActionSuccessPage::new(msg, uri, &context))
 }
 
 /// Serve a form for deleting a post.
@@ -363,7 +336,7 @@ pub fn delete(
     thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _user: User,
 ) -> Result<DeletePage> {
     if db.board(board_name).is_err()
@@ -373,7 +346,7 @@ pub fn delete(
         return Err(Error::PostNotFound { post_id });
     }
 
-    DeletePage::new(post_id, &db, &options)
+    DeletePage::new(post_id, &context)
 }
 
 /// Form data for deleting a post.
@@ -391,7 +364,7 @@ pub fn handle_delete(
     post_id: PostId,
     delete_data: Form<DeleteData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _user: User,
 ) -> Result<ActionSuccessPage> {
     if db.board(board_name).is_err()
@@ -437,6 +410,6 @@ pub fn handle_delete(
     Ok(ActionSuccessPage::new(
         msg,
         redirect_uri.to_string(),
-        &options,
+        &context,
     ))
 }

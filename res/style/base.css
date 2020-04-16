@@ -23,8 +23,8 @@ body {
     margin: 0 auto;
 }
 
-.error h1, .action h1 {
-    font-size: 250%;
+.error h1, .action-page h1 {
+    font-size: 200%;
 }
 
 .site-name {
@@ -153,10 +153,16 @@ nav.boards a {
     box-sizing: border-box;
 }
 
+@media (min-width: 900px) {
+    .thread {
+        min-width: 900px;
+    }
+}
+
 .thread > header {
     width: 100%;
     display: flex;
-    flex-direction: row;
+    flex-flow: row wrap;
     justify-content: center;
 }
 
@@ -166,8 +172,13 @@ nav.boards a {
 
 .thread > header .subject {
     font: bold 1em 'Oswald';
-
     padding: 0.4em;
+    margin: 1em;
+}
+
+.thread-pin, .thread-lock {
+    margin: auto 0.4em;
+    vertical-align: center;
 }
 
 .thread .post:first-of-type {
@@ -175,6 +186,7 @@ nav.boards a {
     border: none;
     align-self: stretch;
     box-shadow: none;
+    min-width: 100%;
 }
 
 .post {
@@ -293,19 +305,23 @@ nav.boards a {
 }
 
 .post .actions {
+    margin-top: 1em;
     display: flex;
     flex-direction: row;
     clear: both;
 }
 
-.post .actions .post-action:first-child {
+.post-action:first-child {
     margin-left: auto;
 }
 
-.post .actions .post-action {
-    margin: 0 0.4em;
+a.post-action {
     text-decoration: none;
-    font-size: 0.9em;
+}
+
+a.post-action, form.post-action > * {
+    margin: 0 0.4em;
+    font-size: 0.8em;
 }
 
 .post .actions .post-action:last-child {
@@ -313,7 +329,8 @@ nav.boards a {
 }
 
 form.post-action input[type=submit] {
-    font: normal 1em 'Roboto Condensed';
+    font-weight: normal;
+    font-family: 'Roboto Condensed';
     background: none;
     padding: 0;
 }
@@ -322,11 +339,10 @@ form.post-action input[type=submit]:hover {
     cursor: pointer;
 }
 
-.action {
+.action-page {
     display: flex;
     flex-direction: column;
     align-items: center;
-    max-width: 50%;
     margin: 0 auto;
 }
 
@@ -345,9 +361,13 @@ form.post-action input[type=submit]:hover {
     grid-column: 1 / 3;
 }
 
-.action .post {
+.action-page .post {
     margin-bottom: 3em;
     align-self: center;
+}
+
+.board {
+    min-width: 100%;
 }
 
 .board .page-nums {
@@ -406,6 +426,15 @@ form.post-action input[type=submit]:hover {
 
 .catalog-item .item-stats {
     font-weight: 900;
+}
+
+.catalog-item a {
+    text-decoration: none;
+}
+
+.catalog-item .subject {
+    margin: 0.5em 0;
+    word-wrap: anywhere;
 }
 
 .home {
@@ -529,7 +558,7 @@ form.post-action input[type=submit]:hover {
     padding: 1em 0;
 }
 
-.report-table, .board-table, .user-table {
+.report-table, .board-table, .user-table, .action-table {
     display: grid;
     grid-gap: 0.4em 1em;
 }
@@ -544,6 +573,10 @@ form.post-action input[type=submit]:hover {
 
 .user-table {
     grid-template-columns: min-content auto max-content max-content max-content;
+}
+
+.action-table {
+    grid-template-columns: min-content max-content auto auto max-content;
 }
 
 .table-header {
@@ -621,17 +654,11 @@ form.post-action input[type=submit]:hover {
 }
 
 .page-body {
-    max-width: 1000px;
+    max-width: 900px;
     margin: 0 auto;
 
     padding-top: 1em;
     padding-bottom: 2em;
-}
-
-@media (max-width: 400px) {
-    .page-body {
-        max-width: 100%;
-    }
 }
 
 .page-footer {

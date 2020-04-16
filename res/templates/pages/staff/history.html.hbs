@@ -1,0 +1,19 @@
+{{#*inline "content"}}
+    <section class="history">
+        <section class="action-table">
+            <span class="table-header">ID</span>
+            <span class="table-header">Done By</span>
+            <span class="table-header">Action</span>
+            <span class="table-header">Reason</span>
+            <span class="table-header">Timestamp</span>
+            {{#each staff_actions}}
+                <span class="action-id">{{id}}</span>
+                <span class="action-done-by">{{done_by}}</span>
+                <span class="action-action">{{action}}</span>
+                <span class="action-reason">{{reason}}</span>
+                <span class="action-timestamp">{{time_stamp}}</span>
+            {{/each}}
+        </section>
+    </section>
+{{/inline}}
+{{> pages/staff/staff}}

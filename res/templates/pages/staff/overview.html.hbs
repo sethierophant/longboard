@@ -26,6 +26,8 @@
             <h2>Close Report</h2>
             <label for="id">Report ID</label>
             <input name="id" type="number">
+            <label for="reason">Reason</label>
+            <input name="reason" type="text">
             <input value="Close" type="submit">
         </form>
     </section>
@@ -94,12 +96,16 @@
             <input type="number" name="id">
             <label for="duration">Duration</label>
             <input type="text" name="duration">
+            <label for="reason">Reason</label>
+            <input name="reason" type="text">
             <input type="submit" value="Ban">
         </form>
         <form class="overview-action" action="/staff/unban-user/" method="POST">
             <h2>Unban User</h2>
             <label for="id">User ID</label>
             <input type="number" name="id">
+            <label for="reason">Reason</label>
+            <input name="reason" type="text">
             <input type="submit" value="Unban">
         </form>
         <form class="overview-action" action="/staff/add-note/" method="POST">
@@ -120,6 +126,8 @@
             <h2>Delete All Posts</h2>
             <label for="id">User ID</label>
             <input type="number" name="id">
+            <label for="reason">Reason</label>
+            <input name="reason" type="text">
             <input type="submit" value="Delete All">
         </form>
     </section>

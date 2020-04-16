@@ -1,0 +1,13 @@
+<header>
+    <a href="{{uri}}">
+        <h2 class="subject">
+            {{subject}}
+        </h2>
+    </a>
+    {{#if pinned}}
+        <span class="thread-pin">&#128204;</span>
+    {{/if}}
+    {{#if locked}}
+        <span class="thread-lock">&#128274;</span>
+    {{/if}}
+</header>

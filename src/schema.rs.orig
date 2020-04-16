@@ -68,6 +68,16 @@ table! {
 }
 
 table! {
+    staff_action (id) {
+        id -> Int4,
+        done_by -> Text,
+        action -> Text,
+        reason -> Text,
+        time_stamp -> Timestamptz,
+    }
+}
+
+table! {
     thread (id) {
         id -> Int4,
         time_stamp -> Timestamptz,
@@ -85,6 +95,7 @@ joinable!(post -> thread (thread));
 joinable!(report -> anon_user (user_id));
 joinable!(report -> post (post));
 joinable!(session -> staff (staff_name));
+joinable!(staff_action -> staff (done_by));
 joinable!(thread -> board (board));
 
 allow_tables_to_appear_in_same_query!(
@@ -95,5 +106,6 @@ allow_tables_to_appear_in_same_query!(
     report,
     session,
     staff,
+    staff_action,
     thread,
 );

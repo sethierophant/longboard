@@ -13,4 +13,5 @@
     --background-gradient-end: black;
     --post-action-color: hsl(0, 0%, 50%);
     --post-action-hover-color: hsl(0, 0%, 70%);
+    --post-action-reason-color: hsl(0, 0%, 20%);
 }

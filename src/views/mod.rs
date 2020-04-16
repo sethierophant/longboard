@@ -8,16 +8,55 @@ use serde::{Serialize, Serializer};
 
 use serde_json::value::{to_value, Value as JsonValue};
 
-use rocket::uri;
+use rocket::request::{FromRequest, Outcome};
+use rocket::{uri, Request, State};
 
 use crate::config::Banner;
 use crate::models::staff::Staff;
 use crate::models::*;
 use crate::routes::UserOptions;
-use crate::{config::Config, Result};
+use crate::{config::Config, Error, Result};
 
 pub mod staff;
 use staff::StaffView;
+
+/// Context that's needed to render a page.
+#[derive(Clone)]
+pub struct Context<'r> {
+    pub database: &'r Database,
+    pub config: &'r Config,
+    pub options: UserOptions,
+    pub staff: Option<Staff>,
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
+    type Error = Error;
+
+    fn from_request(req: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+        let database = req
+            .guard::<State<Database>>()
+            .expect("expected database to be initialized")
+            .inner();
+
+        let session = req
+            .guard::<Session>()
+            .expect("couldn't load session from cookies");
+
+        let staff = database.staff(session.staff_name).ok();
+
+        Outcome::Success(Context {
+            database,
+            staff,
+            config: req
+                .guard::<State<Config>>()
+                .expect("expected config to be initialized")
+                .inner(),
+            options: req
+                .guard::<UserOptions>()
+                .expect("couldn't load user options from cookies"),
+        })
+    }
+}
 
 /// Implement `Responder` for a type which implements `Serialize`, given a path
 /// to a template file that should be loaded.
@@ -55,14 +94,14 @@ pub struct PageInfo {
 }
 
 impl PageInfo {
-    pub fn new<S>(title: S, options: &UserOptions) -> PageInfo
+    pub fn new<S>(title: S, context: &Context) -> PageInfo
     where
         S: Into<String>,
     {
         PageInfo {
             title: title.into(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            style: options.style.clone(),
+            style: context.options.style.clone(),
         }
     }
 }
@@ -75,9 +114,9 @@ pub struct PageFooter {
 }
 
 impl PageFooter {
-    pub fn new(config: &Config) -> PageFooter {
+    pub fn new(context: &Context) -> PageFooter {
         PageFooter {
-            pages: config.options.custom_pages.clone(),
+            pages: context.config.options.custom_pages.clone(),
         }
     }
 }
@@ -89,9 +128,9 @@ pub struct PageNav {
 }
 
 impl PageNav {
-    pub fn new(db: &Database) -> Result<PageNav> {
+    pub fn new(context: &Context) -> Result<PageNav> {
         Ok(PageNav {
-            boards: db.all_boards()?,
+            boards: context.database.all_boards()?,
         })
     }
 }
@@ -109,18 +148,14 @@ pub struct PageHeader {
 }
 
 impl PageHeader {
-    fn new<S>(
-        board_name: S,
-        db: &Database,
-        config: &Config,
-    ) -> Result<PageHeader>
+    fn new<S>(board_name: S, context: &Context) -> Result<PageHeader>
     where
         S: AsRef<str>,
     {
         Ok(PageHeader {
-            board: db.board(board_name)?,
-            banner: BannerView(config.choose_banner().clone()),
-            notice_html: config.notice_html.clone(),
+            board: context.database.board(board_name)?,
+            banner: BannerView(context.config.choose_banner().clone()),
+            notice_html: context.config.notice_html.clone(),
         })
     }
 }
@@ -444,17 +479,19 @@ pub struct HomePage {
 }
 
 impl HomePage {
-    pub fn new(
-        db: &Database,
-        config: &Config,
-        options: &UserOptions,
-    ) -> Result<HomePage> {
+    pub fn new(context: &Context) -> Result<HomePage> {
         Ok(HomePage {
-            page_info: PageInfo::new("LONGBOARD", options),
-            page_nav: PageNav::new(db)?,
-            page_footer: PageFooter::new(config),
-            recent_posts: RecentPost::load(db, crate::DEFAULT_RECENT_POSTS)?,
-            recent_files: RecentFile::load(db, crate::DEFAULT_RECENT_FILES)?,
+            page_info: PageInfo::new("LONGBOARD", context),
+            page_nav: PageNav::new(context)?,
+            page_footer: PageFooter::new(context),
+            recent_posts: RecentPost::load(
+                context.database,
+                crate::DEFAULT_RECENT_POSTS,
+            )?,
+            recent_files: RecentFile::load(
+                context.database,
+                crate::DEFAULT_RECENT_FILES,
+            )?,
         })
     }
 }
@@ -478,22 +515,19 @@ pub struct OptionsPage {
 }
 
 impl OptionsPage {
-    pub fn new(
-        db: &Database,
-        config: &Config,
-        options: &UserOptions,
-    ) -> Result<OptionsPage> {
+    pub fn new(context: &Context) -> Result<OptionsPage> {
         Ok(OptionsPage {
-            page_info: PageInfo::new("Options", options),
-            page_nav: PageNav::new(db)?,
-            page_footer: PageFooter::new(config),
-            styles: config
+            page_info: PageInfo::new("Options", context),
+            page_nav: PageNav::new(context)?,
+            page_footer: PageFooter::new(context),
+            styles: context
+                .config
                 .options
                 .custom_styles
                 .iter()
                 .map(|style| StyleOption {
                     name: style.clone(),
-                    selected: style == &options.style,
+                    selected: style == &context.options.style,
                 })
                 .collect(),
         })
@@ -540,10 +574,7 @@ impl BoardPage {
     pub fn new<S>(
         board_name: S,
         page_num: u32,
-        db: &Database,
-        config: &Config,
-        options: &UserOptions,
-        staff: Option<Staff>,
+        context: &Context,
     ) -> Result<BoardPage>
     where
         S: AsRef<str>,
@@ -551,7 +582,8 @@ impl BoardPage {
         let board_name = board_name.as_ref();
         let page_width = crate::DEFAULT_PAGE_WIDTH;
 
-        let threads = db
+        let threads = context
+            .database
             .thread_page(
                 board_name,
                 Page {
@@ -560,23 +592,24 @@ impl BoardPage {
                 },
             )?
             .into_iter()
-            .map(|thread| DeepThread::new_preview(thread.id, &db))
+            .map(|thread| DeepThread::new_preview(thread.id, &context.database))
             .collect::<Result<_>>()?;
 
-        let page_count = db.thread_page_count(board_name, page_width)?;
+        let page_count =
+            context.database.thread_page_count(board_name, page_width)?;
 
         let catalog_uri =
             uri!(crate::routes::board_catalog: board_name).to_string();
 
         Ok(BoardPage {
-            page_info: PageInfo::new(board_name, options),
-            page_nav: PageNav::new(db)?,
-            page_header: PageHeader::new(board_name, db, config)?,
-            page_footer: PageFooter::new(config),
+            page_info: PageInfo::new(board_name, context),
+            page_nav: PageNav::new(context)?,
+            page_header: PageHeader::new(board_name, context)?,
+            page_footer: PageFooter::new(context),
             threads,
             page_num_links: PageNumLink::generate(page_count, page_num),
             catalog_uri,
-            staff: staff.map(|staff| StaffView(staff)),
+            staff: context.staff.clone().map(StaffView),
         })
     }
 }
@@ -588,7 +621,10 @@ impl_template_responder!(BoardPage, "pages/models/board");
 pub struct CatalogItem {
     thumb_uri: String,
     thread_uri: String,
+    subject: String,
     body: String,
+    pinned: bool,
+    locked: bool,
     num_posts: u32,
     num_files: u32,
 }
@@ -604,22 +640,19 @@ pub struct BoardCatalogPage {
 }
 
 impl BoardCatalogPage {
-    pub fn new<S>(
-        board_name: S,
-        db: &Database,
-        config: &Config,
-        options: &UserOptions,
-    ) -> Result<BoardCatalogPage>
+    pub fn new<S>(board_name: S, context: &Context) -> Result<BoardCatalogPage>
     where
         S: AsRef<str>,
     {
         let board_name = board_name.as_ref();
 
-        let first_posts = db.all_first_posts(board_name)?;
+        let first_posts = context.database.all_first_posts(board_name)?;
         let items = first_posts
             .into_iter()
             .map(|post| {
-                let files = db.files_in_post(post.id)?;
+                let thread = context.database.thread(post.thread_id)?;
+
+                let files = context.database.files_in_post(post.id)?;
 
                 let thumb_uri = files
                     .first()
@@ -636,18 +669,25 @@ impl BoardCatalogPage {
                 Ok(CatalogItem {
                     thumb_uri,
                     thread_uri,
+                    subject: thread.subject,
                     body: post.body,
-                    num_posts: db.thread_post_count(post.thread_id)?,
-                    num_files: db.thread_file_count(post.thread_id)?,
+                    pinned: thread.pinned,
+                    locked: thread.locked,
+                    num_posts: context
+                        .database
+                        .thread_post_count(post.thread_id)?,
+                    num_files: context
+                        .database
+                        .thread_file_count(post.thread_id)?,
                 })
             })
             .collect::<Result<_>>()?;
 
         Ok(BoardCatalogPage {
-            page_info: PageInfo::new(board_name, options),
-            page_nav: PageNav::new(db)?,
-            page_header: PageHeader::new(board_name, db, config)?,
-            page_footer: PageFooter::new(config),
+            page_info: PageInfo::new(board_name, context),
+            page_nav: PageNav::new(context)?,
+            page_header: PageHeader::new(board_name, context)?,
+            page_footer: PageFooter::new(context),
             items,
         })
     }
@@ -670,24 +710,21 @@ impl ThreadPage {
     pub fn new<S>(
         board_name: S,
         thread_id: ThreadId,
-        db: &Database,
-        config: &Config,
-        options: &UserOptions,
-        staff: Option<Staff>,
+        context: &Context,
     ) -> Result<ThreadPage>
     where
         S: AsRef<str>,
     {
-        let thread = DeepThread::new(thread_id, db)?;
+        let thread = DeepThread::new(thread_id, context.database)?;
         let DeepThread(ThreadView(Thread { ref subject, .. }), ..) = thread;
 
         Ok(ThreadPage {
-            page_info: PageInfo::new(subject.clone(), options),
-            page_nav: PageNav::new(db)?,
-            page_header: PageHeader::new(board_name.as_ref(), db, config)?,
-            page_footer: PageFooter::new(config),
+            page_info: PageInfo::new(subject.clone(), context),
+            page_nav: PageNav::new(context)?,
+            page_header: PageHeader::new(board_name.as_ref(), context)?,
+            page_footer: PageFooter::new(context),
             thread,
-            staff: staff.map(|staff| StaffView(staff)),
+            staff: context.staff.clone().map(StaffView),
         })
     }
 }
@@ -718,18 +755,16 @@ impl_template_responder!(PostPreview, "models/post");
 #[derive(Debug, Serialize)]
 pub struct ReportPage {
     pub page_info: PageInfo,
+    pub page_footer: PageFooter,
     pub post: Post,
 }
 
 impl ReportPage {
-    pub fn new(
-        post_id: PostId,
-        db: &Database,
-        options: &UserOptions,
-    ) -> Result<ReportPage> {
+    pub fn new(post_id: PostId, context: &Context) -> Result<ReportPage> {
         Ok(ReportPage {
-            page_info: PageInfo::new("Report post", options),
-            post: db.post(post_id)?,
+            page_info: PageInfo::new("Report post", context),
+            page_footer: PageFooter::new(context),
+            post: context.database.post(post_id)?,
         })
     }
 }
@@ -740,18 +775,16 @@ impl_template_responder!(ReportPage, "pages/actions/report");
 #[derive(Debug, Serialize)]
 pub struct DeletePage {
     pub page_info: PageInfo,
+    pub page_footer: PageFooter,
     pub post: Post,
 }
 
 impl DeletePage {
-    pub fn new(
-        post_id: PostId,
-        db: &Database,
-        options: &UserOptions,
-    ) -> Result<DeletePage> {
+    pub fn new(post_id: PostId, context: &Context) -> Result<DeletePage> {
         Ok(DeletePage {
-            page_info: PageInfo::new("Delete post", options),
-            post: db.post(post_id)?,
+            page_info: PageInfo::new("Delete post", context),
+            page_footer: PageFooter::new(context),
+            post: context.database.post(post_id)?,
         })
     }
 }
@@ -762,6 +795,7 @@ impl_template_responder!(DeletePage, "pages/actions/delete");
 #[derive(Debug, Serialize)]
 pub struct ActionSuccessPage {
     pub page_info: PageInfo,
+    pub page_footer: PageFooter,
     pub msg: String,
     pub redirect_uri: String,
 }
@@ -770,14 +804,15 @@ impl ActionSuccessPage {
     pub fn new<S1, S2>(
         msg: S1,
         redirect_uri: S2,
-        options: &UserOptions,
+        context: &Context,
     ) -> ActionSuccessPage
     where
         S1: Into<String>,
         S2: Into<String>,
     {
         ActionSuccessPage {
-            page_info: PageInfo::new("Success", options),
+            page_info: PageInfo::new("Success", context),
+            page_footer: PageFooter::new(context),
             msg: msg.into(),
             redirect_uri: redirect_uri.into(),
         }

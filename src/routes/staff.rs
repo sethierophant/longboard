@@ -14,9 +14,8 @@ use rocket::response::Response;
 use rocket::{get, post, uri, State};
 
 use crate::models::*;
-use crate::routes::UserOptions;
 use crate::views::staff::*;
-use crate::views::ActionSuccessPage;
+use crate::views::{ActionSuccessPage, Context};
 use crate::{Error, Result};
 
 impl<'a, 'r> FromRequest<'a, 'r> for Session {
@@ -84,15 +83,15 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
 /// Serve the login page for staff members.
 #[get("/staff/login")]
-pub fn login(options: UserOptions, _user: User) -> Result<LoginPage> {
-    LoginPage::new(&options)
+pub fn login(context: Context, _user: User) -> Result<LoginPage> {
+    LoginPage::new(&context)
 }
 
 /// Login form data.
 #[derive(FromForm)]
 pub struct LoginData {
-    user: String,
-    pass: String,
+    pub user: String,
+    pub pass: String,
 }
 
 /// Login as a staff member.
@@ -153,34 +152,34 @@ pub fn logout<'r>(
 /// Serve the overview for staff actions.
 #[get("/staff")]
 pub fn overview(
-    db: State<Database>,
-    options: UserOptions,
+    context: Context,
     session: Option<Session>,
 ) -> Result<OverviewPage> {
-    if let Some(session) = session {
-        OverviewPage::new(session.staff_name, &db, &options)
-    } else {
-        Err(Error::NotAuthenticated)
+    if session.is_none() {
+        return Err(Error::NotAuthenticated);
     }
+
+    OverviewPage::new(&context)
 }
 
 /// Serve the history for staff actions.
 #[get("/staff/history")]
 pub fn history(
-    options: UserOptions,
+    context: Context,
     session: Option<Session>,
 ) -> Result<HistoryPage> {
     if session.is_none() {
-        Err(Error::NotAuthenticated)
-    } else {
-        HistoryPage::new(&options)
+        return Err(Error::NotAuthenticated);
     }
+
+    HistoryPage::new(&context)
 }
 
 /// Form data for closing a report.
 #[derive(FromForm)]
 pub struct CloseReportData {
     pub id: ReportId,
+    pub reason: String,
 }
 
 /// Close a report.
@@ -188,18 +187,24 @@ pub struct CloseReportData {
 pub fn close_report(
     close_data: Form<CloseReportData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
-    let CloseReportData { id } = close_data.into_inner();
+    let CloseReportData { id, reason } = close_data.into_inner();
 
     db.delete_report(id)?;
+
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Closed report {}", id),
+        reason,
+    })?;
 
     let msg = format!("Closed report {} successfully.", id);
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
@@ -215,7 +220,7 @@ pub struct CreateBoardData {
 pub fn create_board(
     create_data: Form<CreateBoardData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let CreateBoardData { name, description } = create_data.into_inner();
@@ -227,7 +232,7 @@ pub fn create_board(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
@@ -243,7 +248,7 @@ pub struct EditBoardData {
 pub fn edit_board(
     edit_data: Form<EditBoardData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let EditBoardData { name, description } = edit_data.into_inner();
@@ -255,7 +260,7 @@ pub fn edit_board(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
@@ -270,7 +275,7 @@ pub struct DeleteBoardData {
 pub fn delete_board(
     delete_data: Form<DeleteBoardData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeleteBoardData { name } = delete_data.into_inner();
@@ -282,12 +287,12 @@ pub fn delete_board(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
 /// Helper type for the duration a user is banned for.
-struct BanDuration(Duration);
+pub struct BanDuration(pub Duration);
 
 impl<'v> FromFormValue<'v> for BanDuration {
     type Error = Error;
@@ -304,8 +309,9 @@ impl<'v> FromFormValue<'v> for BanDuration {
 /// Form data for banning a user.
 #[derive(FromForm)]
 pub struct BanUserData {
-    id: UserId,
-    duration: BanDuration,
+    pub id: UserId,
+    pub duration: BanDuration,
+    pub reason: String,
 }
 
 /// Ban a user.
@@ -313,29 +319,37 @@ pub struct BanUserData {
 pub fn ban_user(
     ban_data: Form<BanUserData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
     let BanUserData {
         id,
         duration: BanDuration(duration),
+        reason,
     } = ban_data.into_inner();
 
     let msg = format!("Banned user {} successfully.", id);
 
     db.ban_user(id, duration)?;
 
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Banned user {}", id),
+        reason,
+    })?;
+
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
 /// Form data for unbanning a user.
 #[derive(FromForm)]
 pub struct UnbanUserData {
-    id: UserId,
+    pub id: UserId,
+    pub reason: String,
 }
 
 /// Unban a user.
@@ -343,27 +357,33 @@ pub struct UnbanUserData {
 pub fn unban_user(
     unban_data: Form<UnbanUserData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
-    let UnbanUserData { id } = unban_data.into_inner();
+    let UnbanUserData { id, reason } = unban_data.into_inner();
 
     let msg = format!("Unbanned user {} successfully.", id);
 
     db.unban_user(id)?;
 
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Unbanned user {}", id),
+        reason,
+    })?;
+
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
 /// Form data for adding a note to a user.
 #[derive(FromForm)]
 pub struct AddNoteData {
-    id: UserId,
-    note: String,
+    pub id: UserId,
+    pub note: String,
 }
 
 /// Add a note to a user.
@@ -371,7 +391,7 @@ pub struct AddNoteData {
 pub fn add_note(
     note_data: Form<AddNoteData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let AddNoteData { id, note } = note_data.into_inner();
@@ -382,14 +402,14 @@ pub fn add_note(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
 /// Form data for removing a note from a user.
 #[derive(FromForm)]
 pub struct RemoveNoteData {
-    id: UserId,
+    pub id: UserId,
 }
 
 /// Remove a note from a user.
@@ -397,7 +417,7 @@ pub struct RemoveNoteData {
 pub fn remove_note(
     note_data: Form<RemoveNoteData>,
     db: State<Database>,
-    options: UserOptions,
+    context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let RemoveNoteData { id } = note_data.into_inner();
@@ -408,14 +428,15 @@ pub fn remove_note(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
 /// Form data for deleting all of a user's posts.
 #[derive(FromForm)]
 pub struct DeletePostsForUserData {
-    id: UserId,
+    pub id: UserId,
+    pub reason: String,
 }
 
 /// Delete all of a user's posts.
@@ -423,30 +444,45 @@ pub struct DeletePostsForUserData {
 pub fn delete_posts_for_user(
     delete_data: Form<DeletePostsForUserData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
-    let DeletePostsForUserData { id } = delete_data.into_inner();
+    let DeletePostsForUserData { id, reason } = delete_data.into_inner();
 
-    db.delete_posts_for_user(id)?;
+    let count = db.delete_posts_for_user(id)?;
+
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Deleted all posts for user {} ({} total)", id, count),
+        reason,
+    })?;
 
     let msg = "Deleted posts successfully.".to_string();
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &options,
+        &context,
     ))
 }
 
+/// Form data for any request that requires a reason.
+#[derive(FromForm)]
+pub struct ReasonData {
+    pub reason: String,
+}
+
 /// Pin a thread.
-#[post("/<board_name>/<thread_id>/pin")]
+#[post("/<board_name>/<thread_id>/pin", data = "<reason_data>")]
 pub fn pin(
     board_name: String,
     thread_id: ThreadId,
+    reason_data: Form<ReasonData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
+    let ReasonData { reason } = reason_data.into_inner();
+
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
@@ -458,19 +494,28 @@ pub fn pin(
 
     db.pin_thread(thread_id)?;
 
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Pinned thread {}", thread_id),
+        reason,
+    })?;
+
     let msg: String = "Pinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &options))
+    Ok(ActionSuccessPage::new(msg, uri, &context))
 }
 
 /// Unpin a thread.
-#[post("/<board_name>/<thread_id>/unpin")]
+#[post("/<board_name>/<thread_id>/unpin", data = "<reason_data>")]
 pub fn unpin(
     board_name: String,
     thread_id: ThreadId,
+    reason_data: Form<ReasonData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
+    let ReasonData { reason } = reason_data.into_inner();
+
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
@@ -482,19 +527,28 @@ pub fn unpin(
 
     db.unpin_thread(thread_id)?;
 
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Unpinned thread {}", thread_id),
+        reason,
+    })?;
+
     let msg: String = "Unpinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &options))
+    Ok(ActionSuccessPage::new(msg, uri, &context))
 }
 
 /// Lock a thread.
-#[post("/<board_name>/<thread_id>/lock")]
+#[post("/<board_name>/<thread_id>/lock", data = "<reason_data>")]
 pub fn lock(
     board_name: String,
     thread_id: ThreadId,
+    reason_data: Form<ReasonData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
+    let ReasonData { reason } = reason_data.into_inner();
+
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
@@ -506,19 +560,28 @@ pub fn lock(
 
     db.lock_thread(thread_id)?;
 
-    let msg: String = "Locked post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &options))
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Locked thread {}", thread_id),
+        reason,
+    })?;
+
+    let msg: String = "Locked thread successfully.".into();
+    Ok(ActionSuccessPage::new(msg, uri, &context))
 }
 
 /// Unlock a thread.
-#[post("/<board_name>/<thread_id>/unlock")]
+#[post("/<board_name>/<thread_id>/unlock", data = "<reason_data>")]
 pub fn unlock(
     board_name: String,
     thread_id: ThreadId,
+    reason_data: Form<ReasonData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
+    let ReasonData { reason } = reason_data.into_inner();
+
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
             board_name,
@@ -530,20 +593,32 @@ pub fn unlock(
 
     db.unlock_thread(thread_id)?;
 
-    let msg: String = "Unlocked post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &options))
+    db.insert_staff_action(NewStaffAction {
+        done_by: session.staff_name,
+        action: format!("Unlocked thread {}", thread_id),
+        reason,
+    })?;
+
+    let msg: String = "Unlocked thread successfully.".into();
+    Ok(ActionSuccessPage::new(msg, uri, &context))
 }
 
 /// Delete a post without needing a password.
-#[post("/<board_name>/<thread_id>/staff-delete/<post_id>")]
+#[post(
+    "/<board_name>/<thread_id>/staff-delete/<post_id>",
+    data = "<reason_data>"
+)]
 pub fn staff_delete(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
+    reason_data: Form<ReasonData>,
     db: State<Database>,
-    options: UserOptions,
-    _session: Session,
+    context: Context,
+    session: Session,
 ) -> Result<ActionSuccessPage> {
+    let ReasonData { reason } = reason_data.into_inner();
+
     if db.board(&board_name).is_err()
         || db.thread(thread_id).is_err()
         || db.post(post_id).is_err()
@@ -551,16 +626,29 @@ pub fn staff_delete(
         return Err(Error::PostNotFound { post_id });
     }
 
-    let post = db.post(post_id)?;
     let thread = db.parent_thread(post_id)?;
 
     let delete_thread = db.is_first_post(post_id)?;
 
     let msg = if delete_thread {
         db.delete_thread(thread.id)?;
-        format!("Deleted thread {} successfully.", post.thread_id)
+
+        db.insert_staff_action(NewStaffAction {
+            done_by: session.staff_name,
+            action: format!("Deleted thread {}", thread_id),
+            reason,
+        })?;
+
+        format!("Deleted thread {} successfully.", thread_id)
     } else {
         db.delete_post(post_id)?;
+
+        db.insert_staff_action(NewStaffAction {
+            done_by: session.staff_name,
+            action: format!("Deleted post {}", post_id),
+            reason,
+        })?;
+
         format!("Deleted post {} successfully.", post_id)
     };
 
@@ -573,6 +661,6 @@ pub fn staff_delete(
     Ok(ActionSuccessPage::new(
         msg,
         redirect_uri.to_string(),
-        &options,
+        &context,
     ))
 }

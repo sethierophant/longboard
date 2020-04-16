@@ -15,11 +15,8 @@ use diesel::{delete, insert_into, update, Insertable, Queryable};
 
 use serde::Serialize;
 
-use super::{PostId, ThreadId};
-use crate::schema::{anon_user, session, staff};
+use crate::schema::{anon_user, session, staff, staff_action};
 use crate::{Database, Error, Result};
-
-pub type UserId = i32;
 
 /// A session for a staff member.
 #[derive(Debug, Queryable, Insertable)]
@@ -95,6 +92,8 @@ pub mod sql_types {
     }
 }
 
+pub type UserId = i32;
+
 /// An anonymous site user.
 #[derive(Debug, Queryable, Serialize)]
 pub struct User {
@@ -164,31 +163,24 @@ impl NewUser {
     }
 }
 
-pub enum UserAction {
-    Ban { user: u8 },
+type StaffActionId = i32;
+
+/// An action done by a staff member.
+#[derive(Debug, Queryable, Serialize)]
+pub struct StaffAction {
+    pub id: StaffActionId,
+    pub done_by: String,
+    pub action: String,
+    pub reason: String,
+    pub time_stamp: DateTime<Utc>,
 }
 
-pub enum PostAction {
-    Delete { posts: Vec<PostId> },
-    Move { post: PostId },
-    Warn { post: PostId },
-}
-
-pub enum ThreadAction {
-    Delete { thread: Vec<PostId> },
-    Move { thread: PostId },
-    Lock { thread: ThreadId },
-
-    Sticky { thread: ThreadId },
-    UnSticky { thread: ThreadId },
-
-    Enable { thread: ThreadId },
-    Disable { thread: ThreadId },
-}
-
-pub enum BoardAction {
-    Delete { board: String },
-    Create { board: String },
+#[derive(Insertable)]
+#[table_name = "staff_action"]
+pub struct NewStaffAction {
+    pub done_by: String,
+    pub action: String,
+    pub reason: String,
 }
 
 impl Database {
@@ -381,12 +373,49 @@ impl Database {
         Ok(())
     }
 
-    /// Delete all of the posts a user has made.
-    pub fn delete_posts_for_user(&self, id: UserId) -> Result<()> {
+    /// Delete all of the posts a user has made. Returns the amount of rows
+    /// deleted.
+    pub fn delete_posts_for_user(&self, id: UserId) -> Result<u32> {
         use crate::schema::post::columns::user_id;
         use crate::schema::post::dsl::post;
 
-        delete(post.filter(user_id.eq(id))).execute(&self.pool.get()?)?;
+        let count: usize =
+            delete(post.filter(user_id.eq(id))).execute(&self.pool.get()?)?;
+
+        Ok(count.try_into().unwrap())
+    }
+
+    /// Get all staff actions.
+    pub fn all_staff_actions(&self) -> Result<Vec<StaffAction>> {
+        use crate::schema::staff_action::dsl::staff_action;
+
+        Ok(staff_action.load(&self.pool.get()?)?)
+    }
+
+    /// Get a staff action.
+    pub fn staff_action(
+        &self,
+        action_id: StaffActionId,
+    ) -> Result<StaffAction> {
+        use crate::schema::staff_action::columns::id;
+        use crate::schema::staff_action::dsl::staff_action;
+
+        Ok(staff_action
+            .filter(id.eq(action_id))
+            .limit(1)
+            .first(&self.pool.get()?)?)
+    }
+
+    /// Record an action that a staff member did.
+    pub fn insert_staff_action(
+        &self,
+        new_action: NewStaffAction,
+    ) -> Result<()> {
+        use crate::schema::staff_action::dsl::staff_action;
+
+        insert_into(staff_action)
+            .values(new_action)
+            .execute(&self.pool.get()?)?;
 
         Ok(())
     }
