@@ -1,3 +1,4 @@
+/* Expand a post's image when it is clicked. */
 function onClickPostImage(ev) {
     if (ev.target.dataset.expanded) {
         delete ev.target.dataset.expanded
@@ -11,6 +12,7 @@ function onClickPostImage(ev) {
     }
 }
 
+/* Update the image's attributes once the image is done loading. */
 function onLoadPostImage(ev) {
     if (ev.target.dataset.expanding) {
         delete ev.target.dataset.expanding
@@ -18,18 +20,7 @@ function onLoadPostImage(ev) {
     }
 }
 
-function onClickPostId(ev) {
-    ev.preventDefault()
-
-    var id = ev.target.textContent.replace("#", "")
-    var reference = ">>" + id + "\n\n"
-
-    var textarea = document.querySelector('.new-item-form textarea')
-
-    textarea.value += reference
-    textarea.focus()
-}
-
+/* Display a preview of a post when the cursor hovers over a post reference. */
 function onMouseEnterPostRef(ev) {
     var targetRect = ev.target.getBoundingClientRect()
 
@@ -56,6 +47,7 @@ function onMouseEnterPostRef(ev) {
     }
 }
 
+/* Insert a post preview into the DOM. */
 function addPostPreview(postPreview, targetRect) {
     postPreview.classList.add("post-fixed")
 
@@ -76,6 +68,8 @@ function addPostPreview(postPreview, targetRect) {
     postPreview.style.maxWidth = previewMaxWidth + "px"
 }
 
+/* Remove a post preview when the cursor stops hovering over the post
+ * reference. */
 function onMouseLeavePostRef(ev) {
     document.querySelectorAll('.post-fixed').forEach((elem) => {
         elem.remove()
@@ -86,10 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.post-image img').forEach((elem) => {
         elem.addEventListener('click', onClickPostImage)
         elem.addEventListener('load', onLoadPostImage)
-    })
-
-    document.querySelectorAll('.post .post-id').forEach((elem) => {
-        elem.addEventListener('click', onClickPostId)
     })
 
     document.querySelectorAll('.post-ref').forEach((elem) => {
