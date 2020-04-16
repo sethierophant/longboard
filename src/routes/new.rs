@@ -272,6 +272,7 @@ fn create_new_models(
     config: &Config,
     db: &Database,
     user: User,
+    session: Option<Session>,
 ) -> Result<(NewPost, Option<NewFile>)> {
     let missing_body_err = Error::MissingThreadParam {
         param: "body".into(),
@@ -303,13 +304,19 @@ fn create_new_models(
 
             Some(hash)
         }
-        None => entries.param("staff-ident").and_then(|ident| {
-            if ident == "Anonymous" {
-                None
+        None => {
+            if session.is_some() {
+                entries.param("staff-ident").and_then(|ident| {
+                    if ident == "Anonymous" {
+                        None
+                    } else {
+                        Some(ident.to_string())
+                    }
+                })
             } else {
-                Some(ident.to_string())
+                None
             }
-        }),
+        }
     };
 
     let delete_hash = entries.param("delete-pass").map(|pass| {
@@ -376,6 +383,7 @@ pub fn new_thread(
     config: State<Config>,
     db: State<Database>,
     user: User,
+    session: Option<Session>,
 ) -> Result<FragmentRedirect> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
@@ -396,7 +404,7 @@ pub fn new_thread(
         .ok_or(missing_subject_err)?
         .to_string();
 
-    let models = create_new_models(entries, &config, &db, user)?;
+    let models = create_new_models(entries, &config, &db, user, session)?;
 
     if let (mut new_post, Some(mut new_file)) = models {
         let new_thread_id = db.insert_thread(NewThread {
@@ -430,6 +438,7 @@ pub fn new_post(
     config: State<Config>,
     db: State<Database>,
     user: User,
+    session: Option<Session>,
 ) -> Result<FragmentRedirect> {
     if db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {
@@ -441,7 +450,7 @@ pub fn new_post(
     let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
 
     let (mut new_post, new_file) =
-        create_new_models(entries, &config, &db, user)?;
+        create_new_models(entries, &config, &db, user, session)?;
 
     new_post.thread = thread_id;
     new_post.board = board_name.clone();
