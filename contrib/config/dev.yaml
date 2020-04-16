@@ -17,5 +17,7 @@ filter_rules:
 
 pages:
     - Rules
-    - Stream
-    - IRC
+
+styles:
+    - dark
+    - light

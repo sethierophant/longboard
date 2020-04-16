@@ -9,6 +9,7 @@ use crate::Result;
 
 use crate::impl_template_responder;
 use crate::models::{staff::User, Board};
+use crate::routes::UserOptions;
 use crate::views::PageInfo;
 
 #[derive(Debug)]
@@ -92,7 +93,11 @@ pub struct OverviewPage {
 }
 
 impl OverviewPage {
-    pub fn new<S>(user_name: S, db: &Database) -> Result<OverviewPage>
+    pub fn new<S>(
+        user_name: S,
+        db: &Database,
+        options: &UserOptions,
+    ) -> Result<OverviewPage>
     where
         S: AsRef<str>,
     {
@@ -108,7 +113,7 @@ impl OverviewPage {
             .collect::<Result<_>>()?;
 
         Ok(OverviewPage {
-            page_info: PageInfo::new("Overview"),
+            page_info: PageInfo::new("Overview", options),
             staff: db.staff(user_name)?,
             reports: db
                 .all_reports()?
@@ -129,9 +134,9 @@ pub struct LoginPage {
 }
 
 impl LoginPage {
-    pub fn new() -> Result<LoginPage> {
+    pub fn new(options: &UserOptions) -> Result<LoginPage> {
         Ok(LoginPage {
-            page_info: PageInfo::new("Login"),
+            page_info: PageInfo::new("Login", options),
         })
     }
 }
@@ -144,9 +149,9 @@ pub struct HistoryPage {
 }
 
 impl HistoryPage {
-    pub fn new() -> Result<HistoryPage> {
+    pub fn new(options: &UserOptions) -> Result<HistoryPage> {
         Ok(HistoryPage {
-            page_info: PageInfo::new("Moderation History"),
+            page_info: PageInfo::new("Moderation History", options),
         })
     }
 }

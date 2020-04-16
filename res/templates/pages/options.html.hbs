@@ -1,0 +1,20 @@
+{{#*inline "body"}}
+    {{#with page_nav}}
+        {{> page-nav}}
+    {{/with}}
+    <section class="user-options">
+        <form class="user-options-form" method="POST">
+            <h2>Options</h2>
+            <label for="style">Style</label>
+            <select name="style">
+                {{#each styles}}
+                    <option value="{{name}}" {{#if selected}}selected="selected"{{/if}}>
+                        {{name}}
+                    </option>
+                {{/each}}
+            </select>
+            <input type="submit" value="Save">
+        </form>
+    </section>
+{{/inline}}
+{{> pages/page}}

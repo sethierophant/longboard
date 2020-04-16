@@ -1,0 +1,17 @@
+:root {
+    --bright-color: hsl(30, 100%, 60%);
+    --dull-color: hsl(0, 0%, 70%);
+    --form-submit-text-color: hsl(0, 0%, 98%);
+    --form-submit-background-color: hsl(140, 40%, 35%);
+    --form-submit-hover-color: hsl(140, 40%, 40%);
+    --text-color: hsl(0, 0%, 4%);
+    --background-color: hsl(100, 50%, 90%);
+    --background-color-highlight: hsl(0, 80%, 80%);
+    --border-color: hsl(0, 0%, 30%);
+    --shadow-color: hsl(0, 0%, 80%);
+    --footer-background-color: hsl(100, 100%, 95%);
+    --background-gradient-start: white;
+    --background-gradient-end: hsl(100, 100%, 95%);
+    --post-action-color: hsl(0, 0%, 50%);
+    --post-action-hover-color: hsl(0, 0%, 70%);
+}

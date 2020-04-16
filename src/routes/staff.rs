@@ -14,6 +14,7 @@ use rocket::response::Response;
 use rocket::{get, post, uri, State};
 
 use crate::models::*;
+use crate::routes::UserOptions;
 use crate::views::staff::*;
 use crate::views::ActionSuccessPage;
 use crate::{Error, Result};
@@ -83,8 +84,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
 /// Serve the login page for staff members.
 #[get("/staff/login")]
-pub fn login(_user: User) -> Result<LoginPage> {
-    LoginPage::new()
+pub fn login(options: UserOptions, _user: User) -> Result<LoginPage> {
+    LoginPage::new(&options)
 }
 
 /// Login form data.
@@ -151,14 +152,18 @@ pub fn logout<'r>(
 
 /// Serve the overview for staff actions.
 #[get("/staff")]
-pub fn overview(session: Session, db: State<Database>) -> Result<OverviewPage> {
-    OverviewPage::new(session.staff_name, &db)
+pub fn overview(
+    session: Session,
+    db: State<Database>,
+    options: UserOptions,
+) -> Result<OverviewPage> {
+    OverviewPage::new(session.staff_name, &db, &options)
 }
 
 /// Serve the history for staff actions.
 #[get("/staff/history")]
-pub fn history(_session: Session, _user: User) -> Result<HistoryPage> {
-    HistoryPage::new()
+pub fn history(options: UserOptions, _session: Session) -> Result<HistoryPage> {
+    HistoryPage::new(&options)
 }
 
 /// Form data for closing a report.
@@ -172,6 +177,7 @@ pub struct CloseReportData {
 pub fn close_report(
     close_data: Form<CloseReportData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let CloseReportData { id } = close_data.into_inner();
@@ -179,7 +185,11 @@ pub fn close_report(
     db.delete_report(id)?;
 
     let msg = format!("Closed report {} successfully.", id);
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for creating a board.
@@ -194,6 +204,7 @@ pub struct CreateBoardData {
 pub fn create_board(
     create_data: Form<CreateBoardData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let CreateBoardData { name, description } = create_data.into_inner();
@@ -202,7 +213,11 @@ pub fn create_board(
 
     db.insert_board(Board { name, description })?;
 
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for editing a board.
@@ -217,6 +232,7 @@ pub struct EditBoardData {
 pub fn edit_board(
     edit_data: Form<EditBoardData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let EditBoardData { name, description } = edit_data.into_inner();
@@ -225,7 +241,11 @@ pub fn edit_board(
 
     db.update_board(name, description)?;
 
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for deleting a board.
@@ -239,6 +259,7 @@ pub struct DeleteBoardData {
 pub fn delete_board(
     delete_data: Form<DeleteBoardData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeleteBoardData { name } = delete_data.into_inner();
@@ -247,7 +268,11 @@ pub fn delete_board(
 
     db.delete_board(name)?;
 
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Helper type for the duration a user is banned for.
@@ -277,6 +302,7 @@ pub struct BanUserData {
 pub fn ban_user(
     ban_data: Form<BanUserData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let BanUserData {
@@ -288,7 +314,11 @@ pub fn ban_user(
 
     db.ban_user(id, duration)?;
 
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for unbanning a user.
@@ -302,6 +332,7 @@ pub struct UnbanUserData {
 pub fn unban_user(
     unban_data: Form<UnbanUserData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let UnbanUserData { id } = unban_data.into_inner();
@@ -310,7 +341,11 @@ pub fn unban_user(
 
     db.unban_user(id)?;
 
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for adding a note to a user.
@@ -325,6 +360,7 @@ pub struct AddNoteData {
 pub fn add_note(
     note_data: Form<AddNoteData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let AddNoteData { id, note } = note_data.into_inner();
@@ -332,7 +368,11 @@ pub fn add_note(
     db.set_user_note(id, note)?;
 
     let msg = "Added note successfully.".to_string();
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for removing a note from a user.
@@ -346,6 +386,7 @@ pub struct RemoveNoteData {
 pub fn remove_note(
     note_data: Form<RemoveNoteData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let RemoveNoteData { id } = note_data.into_inner();
@@ -353,7 +394,11 @@ pub fn remove_note(
     db.remove_user_note(id)?;
 
     let msg = "Removed note successfully.".to_string();
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Form data for deleting all of a user's posts.
@@ -367,6 +412,7 @@ pub struct DeletePostsForUserData {
 pub fn delete_posts_for_user(
     delete_data: Form<DeletePostsForUserData>,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeletePostsForUserData { id } = delete_data.into_inner();
@@ -374,7 +420,11 @@ pub fn delete_posts_for_user(
     db.delete_posts_for_user(id)?;
 
     let msg = "Deleted posts successfully.".to_string();
-    Ok(ActionSuccessPage::new(msg, uri!(overview).to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        uri!(overview).to_string(),
+        &options,
+    ))
 }
 
 /// Pin a thread.
@@ -383,6 +433,7 @@ pub fn pin(
     board_name: String,
     thread_id: ThreadId,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
@@ -397,7 +448,7 @@ pub fn pin(
     db.pin_thread(thread_id)?;
 
     let msg: String = "Pinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri))
+    Ok(ActionSuccessPage::new(msg, uri, &options))
 }
 
 /// Unpin a thread.
@@ -406,6 +457,7 @@ pub fn unpin(
     board_name: String,
     thread_id: ThreadId,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
@@ -420,7 +472,7 @@ pub fn unpin(
     db.unpin_thread(thread_id)?;
 
     let msg: String = "Unpinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri))
+    Ok(ActionSuccessPage::new(msg, uri, &options))
 }
 
 /// Lock a thread.
@@ -429,6 +481,7 @@ pub fn lock(
     board_name: String,
     thread_id: ThreadId,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
@@ -443,7 +496,7 @@ pub fn lock(
     db.lock_thread(thread_id)?;
 
     let msg: String = "Locked post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri))
+    Ok(ActionSuccessPage::new(msg, uri, &options))
 }
 
 /// Unlock a thread.
@@ -452,6 +505,7 @@ pub fn unlock(
     board_name: String,
     thread_id: ThreadId,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
@@ -466,7 +520,7 @@ pub fn unlock(
     db.unlock_thread(thread_id)?;
 
     let msg: String = "Unlocked post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri))
+    Ok(ActionSuccessPage::new(msg, uri, &options))
 }
 
 /// Delete a post without needing a password.
@@ -476,6 +530,7 @@ pub fn staff_delete(
     thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
+    options: UserOptions,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     if db.board(&board_name).is_err()
@@ -504,5 +559,9 @@ pub fn staff_delete(
         uri!(crate::routes::thread: thread.board_name, thread.id)
     };
 
-    Ok(ActionSuccessPage::new(msg, redirect_uri.to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        redirect_uri.to_string(),
+        &options,
+    ))
 }

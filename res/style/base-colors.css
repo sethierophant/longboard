@@ -1,0 +1,138 @@
+a {
+    color: var(--bright-color);
+}
+
+input[type="submit"] {
+    color: var(--form-submit-text-color);
+    background-color: var(--form-submit-background-color);
+}
+
+input[type="submit"]:hover {
+    background-color: var(--form-submit-hover-color);
+}
+
+body {
+    color: var(--text-color);
+}
+
+.new-item-form {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+    box-shadow: 5px 5px 0px var(--shadow-color);
+}
+
+.notice {
+    border-top: thin dashed hsl(0, 0%, 15%);
+}
+
+.thread {
+    border-top: thin dashed hsl(0, 0%, 15%);
+}
+
+.thread > header a {
+    color: var(--text-color);
+}
+
+.thread > header .subject {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+    box-shadow: 5px 5px 0px var(--shadow-color);
+}
+
+.thread .post:first-of-type {
+    box-shadow: none;
+}
+
+.post {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+    box-shadow: 5px 5px 0px var(--shadow-color);
+}
+
+.post:target {
+    animation: 1.0s ease-out 0s highlight;
+}
+
+@keyframes highlight {
+    from {
+        background-color: var(--background-color-highlight)
+    }
+
+    to {
+        background-color: var(--background-color);
+    }
+}
+
+.post-info .post-ident {
+    color: var(--bright-color);
+}
+
+.post-author, .post-timestamp {
+    opacity: 0.5;
+}
+
+.post .actions .post-action {
+    color: var(--post-action-color);
+}
+
+.post .actions .post-action:hover {
+    color: var(--post-action-hover-color);
+}
+
+.action .post {
+    background-color: var(--background-color)
+    border: thin solid var(--border-color);
+}
+
+.board .page-nums {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+    box-shadow: 5px 5px 0px var(--shadow-color);
+}
+
+.board .page-num-link.current {
+    color: var(--text-color);
+}
+
+.catalog-item {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+}
+
+.post-preview .body {
+    border-left: solid 5px var(--shadow-color);
+}
+
+.user-options-form {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+    box-shadow: 5px 5px 0px var(--shadow-color);
+}
+
+.overview-item {
+    border-top: thin dashed var(--border-color);
+}
+
+.table-header {
+    color: var(--dull-color);
+}
+
+.overview-item form {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+}
+
+.page-wrapper {
+    background-image: linear-gradient(var(--background-gradient-start),
+                                      var(--background-gradient-end));
+    background-repeat: no-repeat;
+}
+
+.page-footer {
+    border-top: thin dashed var(--border-color);
+    background-color: var(--footer-background-color);
+}
+
+.page-footer a {
+    color: var(--text-color);
+}

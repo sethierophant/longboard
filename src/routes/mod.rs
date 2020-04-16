@@ -9,8 +9,9 @@ use argon2::verify_encoded;
 
 use pulldown_cmark::{html, Parser};
 
-use rocket::request::{Form, FromForm};
-use rocket::response::NamedFile;
+use rocket::http::{hyper::header::Location, Cookie, Status};
+use rocket::request::{Form, FromForm, FromRequest, Outcome, Request};
+use rocket::response::{NamedFile, Response};
 use rocket::{get, post, routes, uri, Route, State};
 
 use rocket_contrib::templates::Template;
@@ -24,10 +25,40 @@ use crate::{config::Config, Error, Result};
 pub mod new;
 pub mod staff;
 
+#[derive(FromForm)]
+pub struct UserOptions {
+    pub style: String,
+}
+
+impl Default for UserOptions {
+    fn default() -> UserOptions {
+        UserOptions {
+            style: "default".into(),
+        }
+    }
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for UserOptions {
+    type Error = Error;
+
+    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+        let cookies = request.cookies();
+
+        Outcome::Success(UserOptions {
+            style: cookies
+                .get("option-style")
+                .map(|cookie| cookie.value().to_string())
+                .unwrap_or(UserOptions::default().style),
+        })
+    }
+}
+
 /// Get all routes.
 pub fn routes() -> Vec<Route> {
     routes![
         crate::routes::home,
+        crate::routes::options,
+        crate::routes::update_options,
         crate::routes::static_file,
         crate::routes::banner,
         crate::routes::style,
@@ -63,12 +94,6 @@ pub fn routes() -> Vec<Route> {
         crate::routes::staff::lock,
         crate::routes::staff::unlock,
     ]
-}
-
-/// Serve the home page.
-#[get("/", rank = 0)]
-pub fn home(config: State<Config>, db: State<Database>) -> Result<HomePage> {
-    HomePage::new(&db, &config)
 }
 
 /// Serve a static file.
@@ -107,11 +132,22 @@ pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(config.options.upload_dir.join(file))?)
 }
 
+/// Serve the home page.
+#[get("/", rank = 0)]
+pub fn home(
+    config: State<Config>,
+    db: State<Database>,
+    options: UserOptions,
+) -> Result<HomePage> {
+    HomePage::new(&db, &config, &options)
+}
+
 /// Serve a admin-created page.
 #[get("/page/<page_name>", rank = 1)]
 pub fn custom_page(
     page_name: String,
     config: State<Config>,
+    options: UserOptions,
 ) -> Result<Template> {
     let page_path = config
         .options
@@ -128,7 +164,7 @@ pub fn custom_page(
     let mut data = HashMap::new();
     data.insert(
         "page_info".to_string(),
-        to_value(PageInfo::new(&page_name))?,
+        to_value(PageInfo::new(&page_name, &options))?,
     );
     data.insert(
         "page_footer".to_string(),
@@ -140,6 +176,32 @@ pub fn custom_page(
     Ok(Template::render("pages/custom-page", data))
 }
 
+/// Serve the user options page.
+#[get("/options", rank = 0)]
+pub fn options(
+    db: State<Database>,
+    config: State<Config>,
+    options: UserOptions,
+) -> Result<OptionsPage> {
+    OptionsPage::new(&db, &config, &options)
+}
+
+/// Update user options.
+#[post("/options", rank = 0, data = "<user_options>")]
+pub fn update_options<'r>(
+    user_options: Form<UserOptions>,
+) -> Result<Response<'r>> {
+    let UserOptions { style } = user_options.into_inner();
+
+    let style_cookie = Cookie::build("option-style", style).path("/").finish();
+
+    Ok(Response::build()
+        .status(Status::SeeOther)
+        .header(Location(uri!(crate::routes::options).to_string()))
+        .header(style_cookie)
+        .finalize())
+}
+
 /// Serve a board.
 #[get("/<board_name>?<page>", rank = 2)]
 pub fn board(
@@ -147,6 +209,7 @@ pub fn board(
     page: Option<u32>,
     config: State<Config>,
     db: State<Database>,
+    options: UserOptions,
     session: Option<Session>,
     _user: User,
 ) -> Result<BoardPage> {
@@ -159,6 +222,7 @@ pub fn board(
         page.unwrap_or(1),
         &db,
         &config,
+        &options,
         session.is_some(),
     )
 }
@@ -169,6 +233,7 @@ pub fn board_catalog(
     board_name: String,
     config: State<Config>,
     db: State<Database>,
+    options: UserOptions,
     _user: User,
 ) -> Result<BoardCatalogPage> {
     if let Err(Error::DatabaseError(diesel::result::Error::NotFound)) =
@@ -177,7 +242,7 @@ pub fn board_catalog(
         return Err(Error::BoardNotFound { board_name });
     }
 
-    BoardCatalogPage::new(board_name, &db, &config)
+    BoardCatalogPage::new(board_name, &db, &config, &options)
 }
 
 /// Serve a thread.
@@ -187,6 +252,7 @@ pub fn thread(
     thread_id: ThreadId,
     config: State<Config>,
     db: State<Database>,
+    options: UserOptions,
     session: Option<Session>,
     _user: User,
 ) -> Result<ThreadPage> {
@@ -197,7 +263,14 @@ pub fn thread(
         });
     }
 
-    ThreadPage::new(board_name, thread_id, &db, &config, session.is_some())
+    ThreadPage::new(
+        board_name,
+        thread_id,
+        &db,
+        &config,
+        &options,
+        session.is_some(),
+    )
 }
 
 /// Serve a post preview.
@@ -226,6 +299,7 @@ pub fn report(
     thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
+    options: UserOptions,
     _user: User,
 ) -> Result<ReportPage> {
     if db.board(board_name).is_err()
@@ -235,7 +309,7 @@ pub fn report(
         return Err(Error::PostNotFound { post_id });
     }
 
-    ReportPage::new(post_id, &db)
+    ReportPage::new(post_id, &db, &options)
 }
 
 /// Form data for reporting a post.
@@ -252,6 +326,7 @@ pub fn new_report(
     post_id: PostId,
     report_data: Form<ReportData>,
     db: State<Database>,
+    options: UserOptions,
     user: User,
 ) -> Result<ActionSuccessPage> {
     if db.board(board_name).is_err()
@@ -277,7 +352,7 @@ pub fn new_report(
 
     let msg = format!("Reported post {} successfully.", post_id);
     let uri = uri!(thread: thread.board_name, thread.id).to_string();
-    Ok(ActionSuccessPage::new(msg, uri))
+    Ok(ActionSuccessPage::new(msg, uri, &options))
 }
 
 /// Serve a form for deleting a post.
@@ -287,6 +362,7 @@ pub fn delete(
     thread_id: ThreadId,
     post_id: PostId,
     db: State<Database>,
+    options: UserOptions,
     _user: User,
 ) -> Result<DeletePage> {
     if db.board(board_name).is_err()
@@ -296,7 +372,7 @@ pub fn delete(
         return Err(Error::PostNotFound { post_id });
     }
 
-    DeletePage::new(post_id, &db)
+    DeletePage::new(post_id, &db, &options)
 }
 
 /// Form data for deleting a post.
@@ -314,6 +390,7 @@ pub fn handle_delete(
     post_id: PostId,
     delete_data: Form<DeleteData>,
     db: State<Database>,
+    options: UserOptions,
     _user: User,
 ) -> Result<ActionSuccessPage> {
     if db.board(board_name).is_err()
@@ -356,5 +433,9 @@ pub fn handle_delete(
         uri!(thread: thread.board_name, thread.id)
     };
 
-    Ok(ActionSuccessPage::new(msg, redirect_uri.to_string()))
+    Ok(ActionSuccessPage::new(
+        msg,
+        redirect_uri.to_string(),
+        &options,
+    ))
 }

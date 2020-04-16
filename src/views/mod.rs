@@ -12,6 +12,7 @@ use rocket::uri;
 
 use crate::config::Banner;
 use crate::models::*;
+use crate::routes::UserOptions;
 use crate::{config::Config, Result};
 
 pub mod staff;
@@ -47,16 +48,19 @@ pub struct PageInfo {
     pub title: String,
     /// The verson of the longboard server.
     pub version: String,
+    /// Which style to use.
+    pub style: String,
 }
 
 impl PageInfo {
-    pub fn new<S>(title: S) -> PageInfo
+    pub fn new<S>(title: S, options: &UserOptions) -> PageInfo
     where
         S: Into<String>,
     {
         PageInfo {
             title: title.into(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            style: options.style.clone(),
         }
     }
 }
@@ -438,9 +442,13 @@ pub struct HomePage {
 }
 
 impl HomePage {
-    pub fn new(db: &Database, config: &Config) -> Result<HomePage> {
+    pub fn new(
+        db: &Database,
+        config: &Config,
+        options: &UserOptions,
+    ) -> Result<HomePage> {
         Ok(HomePage {
-            page_info: PageInfo::new("LONGBOARD"),
+            page_info: PageInfo::new("LONGBOARD", options),
             page_nav: PageNav::new(db)?,
             page_footer: PageFooter::new(config),
             recent_posts: RecentPost::load(db, crate::DEFAULT_RECENT_POSTS)?,
@@ -450,6 +458,47 @@ impl HomePage {
 }
 
 impl_template_responder!(HomePage, "pages/home");
+
+/// A style that the user can select.
+#[derive(Debug, Serialize)]
+pub struct StyleOption {
+    name: String,
+    selected: bool,
+}
+
+/// A page for user options.
+#[derive(Debug, Serialize)]
+pub struct OptionsPage {
+    page_info: PageInfo,
+    page_nav: PageNav,
+    page_footer: PageFooter,
+    styles: Vec<StyleOption>,
+}
+
+impl OptionsPage {
+    pub fn new(
+        db: &Database,
+        config: &Config,
+        options: &UserOptions,
+    ) -> Result<OptionsPage> {
+        Ok(OptionsPage {
+            page_info: PageInfo::new("Options", options),
+            page_nav: PageNav::new(db)?,
+            page_footer: PageFooter::new(config),
+            styles: config
+                .options
+                .custom_styles
+                .iter()
+                .map(|style| StyleOption {
+                    name: style.clone(),
+                    selected: style == &options.style,
+                })
+                .collect(),
+        })
+    }
+}
+
+impl_template_responder!(OptionsPage, "pages/options");
 
 /// Information about a link to another page.
 #[derive(Debug, Serialize)]
@@ -491,6 +540,7 @@ impl BoardPage {
         page_num: u32,
         db: &Database,
         config: &Config,
+        options: &UserOptions,
         is_staff: bool,
     ) -> Result<BoardPage>
     where
@@ -517,7 +567,7 @@ impl BoardPage {
             uri!(crate::routes::board_catalog: board_name).to_string();
 
         Ok(BoardPage {
-            page_info: PageInfo::new(board_name),
+            page_info: PageInfo::new(board_name, options),
             page_nav: PageNav::new(db)?,
             page_header: PageHeader::new(board_name, db, config)?,
             page_footer: PageFooter::new(config),
@@ -556,6 +606,7 @@ impl BoardCatalogPage {
         board_name: S,
         db: &Database,
         config: &Config,
+        options: &UserOptions,
     ) -> Result<BoardCatalogPage>
     where
         S: AsRef<str>,
@@ -571,7 +622,7 @@ impl BoardCatalogPage {
                 let thumb_uri = files
                     .first()
                     .and_then(|file| file.thumb_uri())
-                    .unwrap_or(String::new());
+                    .unwrap_or_default();
 
                 let thread_uri = uri!(
                     crate::routes::thread:
@@ -591,7 +642,7 @@ impl BoardCatalogPage {
             .collect::<Result<_>>()?;
 
         Ok(BoardCatalogPage {
-            page_info: PageInfo::new(board_name),
+            page_info: PageInfo::new(board_name, options),
             page_nav: PageNav::new(db)?,
             page_header: PageHeader::new(board_name, db, config)?,
             page_footer: PageFooter::new(config),
@@ -619,6 +670,7 @@ impl ThreadPage {
         thread_id: ThreadId,
         db: &Database,
         config: &Config,
+        options: &UserOptions,
         is_staff: bool,
     ) -> Result<ThreadPage>
     where
@@ -628,7 +680,7 @@ impl ThreadPage {
         let DeepThread(ThreadView(Thread { ref subject, .. }), ..) = thread;
 
         Ok(ThreadPage {
-            page_info: PageInfo::new(subject.clone()),
+            page_info: PageInfo::new(subject.clone(), options),
             page_nav: PageNav::new(db)?,
             page_header: PageHeader::new(board_name.as_ref(), db, config)?,
             page_footer: PageFooter::new(config),
@@ -668,9 +720,13 @@ pub struct ReportPage {
 }
 
 impl ReportPage {
-    pub fn new(post_id: PostId, db: &Database) -> Result<ReportPage> {
+    pub fn new(
+        post_id: PostId,
+        db: &Database,
+        options: &UserOptions,
+    ) -> Result<ReportPage> {
         Ok(ReportPage {
-            page_info: PageInfo::new("Report post"),
+            page_info: PageInfo::new("Report post", options),
             post: db.post(post_id)?,
         })
     }
@@ -686,9 +742,13 @@ pub struct DeletePage {
 }
 
 impl DeletePage {
-    pub fn new(post_id: PostId, db: &Database) -> Result<DeletePage> {
+    pub fn new(
+        post_id: PostId,
+        db: &Database,
+        options: &UserOptions,
+    ) -> Result<DeletePage> {
         Ok(DeletePage {
-            page_info: PageInfo::new("Delete post"),
+            page_info: PageInfo::new("Delete post", options),
             post: db.post(post_id)?,
         })
     }
@@ -705,13 +765,17 @@ pub struct ActionSuccessPage {
 }
 
 impl ActionSuccessPage {
-    pub fn new<S1, S2>(msg: S1, redirect_uri: S2) -> ActionSuccessPage
+    pub fn new<S1, S2>(
+        msg: S1,
+        redirect_uri: S2,
+        options: &UserOptions,
+    ) -> ActionSuccessPage
     where
         S1: Into<String>,
         S2: Into<String>,
     {
         ActionSuccessPage {
-            page_info: PageInfo::new("Success"),
+            page_info: PageInfo::new("Success", options),
             msg: msg.into(),
             redirect_uri: redirect_uri.into(),
         }

@@ -1,11 +1,7 @@
-@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700:900|Roboto+Mono|Oswald:700&display=swap');
+/*@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700:900|Roboto+Mono|Oswald:700&display=swap');*/
 
 pre {
     overflow-x: scroll;
-}
-
-a {
-    color: hsl(0, 100%, 60%);
 }
 
 input, textarea {
@@ -15,12 +11,6 @@ input, textarea {
 input[type="submit"] {
     padding: 0.2em;
     font-weight: bold;
-    color: hsl(0, 0%, 98%);
-    background-color: hsl(0, 100%, 55%);
-}
-
-input[type="submit"]:hover {
-    background-color: hsl(0, 100%, 60%);
 }
 
 html, body {
@@ -31,7 +21,6 @@ body {
     font-family: 'Roboto Condensed';
     font-size: 14px;
     margin: 0 auto;
-    color: hsl(0, 0%, 98%);
 }
 
 .error h1, .action h1 {
@@ -101,10 +90,6 @@ nav.boards a {
     grid-template-columns: 6em auto;
     width: 350px;
     grid-gap: 0.2em;
-
-    background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 22%);
-    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 }
 
 .new-item-form label {
@@ -140,7 +125,6 @@ nav.boards a {
     margin: 1em 0 -1em;
 
     align-self: stretch;
-    border-top: thin dashed hsl(0, 0%, 15%);
 
     display: flex;
     flex-flow: column nowrap;
@@ -155,8 +139,6 @@ nav.boards a {
     flex-direction: column;
     align-items: flex-start;
 
-    border-top: thin dashed hsl(0, 0%, 15%);
-
     box-sizing: border-box;
 }
 
@@ -168,16 +150,11 @@ nav.boards a {
 }
 
 .thread > header a {
-    color: hsl(0, 0%, 98%);
     text-decoration: none;
 }
 
 .thread > header .subject {
     font: bold 1em 'Oswald';
-
-    background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 22%);
-    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 
     padding: 0.4em;
 }
@@ -192,27 +169,10 @@ nav.boards a {
 .post {
     padding: 0.4em;
     margin: 0.4em 0;
-    background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 22%);
     line-height: 1.45;
     overflow: hidden;
     box-sizing: border-box;
     max-width: 100%;
-    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
-}
-
-.post:target {
-    animation: 1.0s ease-out 0s highlight;
-}
-
-@keyframes highlight {
-    from {
-        background-color: hsl(0, 0%, 20%);
-    }
-
-    to {
-        background-color: hsl(0, 0%, 10%);
-    }
 }
 
 .post-info {
@@ -227,7 +187,6 @@ nav.boards a {
 
 .post-info .post-ident {
     margin: 0;
-    color: hsl(0, 100%, 60%);
 }
 
 .post-info :first-child, .post-info :last-child {
@@ -334,13 +293,8 @@ nav.boards a {
 
 .post .actions .post-action {
     margin: 0 0.4em;
-    color: hsl(0, 0%, 50%);
     text-decoration: none;
     font-size: 0.9em;
-}
-
-.post .actions .post-action:hover {
-    color: hsl(0, 0%, 70%);
 }
 
 .post .actions .post-action:last-child {
@@ -349,13 +303,11 @@ nav.boards a {
 
 form.post-action input[type=submit] {
     font: normal 1em 'Roboto Condensed';
-    color: hsl(0, 0%, 50%);
     background: none;
     padding: 0;
 }
 
 form.post-action input[type=submit]:hover {
-    color: hsl(0, 0%, 70%);
     cursor: pointer;
 }
 
@@ -384,8 +336,6 @@ form.post-action input[type=submit]:hover {
 
 .action .post {
     margin-bottom: 3em;
-    background-color: hsl(0, 0%, 10%);
-    border: thin solid hsl(0, 0%, 15%);
     align-self: center;
 }
 
@@ -394,18 +344,10 @@ form.post-action input[type=submit]:hover {
     width: max-content;
 
     padding: 0.4em;
-
-    background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 22%);
-    box-shadow: 5px 5px 0px hsl(0, 0%, 8%);
 }
 
 .board .page-num-link {
     margin: 0 0.4em;
-}
-
-.board .page-num-link.current {
-    color: hsl(0, 0%, 60%);
 }
 
 .board .page-num-link.current::before {
@@ -432,9 +374,6 @@ form.post-action input[type=submit]:hover {
     text-align: center;
 
     overflow-y: auto;
-
-    background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 22%);
 }
 
 .catalog-item img {
@@ -485,7 +424,41 @@ form.post-action input[type=submit]:hover {
 
 .post-preview .body {
     padding-left: 2em;
-    border-left: solid 5px hsl(0, 0%, 10%);
+}
+
+.user-options-form {
+    margin: 2em auto 1em;
+    padding: 0.6em;
+    display: grid;
+    grid-template-columns: 6em auto;
+    width: 350px;
+    grid-gap: 0.2em;
+}
+
+.user-options-form label {
+    align-self: center;
+}
+
+.user-options-form input {
+    margin: 0.2em 0;
+    padding: 0.2em 0.4em;
+}
+
+.user-options-form select {
+    border: none;
+    border-radius: 3px;
+    font-family: 'Roboto Condensed';
+}
+
+.user-options-form input[type="submit"] {
+    grid-column: 1 / 3;
+}
+
+.user-options-form h2 {
+    grid-column: 1 / 3;
+    text-align: center;
+    font-size: 1.4em;
+    margin-top: 0;
 }
 
 .staff-page {
@@ -537,7 +510,6 @@ form.post-action input[type=submit]:hover {
 }
 
 .overview-item {
-    border-top: thin dashed hsl(0, 0%, 22%);
     margin-top: 2em;
     padding-bottom: 1em;
 }
@@ -561,7 +533,6 @@ form.post-action input[type=submit]:hover {
 
 .table-header {
     font-weight: bold;
-    color: hsl(0, 0%, 40%);
 }
 
 .user-note {
@@ -577,8 +548,6 @@ form.post-action input[type=submit]:hover {
     margin-top: 0.8em;
     grid-gap: 0.5em 1em;
     grid-template-columns: 7em auto 10em;
-    background-color: hsl(0, 0%, 12%);
-    border: thin solid hsl(0, 0%, 22%);
     border-radius: 4px;
 }
 
@@ -608,9 +577,6 @@ form.post-action input[type=submit]:hover {
 
     padding-top: 1em;
     padding-bottom: 2em;
-
-    background-image: linear-gradient(hsl(10, 10%, 14%), hsl(0, 0%, 0%));
-    background-repeat: no-repeat;
 }
 
 .page-footer {
@@ -620,16 +586,12 @@ form.post-action input[type=submit]:hover {
     height: 100px;
     margin-top: -100px;
 
-    border-top: thin dashed hsl(0, 0%, 12%);
-
     padding: 1em;
-    background-color: hsl(0, 0%, 0%);
 
     box-sizing: border-box;
 }
 
 .page-footer a {
-    color: inherit;
     text-transform: uppercase;
 
     font: bold 1em 'Roboto Condensed';
@@ -650,6 +612,6 @@ form.post-action input[type=submit]:hover {
 }
 
 .page-footer .version {
-    font: 0.8em 'Roboto Mono';
+    font: 0.8em 'Roboto Condensed';
     justify-self: flex-end;
 }

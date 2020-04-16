@@ -154,6 +154,9 @@ pub struct Options {
     /// Custom admin-added pages.
     #[serde(rename = "pages")]
     pub custom_pages: Vec<String>,
+    /// Custom styles.
+    #[serde(rename = "styles")]
+    pub custom_styles: Vec<String>,
 }
 
 impl Options {
@@ -185,6 +188,7 @@ impl Default for Options {
                 names_path: None,
                 notice_path: None,
                 custom_pages: Vec::new(),
+                custom_styles: Vec::new(),
             }
         } else {
             Options {
@@ -201,6 +205,7 @@ impl Default for Options {
                 names_path: None,
                 notice_path: None,
                 custom_pages: Vec::new(),
+                custom_styles: Vec::new(),
             }
         }
     }
