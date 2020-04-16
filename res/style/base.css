@@ -1,4 +1,4 @@
-/*@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700:900|Roboto+Mono|Oswald:700&display=swap');*/
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700:900|Roboto+Mono|Oswald:700&display=swap');
 
 pre {
     overflow-x: scroll;
@@ -571,7 +571,10 @@ form.post-action input[type=submit]:hover {
     grid-row: 3;
 }
 
-.page-wrapper {
+.page-body {
+    max-width: 1000px;
+    margin: 0 auto;
+
     min-height: calc(100% - 100px);
     margin-bottom: 100px;
 

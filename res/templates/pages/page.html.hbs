@@ -2,7 +2,6 @@
 <html>
     <head>
         <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <link rel="shortcut icon" href="/file/favicon.png" type="image/png"> 
         <link rel="stylesheet" href="/file/style/{{page_info.style}}.css"/>
         <script src="/file/script/all.js"></script>
@@ -11,19 +10,21 @@
     </head>
     <body>
         <section class="page-wrapper">
-            {{> body}}
-        </section>
-        <footer class="page-footer">
-            <section>
-                <ul>
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/options">Options</a></li>
-                    {{#each page_footer.pages}}
-                        <li><a href="/page/{{this}}">{{this}}</a></li>
-                    {{/each}}
-                </ul>
+            <section class="page-body">
+                {{> body}}
             </section>
-            <span class="version">longboard {{page_info.version}}</span>
-        </footer>
+            <footer class="page-footer">
+                <section>
+                    <ul>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/options">Options</a></li>
+                        {{#each page_footer.pages}}
+                            <li><a href="/page/{{this}}">{{this}}</a></li>
+                        {{/each}}
+                    </ul>
+                </section>
+                <span class="version">longboard {{page_info.version}}</span>
+            </footer>
+        </section>
     </body>
 </html>

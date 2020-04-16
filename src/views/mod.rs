@@ -11,11 +11,13 @@ use serde_json::value::{to_value, Value as JsonValue};
 use rocket::uri;
 
 use crate::config::Banner;
+use crate::models::staff::Staff;
 use crate::models::*;
 use crate::routes::UserOptions;
 use crate::{config::Config, Result};
 
 pub mod staff;
+use staff::StaffView;
 
 /// Implement `Responder` for a type which implements `Serialize`, given a path
 /// to a template file that should be loaded.
@@ -531,7 +533,7 @@ pub struct BoardPage {
     threads: Vec<DeepThread>,
     page_num_links: Vec<PageNumLink>,
     catalog_uri: String,
-    is_staff: bool,
+    staff: Option<StaffView>,
 }
 
 impl BoardPage {
@@ -541,7 +543,7 @@ impl BoardPage {
         db: &Database,
         config: &Config,
         options: &UserOptions,
-        is_staff: bool,
+        staff: Option<Staff>,
     ) -> Result<BoardPage>
     where
         S: AsRef<str>,
@@ -574,7 +576,7 @@ impl BoardPage {
             threads,
             page_num_links: PageNumLink::generate(page_count, page_num),
             catalog_uri,
-            is_staff,
+            staff: staff.map(|staff| StaffView(staff)),
         })
     }
 }
@@ -661,7 +663,7 @@ pub struct ThreadPage {
     page_header: PageHeader,
     page_footer: PageFooter,
     thread: DeepThread,
-    is_staff: bool,
+    staff: Option<StaffView>,
 }
 
 impl ThreadPage {
@@ -671,7 +673,7 @@ impl ThreadPage {
         db: &Database,
         config: &Config,
         options: &UserOptions,
-        is_staff: bool,
+        staff: Option<Staff>,
     ) -> Result<ThreadPage>
     where
         S: AsRef<str>,
@@ -685,7 +687,7 @@ impl ThreadPage {
             page_header: PageHeader::new(board_name.as_ref(), db, config)?,
             page_footer: PageFooter::new(config),
             thread,
-            is_staff,
+            staff: staff.map(|staff| StaffView(staff)),
         })
     }
 }

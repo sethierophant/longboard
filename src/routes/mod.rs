@@ -223,7 +223,7 @@ pub fn board(
         &db,
         &config,
         &options,
-        session.is_some(),
+        session.and_then(|session| db.staff(&session.staff_name).ok()),
     )
 }
 
@@ -269,7 +269,7 @@ pub fn thread(
         &db,
         &config,
         &options,
-        session.is_some(),
+        session.and_then(|session| db.staff(&session.staff_name).ok()),
     )
 }
 

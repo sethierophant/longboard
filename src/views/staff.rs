@@ -4,13 +4,38 @@ use serde::{Serialize, Serializer};
 
 use serde_json::value::{to_value, Value as JsonValue};
 
-use crate::models::{Database, Report, Staff};
-use crate::Result;
-
 use crate::impl_template_responder;
-use crate::models::{staff::User, Board};
+use crate::models::staff::{Role, Staff, User};
+use crate::models::{Board, Report};
 use crate::routes::UserOptions;
 use crate::views::PageInfo;
+use crate::{Database, Result};
+
+#[derive(Debug)]
+pub struct StaffView(pub Staff);
+
+impl Serialize for StaffView {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let is_janitor = self.0.role == Role::Janitor;
+        let is_administrator = self.0.role == Role::Administrator;
+        let is_moderator = self.0.role == Role::Moderator;
+
+        let mut data =
+            to_value(&self.0).expect("could not serialize staff member");
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("is_janitor".into(), is_janitor.into());
+        obj.insert("is_moderator".into(), is_moderator.into());
+        obj.insert("is_administrator".into(), is_administrator.into());
+
+        data.serialize(serializer)
+    }
+}
 
 #[derive(Debug)]
 pub struct ReportView {
@@ -86,7 +111,7 @@ impl Serialize for UserView {
 #[derive(Debug, Serialize)]
 pub struct OverviewPage {
     page_info: PageInfo,
-    staff: Staff,
+    staff: StaffView,
     reports: Vec<ReportView>,
     boards: Vec<Board>,
     users: Vec<UserView>,
@@ -114,7 +139,7 @@ impl OverviewPage {
 
         Ok(OverviewPage {
             page_info: PageInfo::new("Overview", options),
-            staff: db.staff(user_name)?,
+            staff: StaffView(db.staff(user_name)?),
             reports: db
                 .all_reports()?
                 .into_iter()

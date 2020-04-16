@@ -7,8 +7,28 @@
     <input type="text" name="author">
     <label for="contact">Contact</label>
     <input type="text" name="contact">
-    <label for="ident">Identity</label>
-    <input type="password" name="ident">
+    {{#unless @root.staff}}
+        <label for="ident">Identity</label>
+        <input type="password" name="ident">
+    {{else}}
+        <label for="staff-ident">Identity</label>
+        <select name="staff-ident">
+            <option>Anonymous</option>
+            {{#if @root.staff.is_janitor}}
+                <option>Janitor</option>
+            {{/if}}
+            {{#if @root.staff.is_moderator}}
+                <option>Janitor</option>
+                <option>Moderator</option>
+            {{/if}}
+            {{#if @root.staff.is_administrator}}
+                <option>Janitor</option>
+                <option>Moderator</option>
+                <option>Administrator</option>
+            {{/if}}
+            <option>{{@root.staff.name}} ({{@root.staff.role}})</option>
+        </select>
+    {{/unless}}
     <textarea name="body"></textarea>
     <input type="file" name="file">
     <label for="spoiler">Spoiler?</label>

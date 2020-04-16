@@ -25,7 +25,7 @@
     </article>
     {{#unless hide_actions}}
         <footer class="actions">
-            {{#if @root.is_staff}}
+            {{#if @root.staff}}
                 {{#if @first}}
                     {{#unless ../pinned}}
                         <form class="post-action" method="POST"
@@ -63,7 +63,7 @@
                 </form>
             {{/if}}
 
-            {{#unless @root.is_staff}}
+            {{#unless @root.staff}}
                 <a class="post-action action-report"
                    href="{{report_uri}}">Report</a>
                 <a class="post-action action-delete"
