@@ -325,6 +325,8 @@ fn create_new_models(
             .expect("could not hash delete password with Argon2")
     });
 
+    let no_bump = entries.param("no-bump").is_some();
+
     let new_post = NewPost {
         body,
         author_name,
@@ -334,6 +336,7 @@ fn create_new_models(
         thread: 0,
         board: String::new(),
         user_id: user.id,
+        no_bump,
     };
 
     let field = entries.field("file").filter(|field| field.data.size() > 0);
@@ -452,6 +455,8 @@ pub fn new_post(
     let (mut new_post, new_file) =
         create_new_models(entries, &config, &db, user, session)?;
 
+    let no_bump = new_post.no_bump;
+
     new_post.thread = thread_id;
     new_post.board = board_name.clone();
     let new_post_id = db.insert_post(new_post)?;
@@ -459,6 +464,10 @@ pub fn new_post(
     if let Some(mut new_file) = new_file {
         new_file.post = new_post_id;
         db.insert_file(new_file)?;
+    }
+
+    if !no_bump {
+        db.bump_thread(thread_id)?;
     }
 
     let uri = uri!(crate::routes::thread: board_name, thread_id);

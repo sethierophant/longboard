@@ -59,6 +59,8 @@ pub struct Thread {
     pub pinned: bool,
     /// Whether or not a thread is locked from new posts.
     pub locked: bool,
+    /// When the thread was last bumped.
+    pub bump_date: DateTime<Utc>,
 }
 
 impl Thread {
@@ -90,6 +92,8 @@ pub struct Post {
     pub board_name: String,
     /// The user that made the post.
     pub user_id: UserId,
+    /// Whether a post should not bump it's thread.
+    pub no_bump: bool,
 }
 
 impl Post {
@@ -166,6 +170,7 @@ pub struct NewPost {
     pub thread: ThreadId,
     pub board: String,
     pub user_id: UserId,
+    pub no_bump: bool,
 }
 
 /// A new file to be inserted in the database.
@@ -312,6 +317,10 @@ impl Database {
     }
 
     /// Get a single page of threads on a board.
+    ///
+    /// The order here is the bump order of the thread, i.e. sort by the
+    /// timestamp of the most recent post made to the thread which isn't a "no
+    /// bump" post.
     pub fn thread_page<S>(
         &self,
         board_name: S,
@@ -320,12 +329,12 @@ impl Database {
     where
         S: AsRef<str>,
     {
-        use crate::schema::thread::columns::{board, id};
+        use crate::schema::thread::columns::{board, bump_date};
         use crate::schema::thread::dsl::thread;
 
         Ok(thread
             .filter(board.eq(board_name.as_ref()))
-            .order(id.asc())
+            .order(bump_date.desc())
             .limit(page.width as i64)
             .offset(page.offset() as i64)
             .load(&self.pool.get()?)?)
@@ -351,19 +360,43 @@ impl Database {
         Ok((thread_count as f64 / page_width as f64).ceil() as u32)
     }
 
-    /// All of the first posts of threads in the database.
-    pub fn all_first_posts<S>(&self, board_name: S) -> Result<Vec<Post>>
+    /// All of the first posts of threads on the given board.
+    ///
+    /// The order here is the same as `thread_page`.
+    pub fn first_posts<S>(&self, board_name: S) -> Result<Vec<Post>>
     where
         S: AsRef<str>,
     {
-        use crate::schema::post::columns::{board, id, thread};
+        use crate::schema::post::columns as post_columns;
         use crate::schema::post::dsl::post;
 
+        use crate::schema::thread::columns as thread_columns;
+        use crate::schema::thread::dsl::thread;
+
+        use diesel::dsl::sql;
+
         Ok(post
-            .distinct_on(thread)
-            .filter(board.eq(board_name.as_ref()))
-            .order_by(thread.asc())
-            .then_order_by(id.asc())
+            .inner_join(thread)
+            .select((
+                post_columns::id,
+                post_columns::time_stamp,
+                post_columns::body,
+                post_columns::author_name,
+                post_columns::author_contact,
+                post_columns::author_ident,
+                post_columns::thread,
+                post_columns::delete_hash,
+                post_columns::board,
+                post_columns::user_id,
+                post_columns::no_bump,
+            ))
+            .filter(post_columns::board.eq(board_name.as_ref()))
+            .filter(sql("post.id IN (\
+                             SELECT id FROM post AS inner_post \
+                                 WHERE inner_post.thread = thread.id \
+                                 ORDER BY id ASC \
+                                 LIMIT 1)"))
+            .order_by(thread_columns::bump_date.desc())
             .load(&self.pool.get()?)?)
     }
 
@@ -376,6 +409,20 @@ impl Database {
             .values(&new_thread)
             .returning(id)
             .get_result(&self.pool.get()?)?)
+    }
+
+    /// Update a thread's bump_date.
+    pub fn bump_thread(&self, thread_id: ThreadId) -> Result<()> {
+        use crate::schema::thread::columns::{bump_date, id};
+        use crate::schema::thread::dsl::thread;
+
+        use diesel::dsl::now;
+
+        update(thread.filter(id.eq(thread_id)))
+            .set(bump_date.eq(now))
+            .execute(&self.pool.get()?)?;
+
+        Ok(())
     }
 
     /// Delete a thread.

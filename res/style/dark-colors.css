@@ -1,7 +1,10 @@
 :root {
     --bright-color: hsl(0, 100%, 60%);
     --dull-color: hsl(0, 0%, 40%);
-    --form-submit-color: hsl(0, 100%, 55%);
+    --form-item-background-color: hsl(0, 0%, 22%);
+    --form-submit-text-color: hsl(0, 0%, 98%);
+    --form-submit-background-color: hsl(0, 100%, 50%);
+    --form-submit-hover-color: hsl(0, 100%, 60%);
     --form-hover-color: hsl(0, 100%, 60%);
     --text-color: hsl(0, 0%, 98%);
     --background-color: hsl(0, 0%, 12%);

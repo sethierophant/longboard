@@ -13,6 +13,12 @@ input[type="submit"] {
     font-weight: bold;
 }
 
+select {
+    border: none;
+    font-family: 'Roboto Condensed';
+}
+
+
 html, body {
     height: 100%;
 }
@@ -120,6 +126,11 @@ nav.boards a {
 
 .new-item-form input, .new-item-form textarea {
     margin: 0.2em 0;
+    padding: 0.2em 0.4em;
+}
+
+.new-item-form select {
+    margin: 0.4em 0;
     padding: 0.2em 0.4em;
 }
 
@@ -433,6 +444,8 @@ form.post-action input[type=submit]:hover {
 .catalog-item .subject {
     margin: 0.5em 0;
     word-wrap: anywhere;
+    font-size: 1em;
+    margin-top: 2em;
 }
 
 .home {
@@ -486,12 +499,6 @@ form.post-action input[type=submit]:hover {
 .user-options-form input {
     margin: 0.2em 0;
     padding: 0.2em 0.4em;
-}
-
-.user-options-form select {
-    border: none;
-    border-radius: 3px;
-    font-family: 'Roboto Condensed';
 }
 
 .user-options-form input[type="submit"] {

@@ -1,11 +1,13 @@
 <section class="catalog-item">
-    <a href="{{thread_uri}}"><img src="{{thumb_uri}}"></a>
+    <a href="{{thread.uri}}"><img src="{{first_post.file.thumb_uri}}"></a>
     <section class="item-stats">
-        <span>Posts: {{num_posts}}</span>
-        <span>Files: {{num_files}}</span>
+        <span>Posts: {{thread.post_count}}</span>
+        <span>Files: {{thread.file_count}}</span>
     </section>
-    {{> models/thread-subject}}
+    {{#with thread}}
+        {{> models/thread-subject}}
+    {{/with}}
     <section class="body-contents">
-        {{{body}}}
+        {{{first_post.body}}}
     </section>
 </section>

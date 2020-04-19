@@ -38,6 +38,7 @@ table! {
         delete_hash -> Nullable<Text>,
         board -> Text,
         user_id -> Int4,
+        no_bump -> Bool,
     }
 }
 
@@ -85,6 +86,7 @@ table! {
         board -> Text,
         pinned -> Bool,
         locked -> Bool,
+        bump_date -> Timestamptz,
     }
 }
 

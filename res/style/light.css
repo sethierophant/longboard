@@ -8,5 +8,6 @@ input[type="text"],
     textarea,
     select
 {
-    border: thin solid var(--border-color);
+    border-width: thin;
+    border-style: solid;
 }

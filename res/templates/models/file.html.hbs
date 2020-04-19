@@ -1,13 +1,4 @@
-{{#*inline "file"}}
-    <section class="post-image">
-        <a href="{{uri}}" title="{{orig_name}}">{{orig_name}}</a>
-        <img src="{{thumb_uri}}" data-uri="{{uri}}" data-thumb-uri="{{thumb_uri}}">
-    </section>
-{{/inline}}
-
-{{#unless is_spoiler}}
-    {{> file show_uri=uri}}
-{{/unless}}
-{{#if is_spoiler}}
-    {{> file show_uri="/file/spoiler.png"}}
-{{/if}}
+<section class="post-image">
+    <a href="{{uri}}" title="{{orig_name}}">{{orig_name}}</a>
+    <img src="{{thumb_uri}}" data-uri="{{uri}}" data-thumb-uri="{{thumb_uri}}">
+</section>

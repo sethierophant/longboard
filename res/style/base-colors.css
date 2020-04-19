@@ -27,6 +27,8 @@ body {
     .new-item-form input[type="checkbox"],
     .new-item-form textarea
 {
+    color: var(--text-color);
+    border-color: var(--border-color);
     background-color: var(--form-item-background-color);
 }
 

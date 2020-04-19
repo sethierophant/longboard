@@ -197,6 +197,7 @@ impl Serialize for FileView {
     {
         let uri = self.0.uri();
         let thumb_uri = self.0.thumb_uri();
+        let is_spoiler = self.0.is_spoiler;
 
         let mut data = to_value(&self.0).expect("could not serialize file");
 
@@ -204,9 +205,16 @@ impl Serialize for FileView {
 
         obj.insert("uri".into(), JsonValue::String(uri));
 
-        thumb_uri.map(|thumb_uri| {
-            obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri))
-        });
+        if let Some(thumb_uri) = thumb_uri {
+            if is_spoiler {
+                obj.insert(
+                    "thumb_uri".into(),
+                    JsonValue::from("/file/spoiler.png"),
+                );
+            } else {
+                obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri));
+            }
+        }
 
         data.serialize(serializer)
     }
@@ -313,7 +321,21 @@ impl Serialize for PostView {
 
 /// A wrapper for thread that can be passed into a template.
 #[derive(Debug)]
-pub struct ThreadView(Thread);
+pub struct ThreadView {
+    pub thread: Thread,
+    pub post_count: u32,
+    pub file_count: u32,
+}
+
+impl ThreadView {
+    pub fn new(thread_id: ThreadId, db: &Database) -> Result<ThreadView> {
+        Ok(ThreadView {
+            thread: db.thread(thread_id)?,
+            post_count: db.thread_post_count(thread_id)?,
+            file_count: db.thread_file_count(thread_id)?,
+        })
+    }
+}
 
 impl Serialize for ThreadView {
     fn serialize<S>(
@@ -323,13 +345,15 @@ impl Serialize for ThreadView {
     where
         S: Serializer,
     {
-        let uri = self.0.uri();
+        let uri = self.thread.uri();
 
-        let mut data = to_value(&self.0).expect("could not serialize thread");
+        let mut data =
+            to_value(&self.thread).expect("could not serialize thread");
 
-        data.as_object_mut()
-            .unwrap()
-            .insert("uri".into(), JsonValue::String(uri));
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("uri".into(), JsonValue::String(uri));
+        obj.insert("post_count".into(), JsonValue::from(self.post_count));
+        obj.insert("file_count".into(), JsonValue::from(self.file_count));
 
         data.serialize(serializer)
     }
@@ -379,7 +403,7 @@ pub struct DeepThread(ThreadView, Vec<DeepPost>);
 impl DeepThread {
     /// Load a thread and its posts from the database.
     fn new(thread_id: ThreadId, db: &Database) -> Result<DeepThread> {
-        let thread = ThreadView(db.thread(thread_id)?);
+        let thread = ThreadView::new(thread_id, db)?;
         let posts = db.posts_in_thread(thread_id)?;
 
         let deep_posts = posts
@@ -395,7 +419,7 @@ impl DeepThread {
 
     /// Load a thread and a preview of its posts from the database.
     fn new_preview(thread_id: ThreadId, db: &Database) -> Result<DeepThread> {
-        let thread = ThreadView(db.thread(thread_id)?);
+        let thread = ThreadView::new(thread_id, db)?;
         let posts =
             db.preview_thread(thread_id, crate::DEFAULT_PREVIEW_LIMIT)?;
 
@@ -621,12 +645,8 @@ impl_template_responder!(BoardPage, "pages/models/board");
 /// A catalog item.
 #[derive(Debug, Serialize)]
 pub struct CatalogItem {
-    thumb_uri: String,
-    thread_uri: String,
-    subject: String,
-    body: String,
-    pinned: bool,
-    locked: bool,
+    thread: ThreadView,
+    first_post: DeepPost,
     num_posts: u32,
     num_files: u32,
 }
@@ -648,33 +668,16 @@ impl BoardCatalogPage {
     {
         let board_name = board_name.as_ref();
 
-        let first_posts = context.database.all_first_posts(board_name)?;
+        let first_posts = context.database.first_posts(board_name)?;
+
         let items = first_posts
             .into_iter()
             .map(|post| {
                 let thread = context.database.thread(post.thread_id)?;
 
-                let files = context.database.files_in_post(post.id)?;
-
-                let thumb_uri = files
-                    .first()
-                    .and_then(|file| file.thumb_uri())
-                    .unwrap_or_default();
-
-                let thread_uri = uri!(
-                    crate::routes::thread:
-                    post.board_name,
-                    post.thread_id
-                )
-                .to_string();
-
                 Ok(CatalogItem {
-                    thumb_uri,
-                    thread_uri,
-                    subject: thread.subject,
-                    body: post.body,
-                    pinned: thread.pinned,
-                    locked: thread.locked,
+                    thread: ThreadView::new(thread.id, context.database)?,
+                    first_post: DeepPost::new(post.id, context.database)?,
                     num_posts: context
                         .database
                         .thread_post_count(post.thread_id)?,
@@ -718,10 +721,10 @@ impl ThreadPage {
         S: AsRef<str>,
     {
         let thread = DeepThread::new(thread_id, context.database)?;
-        let DeepThread(ThreadView(Thread { ref subject, .. }), ..) = thread;
+        let subject = thread.0.thread.subject.clone();
 
         Ok(ThreadPage {
-            page_info: PageInfo::new(subject.clone(), context),
+            page_info: PageInfo::new(subject, context),
             page_nav: PageNav::new(context)?,
             page_header: PageHeader::new(board_name.as_ref(), context)?,
             page_footer: PageFooter::new(context),
