@@ -2,6 +2,7 @@
     --bright-color: hsl(30, 100%, 60%);
     --dull-color: hsl(0, 0%, 70%);
     --form-submit-text-color: hsl(0, 0%, 98%);
+    --form-item-background-color: hsl(0, 0%, 98%);
     --form-submit-background-color: hsl(140, 40%, 35%);
     --form-submit-hover-color: hsl(140, 40%, 40%);
     --text-color: hsl(0, 0%, 4%);
@@ -14,5 +15,5 @@
     --background-gradient-end: hsl(100, 100%, 95%);
     --post-action-color: hsl(0, 0%, 4%);
     --post-action-hover-color: hsl(0, 0%, 50%);
-    --post-action-reason-color: hsl(0, 0%, 80%);
+    --post-action-reason-color: hsl(0, 0%, 95%);
 }

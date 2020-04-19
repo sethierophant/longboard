@@ -199,13 +199,11 @@ nav.boards a {
 }
 
 .post-info {
-    display: flex;
-    flex-flow: row;
     font-size: 0.9em;
 }
 
 .post-info * {
-    margin: 0 1em;
+    margin: 0 0.7em;
 }
 
 .post-info .post-ident {

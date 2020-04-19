@@ -17,6 +17,7 @@ use crate::models::*;
 use crate::routes::UserOptions;
 use crate::{config::Config, Error, Result};
 
+pub mod error;
 pub mod staff;
 use staff::StaffView;
 
@@ -39,10 +40,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
             .inner();
 
         let session = req
-            .guard::<Session>()
+            .guard::<Option<Session>>()
             .expect("couldn't load session from cookies");
 
-        let staff = database.staff(session.staff_name).ok();
+        let staff =
+            session.and_then(|session| database.staff(session.staff_name).ok());
 
         Outcome::Success(Context {
             database,

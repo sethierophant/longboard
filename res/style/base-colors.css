@@ -21,6 +21,15 @@ body {
     box-shadow: 5px 5px 0px var(--shadow-color);
 }
 
+.new-item-form select,
+    .new-item-form input[type="text"],
+    .new-item-form input[type="password"],
+    .new-item-form input[type="checkbox"],
+    .new-item-form textarea
+{
+    background-color: var(--form-item-background-color);
+}
+
 .notice {
     border-top: thin dashed hsl(0, 0%, 15%);
 }

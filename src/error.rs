@@ -4,17 +4,15 @@ use std::net::IpAddr;
 
 use log::{error, warn};
 
-use maplit::hashmap;
-
 use rocket::http::{hyper::header::Location, Status};
 use rocket::response::{Responder, Response};
 use rocket::{uri, Request};
 
-use rocket_contrib::templates::Template;
-
 use derive_more::{Display, From};
 
 use crate::models::{PostId, ThreadId};
+use crate::views::error::*;
+use crate::views::Context;
 
 /// Our error type.
 #[derive(Debug, Display, From)]
@@ -135,14 +133,10 @@ impl<'r> Responder<'r> for Error {
             | Error::ThreadLocked => {
                 warn!("{}", &self);
 
-                let template = Template::render(
-                    "pages/error/400",
-                    hashmap! {
-                        "message" => self.to_string()
-                    },
-                );
+                let context = req.guard::<Context>().unwrap();
+                let page = BadRequestPage::new(self.to_string(), &context);
 
-                let mut res = template.respond_to(req)?;
+                let mut res = page.respond_to(req)?;
                 res.set_status(Status::BadRequest);
 
                 Ok(res)
@@ -153,14 +147,10 @@ impl<'r> Responder<'r> for Error {
             | Error::ThreadNotFound { .. } => {
                 warn!("{}", &self);
 
-                let template = Template::render(
-                    "pages/error/404",
-                    hashmap! {
-                        "message" => self.to_string()
-                    },
-                );
+                let context = req.guard::<Context>().unwrap();
+                let page = NotFoundPage::new(self.to_string(), &context);
 
-                let mut res = template.respond_to(req)?;
+                let mut res = page.respond_to(req)?;
                 res.set_status(Status::NotFound);
 
                 Ok(res)
@@ -181,9 +171,11 @@ impl<'r> Responder<'r> for Error {
             _ => {
                 error!("{}", self);
 
-                let template = Template::render("pages/error/500", ());
+                let context = req.guard::<Context>().unwrap();
+                let page =
+                    InternalServerErrorPage::new(self.to_string(), &context);
 
-                let mut res = template.respond_to(req)?;
+                let mut res = page.respond_to(req)?;
                 res.set_status(Status::InternalServerError);
 
                 Ok(res)
