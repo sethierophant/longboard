@@ -205,7 +205,7 @@ pub fn close_report(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for creating a board.
@@ -233,7 +233,7 @@ pub fn create_board(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for editing a board.
@@ -261,7 +261,7 @@ pub fn edit_board(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for deleting a board.
@@ -288,7 +288,7 @@ pub fn delete_board(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Helper type for the duration a user is banned for.
@@ -342,7 +342,7 @@ pub fn ban_user(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for unbanning a user.
@@ -376,7 +376,7 @@ pub fn unban_user(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for adding a note to a user.
@@ -403,7 +403,7 @@ pub fn add_note(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for removing a note from a user.
@@ -429,7 +429,7 @@ pub fn remove_note(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for deleting all of a user's posts.
@@ -462,7 +462,7 @@ pub fn delete_posts_for_user(
         msg,
         uri!(overview).to_string(),
         &context,
-    ))
+    )?)
 }
 
 /// Form data for any request that requires a reason.
@@ -501,7 +501,7 @@ pub fn pin(
     })?;
 
     let msg: String = "Pinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context))
+    Ok(ActionSuccessPage::new(msg, uri, &context)?)
 }
 
 /// Unpin a thread.
@@ -534,7 +534,7 @@ pub fn unpin(
     })?;
 
     let msg: String = "Unpinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context))
+    Ok(ActionSuccessPage::new(msg, uri, &context)?)
 }
 
 /// Lock a thread.
@@ -567,7 +567,7 @@ pub fn lock(
     })?;
 
     let msg: String = "Locked thread successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context))
+    Ok(ActionSuccessPage::new(msg, uri, &context)?)
 }
 
 /// Unlock a thread.
@@ -600,7 +600,7 @@ pub fn unlock(
     })?;
 
     let msg: String = "Unlocked thread successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context))
+    Ok(ActionSuccessPage::new(msg, uri, &context)?)
 }
 
 /// Delete a post without needing a password.
@@ -662,5 +662,5 @@ pub fn staff_delete(
         msg,
         redirect_uri.to_string(),
         &context,
-    ))
+    )?)
 }

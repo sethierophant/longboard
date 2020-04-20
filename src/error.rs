@@ -34,6 +34,8 @@ pub enum Error {
     },
     #[display(fmt = "Post #{} not found", post_id)]
     PostNotFound { post_id: PostId },
+    #[display(fmt = "Custom page {} not found", name)]
+    CustomPageNotFound { name: String },
     #[display(fmt = "Missing param '{}' for new thread", param)]
     MissingThreadParam { param: String },
     #[display(fmt = "Missing param '{}' for new post", param)]
@@ -56,12 +58,18 @@ pub enum Error {
     InvalidSessionCookie,
     #[display(fmt = "Session expired")]
     ExpiredSession,
-    #[display(fmt = "Report length was more than the max of 250 characters.")]
+    #[display(fmt = "Report length was more than the max of 250 characters")]
     ReportTooLong,
-    #[display(fmt = "Cannot add a post to a locked thread.")]
+    #[display(fmt = "Cannot add a post to a locked thread")]
     ThreadLocked,
-    #[display(fmt = "Tried to access a staff page without authentication.")]
+    #[display(fmt = "Tried to access a staff page without authentication")]
     NotAuthenticated,
+    #[display(fmt = "Banner dir is empty")]
+    BannerDirEmpty,
+    #[display(fmt = "Names file is empty")]
+    NamesFileEmpty,
+    #[display(fmt = "Path for {} at {} does not exist", name, path)]
+    ConfigPathNotFound { name: String, path: String },
     #[display(fmt = "Couldn't create regex: {}", _0)]
     #[from]
     RegexError(regex::Error),
@@ -144,7 +152,8 @@ impl<'r> Responder<'r> for Error {
 
             Error::PostNotFound { .. }
             | Error::BoardNotFound { .. }
-            | Error::ThreadNotFound { .. } => {
+            | Error::ThreadNotFound { .. }
+            | Error::CustomPageNotFound { .. } => {
                 warn!("{}", &self);
 
                 let context = req.guard::<Context>().unwrap();

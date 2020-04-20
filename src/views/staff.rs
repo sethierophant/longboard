@@ -133,7 +133,7 @@ impl OverviewPage {
 
         Ok(OverviewPage {
             page_info: PageInfo::new("Overview", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             staff: StaffView(context.staff.clone().unwrap()),
             reports: context
                 .database
@@ -159,7 +159,7 @@ impl LoginPage {
     pub fn new(context: &Context) -> Result<LoginPage> {
         Ok(LoginPage {
             page_info: PageInfo::new("Login", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
         })
     }
 }
@@ -177,7 +177,7 @@ impl HistoryPage {
     pub fn new(context: &Context) -> Result<HistoryPage> {
         Ok(HistoryPage {
             page_info: PageInfo::new("Moderation History", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             staff_actions: context.database.all_staff_actions()?,
         })
     }

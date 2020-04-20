@@ -19,7 +19,7 @@ impl BadRequestPage {
         Ok(BadRequestPage {
             message: message.into(),
             page_info: PageInfo::new("Error", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
         })
     }
 }
@@ -41,7 +41,7 @@ impl NotFoundPage {
         Ok(NotFoundPage {
             message: message.into(),
             page_info: PageInfo::new("Error", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
         })
     }
 }
@@ -66,7 +66,7 @@ impl InternalServerErrorPage {
         Ok(InternalServerErrorPage {
             message: message.into(),
             page_info: PageInfo::new("Error", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
         })
     }
 }

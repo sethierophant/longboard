@@ -1,7 +1,6 @@
 #![feature(proc_macro_hygiene)]
 
-use std::fs::{File, OpenOptions};
-use std::path::Path;
+use std::fs::OpenOptions;
 
 use clap::{App, Arg};
 
@@ -9,7 +8,6 @@ use fern::colors::{Color, ColoredLevelConfig};
 
 use log::{debug, info};
 
-use longboard::config::Options;
 use longboard::{new_instance, Config, Result};
 
 fn main_res() -> Result<()> {
@@ -26,14 +24,6 @@ fn main_res() -> Result<()> {
                 .help("Config file to use"),
         )
         .arg(
-            Arg::with_name("gen-config")
-                .long("gen-config")
-                .value_name("FILE")
-                .takes_value(true)
-                .default_value("-")
-                .help("Generate a new config file"),
-        )
-        .arg(
             Arg::with_name("log-all")
                 .long("log-all")
                 .help("Show all log messages, this makes the log very messy"),
@@ -45,26 +35,13 @@ fn main_res() -> Result<()> {
         )
         .get_matches();
 
-    if matches.occurrences_of("gen-config") == 1 {
-        let gen_path = matches.value_of("gen-config").unwrap();
+    let conf = if let Some(path) = matches.value_of("config") {
+        Config::new(path)?
+    } else {
+        Config::new_default()?
+    };
 
-        if gen_path == "-" {
-            Options::generate(std::io::stdout())?;
-        } else {
-            Options::generate(File::create(gen_path)?)?;
-        }
-
-        return Ok(());
-    }
-
-    let conf_path = matches
-        .value_of("config")
-        .map(Path::new)
-        .unwrap_or_else(|| Config::default_path());
-
-    let conf = Config::open(conf_path)?;
-
-    let log_to_file = conf.options.log_file.is_some();
+    let log_to_file = conf.log_file.is_some();
 
     let log_all = matches.is_present("log-all");
 
@@ -97,7 +74,7 @@ fn main_res() -> Result<()> {
             metadata.target().starts_with("longboard") || log_all
         });
 
-    match conf.options.log_file {
+    match conf.log_file {
         Some(ref log_path) => {
             let log_file = OpenOptions::new()
                 .append(true)
@@ -108,7 +85,11 @@ fn main_res() -> Result<()> {
         None => dispatch.chain(std::io::stdout()).apply()?,
     };
 
-    info!("Using config file {}", conf_path.display());
+    if let Some(path) = matches.value_of("config") {
+        info!("Using config file {}", path);
+    } else {
+        info!("Using config file {}", Config::default_path().display());
+    };
 
     if matches.is_present("debug-config") {
         for line in format!("{:#?}", conf).lines() {

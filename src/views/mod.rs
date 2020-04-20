@@ -11,7 +11,7 @@ use serde_json::value::{to_value, Value as JsonValue};
 use rocket::request::{FromRequest, Outcome};
 use rocket::{uri, Request, State};
 
-use crate::config::Banner;
+use crate::config::{Banner, Page as ConfigPage};
 use crate::models::staff::Staff;
 use crate::models::*;
 use crate::routes::UserOptions;
@@ -112,14 +112,14 @@ impl PageInfo {
 #[derive(Debug, Serialize)]
 pub struct PageFooter {
     /// A list of admin-created pages.
-    pages: Vec<String>,
+    pages: Vec<ConfigPage>,
 }
 
 impl PageFooter {
-    pub fn new(context: &Context) -> PageFooter {
-        PageFooter {
-            pages: context.config.options.custom_pages.clone(),
-        }
+    pub fn new(context: &Context) -> Result<PageFooter> {
+        Ok(PageFooter {
+            pages: context.config.pages()?,
+        })
     }
 }
 
@@ -156,8 +156,8 @@ impl PageHeader {
     {
         Ok(PageHeader {
             board: context.database.board(board_name)?,
-            banner: BannerView(context.config.choose_banner().clone()),
-            notice_html: context.config.notice_html.clone(),
+            banner: BannerView(context.config.choose_banner()?),
+            notice_html: context.config.notice()?,
         })
     }
 }
@@ -509,7 +509,7 @@ impl HomePage {
         Ok(HomePage {
             page_info: PageInfo::new("LONGBOARD", context),
             page_nav: PageNav::new(context)?,
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             recent_posts: RecentPost::load(
                 context.database,
                 crate::DEFAULT_RECENT_POSTS,
@@ -545,15 +545,14 @@ impl OptionsPage {
         Ok(OptionsPage {
             page_info: PageInfo::new("Options", context),
             page_nav: PageNav::new(context)?,
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             styles: context
                 .config
-                .options
                 .custom_styles
                 .iter()
-                .map(|style| StyleOption {
-                    name: style.clone(),
-                    selected: style == &context.options.style,
+                .map(|name| StyleOption {
+                    name: name.clone(),
+                    selected: name == &context.options.style,
                 })
                 .collect(),
         })
@@ -631,7 +630,7 @@ impl BoardPage {
             page_info: PageInfo::new(board_name, context),
             page_nav: PageNav::new(context)?,
             page_header: PageHeader::new(board_name, context)?,
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             threads,
             page_num_links: PageNumLink::generate(page_count, page_num),
             catalog_uri,
@@ -692,7 +691,7 @@ impl BoardCatalogPage {
             page_info: PageInfo::new(board_name, context),
             page_nav: PageNav::new(context)?,
             page_header: PageHeader::new(board_name, context)?,
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             items,
         })
     }
@@ -727,7 +726,7 @@ impl ThreadPage {
             page_info: PageInfo::new(subject, context),
             page_nav: PageNav::new(context)?,
             page_header: PageHeader::new(board_name.as_ref(), context)?,
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             thread,
             staff: context.staff.clone().map(StaffView),
         })
@@ -768,7 +767,7 @@ impl ReportPage {
     pub fn new(post_id: PostId, context: &Context) -> Result<ReportPage> {
         Ok(ReportPage {
             page_info: PageInfo::new("Report post", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             post: context.database.post(post_id)?,
         })
     }
@@ -788,7 +787,7 @@ impl DeletePage {
     pub fn new(post_id: PostId, context: &Context) -> Result<DeletePage> {
         Ok(DeletePage {
             page_info: PageInfo::new("Delete post", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             post: context.database.post(post_id)?,
         })
     }
@@ -810,17 +809,17 @@ impl ActionSuccessPage {
         msg: S1,
         redirect_uri: S2,
         context: &Context,
-    ) -> ActionSuccessPage
+    ) -> Result<ActionSuccessPage>
     where
         S1: Into<String>,
         S2: Into<String>,
     {
-        ActionSuccessPage {
+        Ok(ActionSuccessPage {
             page_info: PageInfo::new("Success", context),
-            page_footer: PageFooter::new(context),
+            page_footer: PageFooter::new(context)?,
             msg: msg.into(),
             redirect_uri: redirect_uri.into(),
-        }
+        })
     }
 }
 

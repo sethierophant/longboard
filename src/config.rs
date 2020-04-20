@@ -1,7 +1,7 @@
 //! App configuration.
 
 use std::fs::{read_dir, read_to_string, File};
-use std::io::{self, Write};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
@@ -9,7 +9,7 @@ use pulldown_cmark::{html::push_html, Parser};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{thread_rng, Rng};
 
 use regex::Regex;
 
@@ -17,76 +17,102 @@ use rocket::uri;
 
 use crate::{Error, Result};
 
-/// Configuration for a longboard server.
-#[derive(Debug)]
+/// Configuration options loaded from a file.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
-    pub options: Options,
-    pub banners: Vec<Banner>,
-    pub names: Vec<String>,
-    pub notice_html: Option<String>,
+    /// Address to bind to.
+    pub address: String,
+    /// Port to bind to.
+    pub port: u16,
+    /// Where the site resources (styles, templates, ...) are.
+    pub resource_dir: PathBuf,
+    /// Where the user-uploaded files are.
+    pub upload_dir: PathBuf,
+    /// Where the staff-added pages are.
+    pub pages_dir: Option<PathBuf>,
+    /// The path to a list of user names.
+    #[serde(rename = "names")]
+    pub names_path: Option<PathBuf>,
+    /// The path to a notice file to be displayed at the top of each board.
+    #[serde(rename = "notice")]
+    pub notice_path: Option<PathBuf>,
+    /// URL to connect to the database.
+    pub database_uri: String,
+    /// File to log to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_file: Option<PathBuf>,
+    /// Filter rules to apply to posts.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub filter_rules: Vec<Rule>,
+    /// Custom styles.
+    #[serde(rename = "styles")]
+    pub custom_styles: Vec<String>,
 }
 
 impl Config {
-    /// Open a config file at the given path.
-    pub fn open<P>(path: P) -> Result<Config>
+    /// Load configuration from a file.
+    pub fn new<P>(path: P) -> Result<Config>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
 
-        let map_err = |err| {
-            let msg =
-                format!("Couldn't open config file at {}", path.display());
-            Error::from_io_error(err, msg)
-        };
+        let file = File::open(path).map_err(|cause| Error::IoErrorMsg {
+            cause,
+            msg: format!("Couldn't open config file at {}", path.display()),
+        })?;
 
-        let reader = File::open(path).map_err(map_err)?;
-        let options: Options = serde_yaml::from_reader(reader)?;
+        let conf: Config =
+            serde_yaml::from_reader(file).map_err(Error::from)?;
 
-        let banners = match read_dir(options.resource_dir.join("banners")) {
-            Ok(iter) => iter
-                .map(|entry| {
-                    Ok(Banner {
-                        name: entry?.file_name().into_string().unwrap(),
-                    })
-                })
-                .collect::<Result<_>>()?,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
-            Err(e) => return Err(Error::from(e)),
-        };
+        if !conf.resource_dir.exists() {
+            return Err(Error::ConfigPathNotFound {
+                name: "resource dir".to_string(),
+                path: conf.resource_dir.display().to_string(),
+            });
+        }
 
-        let default_names_path = options.resource_dir.join("names.txt");
-        let names_path =
-            options.names_path.as_ref().unwrap_or(&default_names_path);
+        if !conf.upload_dir.exists() {
+            return Err(Error::ConfigPathNotFound {
+                name: "uploads dir".to_string(),
+                path: conf.resource_dir.display().to_string(),
+            });
+        }
 
-        log::debug!("names_path: {}", names_path.display());
-
-        let names = match read_to_string(names_path) {
-            Ok(s) => s.lines().map(ToString::to_string).collect(),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
-            Err(e) => return Err(Error::from(e)),
-        };
-
-        let default_notice_path = options.resource_dir.join("notice.md");
-        let notice_path =
-            options.notice_path.as_ref().unwrap_or(&default_notice_path);
-
-        let notice_html = match read_to_string(notice_path) {
-            Ok(s) => {
-                let mut html = String::new();
-                push_html(&mut html, Parser::new(&s));
-                Some(html)
+        if let Some(path) = &conf.pages_dir {
+            if !path.exists() {
+                return Err(Error::ConfigPathNotFound {
+                    name: "pages dir".to_string(),
+                    path: path.display().to_string(),
+                });
             }
-            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
-            Err(e) => return Err(Error::from(e)),
-        };
+        }
 
-        Ok(Config {
-            options,
-            banners,
-            names,
-            notice_html,
-        })
+        if let Some(path) = &conf.names_path {
+            if !path.exists() {
+                return Err(Error::ConfigPathNotFound {
+                    name: "names file".to_string(),
+                    path: path.display().to_string(),
+                });
+            }
+        }
+
+        if let Some(path) = &conf.notice_path {
+            if !path.exists() {
+                return Err(Error::ConfigPathNotFound {
+                    name: "notice file".to_string(),
+                    path: path.display().to_string(),
+                });
+            }
+        }
+
+        Ok(conf)
+    }
+
+    /// Load configuration from the default location.
+    pub fn new_default() -> Result<Config> {
+        Config::new(Config::default_path())
     }
 
     /// Get the default location of the config file.
@@ -98,113 +124,150 @@ impl Config {
         }
     }
 
+    /// Get all of the banners.
+    pub fn banners(&self) -> Result<Vec<Banner>> {
+        let path = self.resource_dir.join("banners");
+        let iter = read_dir(&path).map_err(|cause| Error::IoErrorMsg {
+            cause,
+            msg: format!("Couldn't open banners dir at {}", path.display()),
+        });
+
+        let mut banners = Vec::new();
+
+        for entry in iter? {
+            banners.push(Banner {
+                name: entry?.file_name().into_string().unwrap(),
+            });
+        }
+
+        Ok(banners)
+    }
+
     /// Choose a banner at random.
-    pub fn choose_banner(&self) -> &Banner {
+    pub fn choose_banner(&self) -> Result<Banner> {
         let mut rng = thread_rng();
-        &self.banners.choose(&mut rng).expect("banner list is empty")
+        let mut banners = self.banners()?;
+
+        if !banners.is_empty() {
+            Ok(banners.remove(rng.gen_range(0, banners.len())))
+        } else {
+            Err(Error::BannerDirEmpty)
+        }
+    }
+
+    /// Get all of the added pages.
+    pub fn pages(&self) -> Result<Vec<Page>> {
+        if let Some(path) = &self.pages_dir {
+            let iter = read_dir(path).map_err(|cause| Error::IoErrorMsg {
+                cause,
+                msg: format!("Couldn't open pages dir at {}", path.display()),
+            });
+
+            let mut pages = Vec::new();
+
+            for entry in iter? {
+                let entry = entry?;
+
+                pages.push(Page {
+                    name: entry
+                        .path()
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    path: entry.path(),
+                })
+            }
+
+            Ok(pages)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Get all of the default names for anonymous posts.
+    pub fn names(&self) -> Result<Vec<String>> {
+        if let Some(path) = &self.names_path {
+            let file = File::open(path).map_err(|cause| Error::IoErrorMsg {
+                cause,
+                msg: format!("Couldn't open names file at {}", path.display()),
+            });
+
+            Ok(BufReader::new(file?)
+                .lines()
+                .collect::<std::io::Result<_>>()?)
+        } else {
+            Ok(vec!["Anonymous".to_string()])
+        }
     }
 
     /// Choose a name at random.
-    pub fn choose_name(&self) -> &str {
+    pub fn choose_name(&self) -> Result<String> {
         let mut rng = thread_rng();
-        &self
-            .names
-            .choose(&mut rng)
-            .map(|s| s.as_str())
-            .unwrap_or("Anonymous")
+        let mut names = self.names()?;
+
+        if !names.is_empty() {
+            Ok(names.remove(rng.gen_range(0, names.len())))
+        } else {
+            Err(Error::NamesFileEmpty)
+        }
+    }
+
+    /// Get the site notice, if it exists.
+    pub fn notice(&self) -> Result<Option<String>> {
+        if let Some(path) = &self.notice_path {
+            let contents =
+                read_to_string(path).map_err(|cause| Error::IoErrorMsg {
+                    cause,
+                    msg: format!(
+                        "Couldn't open notice file at {}",
+                        path.display()
+                    ),
+                });
+
+            let mut notice_html = String::new();
+            push_html(&mut notice_html, Parser::new(&contents?));
+
+            Ok(Some(notice_html))
+        } else {
+            Ok(None)
+        }
     }
 }
 
 impl Default for Config {
     fn default() -> Config {
-        Config {
-            options: Options::default(),
-            banners: Vec::new(),
-            names: Vec::new(),
-            notice_html: None,
-        }
-    }
-}
-
-/// Configuration options loaded from a file.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Options {
-    /// Address to bind to.
-    pub address: String,
-    /// Port to bind to.
-    pub port: u16,
-    /// Where the site resources (styles, templates, ...) are.
-    pub resource_dir: PathBuf,
-    /// Where the user-uploaded files are.
-    pub upload_dir: PathBuf,
-    /// The path to a list of user names.
-    #[serde(rename = "names")]
-    pub names_path: Option<PathBuf>,
-    /// The path to a notice file to be displayed at the top of each board.
-    pub notice_path: Option<PathBuf>,
-    /// URL to connect to the database.
-    pub database_url: String,
-    /// File to log to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub log_file: Option<PathBuf>,
-    /// Filter rules to apply to posts.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub filter_rules: Vec<Rule>,
-    /// Custom admin-added pages.
-    #[serde(rename = "pages")]
-    pub custom_pages: Vec<String>,
-    /// Custom styles.
-    #[serde(rename = "styles")]
-    pub custom_styles: Vec<String>,
-}
-
-impl Options {
-    pub fn generate<W>(mut out: W) -> Result<()>
-    where
-        W: Write,
-    {
-        writeln!(&mut out, "# Configuration for longboard")?;
-        writeln!(&mut out)?;
-        serde_yaml::to_writer(&mut out, &Options::default())?;
-        writeln!(&mut out)?;
-
-        Ok(())
-    }
-}
-
-impl Default for Options {
-    fn default() -> Options {
         if cfg!(debug_assertions) {
-            Options {
+            Config {
                 address: "0.0.0.0".into(),
                 port: 8000,
-                resource_dir: PathBuf::from("res/"),
+                resource_dir: PathBuf::from("res"),
                 upload_dir: PathBuf::from("uploads"),
-                database_url: "postgres://longboard:@localhost/longboard"
+                pages_dir: None,
+                database_uri: "postgres://longboard:@localhost/longboard"
                     .into(),
                 log_file: None,
-                filter_rules: Vec::new(),
                 names_path: None,
                 notice_path: None,
-                custom_pages: Vec::new(),
+                filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
             }
         } else {
-            Options {
+            Config {
                 address: "0.0.0.0".into(),
-                port: 8000,
-                resource_dir: PathBuf::from("/etc/longboard/"),
-                upload_dir: PathBuf::from("/var/lib/longboard/"),
-                database_url: "postgres://longboard:@localhost/longboard"
+                port: 80,
+                resource_dir: PathBuf::from("/var/lib/longboard"),
+                upload_dir: PathBuf::from("/var/lib/longboard/uploads"),
+                pages_dir: None,
+                database_uri: "postgres://longboard:@localhost/longboard"
                     .into(),
                 log_file: Some(PathBuf::from(
                     "/var/log/longboard/longboard.log",
                 )),
-                filter_rules: Vec::new(),
                 names_path: None,
                 notice_path: None,
-                custom_pages: Vec::new(),
+                filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
             }
         }
@@ -241,4 +304,11 @@ impl Banner {
     pub fn uri(&self) -> String {
         uri!(crate::routes::banner: PathBuf::from(&self.name)).to_string()
     }
+}
+
+/// A custom page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Page {
+    pub name: String,
+    pub path: PathBuf,
 }

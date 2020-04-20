@@ -100,14 +100,14 @@ pub fn routes() -> Vec<Route> {
 /// Serve a static file.
 #[get("/file/<file..>", rank = 1)]
 pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.options.resource_dir.join(file))?)
+    Ok(NamedFile::open(config.resource_dir.join(file))?)
 }
 
 /// Serve a stylesheet.
 #[get("/file/style/<file..>", rank = 0)]
 pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(
-        config.options.resource_dir.join("style").join(file),
+        config.resource_dir.join("style").join(file),
     )?)
 }
 
@@ -115,7 +115,7 @@ pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 #[get("/file/script/<file..>", rank = 0)]
 pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(
-        config.options.resource_dir.join("script").join(file),
+        config.resource_dir.join("script").join(file),
     )?)
 }
 
@@ -123,14 +123,14 @@ pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 #[get("/file/banner/<file..>", rank = 0)]
 pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     Ok(NamedFile::open(
-        config.options.resource_dir.join("banners").join(file),
+        config.resource_dir.join("banners").join(file),
     )?)
 }
 
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
 pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.options.upload_dir.join(file))?)
+    Ok(NamedFile::open(config.upload_dir.join(file))?)
 }
 
 /// Serve the home page.
@@ -146,31 +146,36 @@ pub fn custom_page(
     config: State<Config>,
     context: Context,
 ) -> Result<Template> {
-    let page_path = config
-        .options
-        .resource_dir
-        .join("custom-pages")
-        .join(format!("{}.md", &page_name.to_lowercase()));
+    if let Some(pages_dir) = &config.pages_dir {
+        let page_path =
+            pages_dir.join(format!("{}.md", &page_name.to_lowercase()));
 
-    let page_contents = read_to_string(page_path)?;
-    let parser = Parser::new(&page_contents);
+        let page_contents = read_to_string(page_path).map_err(|_err| {
+            Error::CustomPageNotFound {
+                name: page_name.clone(),
+            }
+        })?;
+        let parser = Parser::new(&page_contents);
 
-    let mut page_html = String::new();
-    html::push_html(&mut page_html, parser);
+        let mut page_html = String::new();
+        html::push_html(&mut page_html, parser);
 
-    let mut data = HashMap::new();
-    data.insert(
-        "page_info".to_string(),
-        to_value(PageInfo::new(&page_name, &context))?,
-    );
-    data.insert(
-        "page_footer".to_string(),
-        to_value(PageFooter::new(&context))?,
-    );
-    data.insert("page_name".to_string(), JsonValue::String(page_name));
-    data.insert("content".to_string(), JsonValue::String(page_html));
+        let mut data = HashMap::new();
+        data.insert(
+            "page_info".to_string(),
+            to_value(PageInfo::new(&page_name, &context))?,
+        );
+        data.insert(
+            "page_footer".to_string(),
+            to_value(PageFooter::new(&context)?)?,
+        );
+        data.insert("page_name".to_string(), JsonValue::String(page_name));
+        data.insert("content".to_string(), JsonValue::String(page_html));
 
-    Ok(Template::render("pages/custom-page", data))
+        Ok(Template::render("pages/custom-page", data))
+    } else {
+        Err(Error::CustomPageNotFound { name: page_name })
+    }
 }
 
 /// Serve the user options page.
@@ -326,7 +331,7 @@ pub fn new_report(
 
     let msg = format!("Reported post {} successfully.", post_id);
     let uri = uri!(thread: thread.board_name, thread.id).to_string();
-    Ok(ActionSuccessPage::new(msg, uri, &context))
+    Ok(ActionSuccessPage::new(msg, uri, &context)?)
 }
 
 /// Serve a form for deleting a post.
@@ -411,5 +416,5 @@ pub fn handle_delete(
         msg,
         redirect_uri.to_string(),
         &context,
-    ))
+    )?)
 }

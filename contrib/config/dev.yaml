@@ -1,11 +1,4 @@
-address: 0.0.0.0
-port: 8000
-
-resource_dir: res
-upload_dir: uploads
-
-database_url: postgres://longboard:@localhost/longboard
-
+pages_dir: contrib/config/pages
 names: contrib/config/names.txt
 notice: contrib/config/notice.md
 
@@ -14,9 +7,6 @@ filter_rules:
       replace_with: language enhancer
     - pattern: big dick
       replace_with: sizable dongus
-
-pages:
-    - Rules
 
 styles:
     - dark

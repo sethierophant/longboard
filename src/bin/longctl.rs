@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use clap::{App, Arg, SubCommand};
 
 use rand::{thread_rng, Rng};
@@ -67,14 +65,13 @@ fn main_res() -> Result<()> {
         )
         .get_matches();
 
-    let conf_path = matches
-        .value_of("config")
-        .map(Path::new)
-        .unwrap_or_else(|| Config::default_path());
+    let conf = if let Some(path) = matches.value_of("config") {
+        Config::new(path)?
+    } else {
+        Config::new_default()?
+    };
 
-    let conf = Config::open(conf_path)?;
-
-    let db = Database::open(&conf.options.database_url)?;
+    let db = Database::open(&conf.database_uri)?;
 
     if let Some(matches) = matches.subcommand_matches("add-staff") {
         let pass = matches.value_of("pass").unwrap().as_bytes();
