@@ -1,5 +1,7 @@
 **Longboard** is an [imageboard][1] engine written in Rust.
 
+![Screenshot of a page](/../screenshots/screenshot.png?raw=True)
+
 ## Goals
 
 Longboard aims to be **configurable**, **performant**, and **spam-resistant**.
