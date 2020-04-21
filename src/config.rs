@@ -48,6 +48,36 @@ pub struct Config {
     /// Custom styles.
     #[serde(rename = "styles")]
     pub custom_styles: Vec<String>,
+    /// The file size limit for uploaded files.
+    #[serde(deserialize_with = "de_file_size_limit")]
+    pub file_size_limit: u64,
+}
+
+fn de_file_size_limit<'de, D>(de: D) -> std::result::Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    String::deserialize(de).and_then(|s| {
+        // Make sure that the pattern is a valid regex.
+        let re = Regex::new("(\\d+)([kKmMgG])?").unwrap();
+
+        if let Some(captures) = re.captures(&s) {
+            let size: u64 = captures.get(0).unwrap().as_str().parse().unwrap();
+            let multiplier = match captures.get(1) {
+                Some(m) => match m.as_str() {
+                    "K" | "k" => 2u64.pow(10),
+                    "M" | "m" => 2u64.pow(20),
+                    "G" | "g" => 2u64.pow(30),
+                    _ => unreachable!(),
+                },
+                None => 1,
+            };
+
+            Ok(size * multiplier)
+        } else {
+            Err(serde::de::Error::custom("expected file size"))
+        }
+    })
 }
 
 impl Config {
@@ -252,6 +282,7 @@ impl Default for Config {
                 notice_path: None,
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
+                file_size_limit: 2u64.pow(20) * 2,
             }
         } else {
             Config {
@@ -269,12 +300,21 @@ impl Default for Config {
                 notice_path: None,
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
+                file_size_limit: 2u64.pow(20) * 2,
             }
         }
     }
 }
 
-fn pattern_de_helper<'de, D>(de: D) -> std::result::Result<String, D::Error>
+#[derive(Debug, Serialize, Deserialize)]
+/// A rule for filtering/enhancing user posts.
+pub struct Rule {
+    #[serde(deserialize_with = "de_pattern")]
+    pub pattern: String,
+    pub replace_with: String,
+}
+
+fn de_pattern<'de, D>(de: D) -> std::result::Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -283,14 +323,6 @@ where
         let _ = Regex::new(&s).map_err(serde::de::Error::custom)?;
         Ok(s)
     })
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-/// A rule for filtering/enhancing user posts.
-pub struct Rule {
-    #[serde(deserialize_with = "pattern_de_helper")]
-    pub pattern: String,
-    pub replace_with: String,
 }
 
 /// A banner to be displayed at the top of the page.

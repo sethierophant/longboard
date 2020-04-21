@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{self, BufReader};
+use std::io::{self, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
@@ -56,7 +56,11 @@ impl FragmentRedirect {
 
 /// Helper functions for entries from a parsed `multipart/form-data`
 pub trait MultipartEntriesExt: Sized {
-    fn parse(content_type: &ContentType, data: Data) -> Result<Self>;
+    fn parse(
+        content_type: &ContentType,
+        data: Data,
+        file_size_limit: u64,
+    ) -> Result<Self>;
     fn param<S>(&self, name: S) -> Option<&str>
     where
         S: AsRef<str>;
@@ -66,7 +70,11 @@ pub trait MultipartEntriesExt: Sized {
 }
 
 impl MultipartEntriesExt for Entries {
-    fn parse(content_type: &ContentType, data: Data) -> Result<Entries> {
+    fn parse(
+        content_type: &ContentType,
+        data: Data,
+        file_size_limit: u64,
+    ) -> Result<Entries> {
         if !content_type.is_form_data() {
             return Err(Error::FormDataBadContentType);
         }
@@ -76,7 +84,7 @@ impl MultipartEntriesExt for Entries {
             .find(|(k, _)| *k == "boundary")
             .ok_or(Error::FormDataBadContentType)?;
 
-        Ok(Multipart::with_body(data.open(), boundary)
+        Ok(Multipart::with_body(data.open().take(file_size_limit), boundary)
             .save()
             .temp()
             .into_entries()
@@ -401,7 +409,8 @@ pub fn new_thread(
         param: "file".into(),
     };
 
-    let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
+    let entries: Entries =
+        MultipartEntriesExt::parse(content_type, data, config.file_size_limit)?;
 
     let subject = entries
         .param("subject")
@@ -451,7 +460,8 @@ pub fn new_post(
         });
     }
 
-    let entries: Entries = MultipartEntriesExt::parse(content_type, data)?;
+    let entries: Entries =
+        MultipartEntriesExt::parse(content_type, data, config.file_size_limit)?;
 
     let (mut new_post, new_file) =
         create_new_models(entries, &config, &db, user, session)?;

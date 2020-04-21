@@ -36,3 +36,5 @@ styles:
     - light
     - dark
 
+# The maximum size for user-uploaded files.
+file_size_limit: 2M
