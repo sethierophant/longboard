@@ -11,6 +11,8 @@ use diesel::dsl::count;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{delete, insert_into, prelude::*, sql_query, update};
 
+use diesel_migrations::embed_migrations;
+
 use rocket::uri;
 
 use serde::Serialize;
@@ -20,6 +22,8 @@ use crate::{Error, Result};
 
 pub mod staff;
 pub use staff::*;
+
+embed_migrations!();
 
 /// A thread ID.
 pub type ThreadId = i32;
@@ -237,6 +241,7 @@ impl Database {
         S: AsRef<str>,
     {
         let pool = Pool::new(ConnectionManager::new(url.as_ref()))?;
+        embedded_migrations::run(&pool.get()?)?;
 
         Ok(Database { pool })
     }

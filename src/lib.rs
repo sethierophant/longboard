@@ -6,6 +6,8 @@
 
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate diesel_migrations;
 
 use std::fmt::Write;
 use std::string::ToString;

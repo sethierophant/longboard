@@ -22,6 +22,7 @@ chrono = { version = "0.4", features = ["serde"] }
 clap = "2.33"
 derive_more = "0.99"
 diesel = { version = "1.4", features = ["chrono", "postgres", "r2d2"] }
+diesel_migrations = "1.4"
 fern = { version = "0.5", features = ["colored"] }
 handlebars = "3.0"
 image = "0.23"

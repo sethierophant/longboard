@@ -100,6 +100,9 @@ pub enum Error {
     #[display(fmt = "Database error: {}", _0)]
     #[from]
     DatabaseError(diesel::result::Error),
+    #[display(fmt = "Database migration error: {}", _0)]
+    #[from]
+    DatabaseMigrationError(diesel_migrations::RunMigrationsError),
     #[display(fmt = "Couldn't connect to the PostgreSQL database: {}", _0)]
     #[from]
     ConnectionError(diesel::ConnectionError),
