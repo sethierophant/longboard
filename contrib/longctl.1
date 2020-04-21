@@ -1,0 +1,44 @@
+.ad l
+.TH longboard 8 2020-04-20
+.SH Name
+longboard \- imageboard engine
+.SH Synopsis
+.B longctl
+[\fB-c\fR \fIconfig\fR] [\fB-h\fR] [\fB-V\fR] [\fICOMMAND\fR]
+.br
+.B longctl
+[\fIOPTIONS\fR...] add-staff \fB-u\fR \fINAME\fR \fB-p\fR \fIPASS\fR
+\fB-r\fR \fIROLE\fR
+.br
+.B longctl
+[\fIOPTIONS\fR...] remove-staff \fB-u\fR \fINAME\fR
+.SH Description
+.B longctl
+is a tool for managing a longboard instance.
+.SH Options
+.TP
+.BR \-c ", " \-\-config " " \fIconfig\fR
+The config file to load. Defaults to \fI/etc/longboard/config.yaml\fR.
+.TP
+.BR \-h ", " \-\-help
+Show a help message.
+.TP
+.BR \-V ", " \-\-version
+Show the program version.
+.SS add-staff
+.TP
+.BR \-u ", " \-\-user " " \fINAME\fR
+The name of the staff member to add.
+.TP
+.BR \-p ", " \-\-pass " " \fIPASS\fR
+The new staff members's password.
+.TP
+.BR \-r ", " \-\-role " " \fIROLE\fR
+The role of the new staff member. Can be one of janitor, moderator, or
+administrator.
+.SS remove-staff
+.TP
+.BR \-u ", " \-\-user " " \fINAME\fR
+The name of the staff member to remove.
+.SH See Also
+longboard(5), longboard(8)

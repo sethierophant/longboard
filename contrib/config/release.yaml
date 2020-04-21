@@ -9,7 +9,7 @@ port: 80
 # How to connect to the database.
 database_uri: postgres://longboard:@localhost/longboard
 
-# Where the resources (templates, styles, scripts, ...) are stored.
+# Where the resources (templates, css, javascript, ...) are stored.
 resource_dir: /var/lib/longboard
 
 # Where the user-uploaded files are stored.
@@ -21,7 +21,7 @@ pages_dir: /etc/longboard/pages
 # List of names to use for anonymous posters.
 names: /etc/longboard/names.txt
 
-# A notice message that will be displayed at the top of each board.
+# A notice message that will be displayed at the top of each board/thread.
 notice: /etc/longboard/notice.md
 
 # Rules to filter posts with. The pattern is parsed as a regex.

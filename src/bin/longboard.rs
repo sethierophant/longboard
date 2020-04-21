@@ -25,11 +25,13 @@ fn main_res() -> Result<()> {
         )
         .arg(
             Arg::with_name("log-all")
+                .short("a")
                 .long("log-all")
                 .help("Show all log messages, this makes the log very messy"),
         )
         .arg(
             Arg::with_name("debug-config")
+                .short("d")
                 .long("debug-config")
                 .help("Dump the configuration to the log on startup"),
         )

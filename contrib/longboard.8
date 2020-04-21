@@ -1,0 +1,31 @@
+.ad l
+.TH longboard 8 2020-04-20
+.SH Name
+longboard \- imageboard engine
+.SH Synopsis
+.B longboard
+[\fB-c\fR \fIconfig\fR] [\fB-d\fR] [\fB-a\fR] [\fB-h\fR] [\fB-V\fR]
+.SH Description
+.B longboard
+is an imageboard engine. In general, you should start this program with a daemon manager such
+as systemd.
+.SH Options
+.TP
+.BR \-c ", " \-\-config " " \fIconfig\fR
+The config file to load. Defaults to \fI/etc/longboard/config.yaml\fR.
+.TP
+.BR \-d ", " \-\-debug-config
+On startup, dump the config to the log file. This is useful for debugging the
+config file.
+.TP
+.BR \-a ", " \-\-log-all
+Log absolutely everything. This dumps a lot of garbage to the log file but can
+be useful for debugging templates, for example.
+.TP
+.BR \-h ", " \-\-help
+Show a help message.
+.TP
+.BR \-V ", " \-\-version
+Show the program version.
+.SH See Also
+longboard(5), longctl(1)

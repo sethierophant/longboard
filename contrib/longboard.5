@@ -1,0 +1,61 @@
+.ad l
+.TH longboard 5 2020-04-20
+.SH Name
+longboard \- imageboard engine
+.SH Synopsis
+.B /etc/longboard/config.yaml
+.SH Description
+The file \fBconfig.yaml\fR contains configuration information for longboard.
+The following options are recognized:
+.TP
+.B address
+The address to bind to.
+.TP
+.B port
+The port to bind to.
+.TP
+.B database_uri
+The database URI to use. This should start with "postgres://" and contains
+information like the username, password, database hostname, and database name.
+.TP
+.B resource_dir
+Where resources (templates, css, javascript, ...) are stored.
+.TP
+.B pages_dir
+Where additional pages are stored. If set, this should be a directory of
+markdown files. Any file you add to this directory will be rendered as HTML and
+added to your site. All of the pages from this directory are shown in the
+footer at the bottom of the page.
+.IP
+Typical uses for this option may be to add a rules page, FAQ page, donation
+page, etc...
+.TP
+.B names
+The name list. This should be a plain text file with one name on each line. If
+this option is set, when a user creates a post without a name, one is chosen
+randomly from this file for them.
+.TP
+.B notice
+The site notice. This file should be a markdown file. If this option is set,
+the contents of this file are rendered into HTML and displayed at the top of
+every board/thread page.
+.TP
+.B filter_rules
+A list of filter rules to filter posts with. Each item in this list should have
+two fields:
+.IP
+.B pattern
+The pattern to match a user's posts with. See
+https://docs.rs/regex/1.3.4/regex/#syntax for valid regex sytax that can be
+used.
+.IP
+.B replace_with
+What to replace the matched text with. This is a fixed string.
+.TP
+.B styles
+A list of style sheets that the user can choose between. If you add STYLE to
+this list, then resource_dir/styles/STYLE.css should exist.
+.SH Files
+.B /etc/longboard/config.yaml
+.SH See Also
+longboard(8), longctl(1)

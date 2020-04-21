@@ -6,30 +6,32 @@
 #
 # [1]: https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html
 
-SHELL			= /bin/sh
+SHELL		= /bin/sh
 
 INSTALLFLAGS	= -o longboard -g longboard
-INSTALL			= install $(INSTALLFLAGS)
+INSTALL		= install $(INSTALLFLAGS)
 INSTALL_PROGRAM	= $(INSTALL)
 INSTALL_DATA	= $(INSTALL) -m 644
 
-CARGOFLAGS		= --locked
-CARGO			= cargo $(CARGOFLAGS)
+CARGOFLAGS	= --locked
+CARGO		= cargo $(CARGOFLAGS)
 
-prefix			= /usr/local
-exec_prefix		= $(prefix)
+prefix		= /usr/local
+exec_prefix	= $(prefix)
 
-bindir			= $(exec_prefix)/bin
-datarootdir		= $(prefix)/share
-datadir			= $(datarootdir)
-mandir			= $(datarootdir)/man
-man1dir			= $(mandir)/man1
-man5dir			= $(mandir)/man5
-man1ext			= .1
-man5ext			= .5
-sysconfdir		= $(prefix)/etc
-resdir			= $(prefix)/var/lib
-logdir			= $(prefix)/var/log
+bindir		= $(exec_prefix)/bin
+datarootdir	= $(prefix)/share
+datadir		= $(datarootdir)
+mandir		= $(datarootdir)/man
+man1dir		= $(mandir)/man1
+man5dir		= $(mandir)/man5
+man8dir		= $(mandir)/man8
+man1ext		= .1
+man5ext		= .5
+man8ext		= .8
+sysconfdir	= $(prefix)/etc
+resdir		= $(prefix)/var/lib
+logdir		= $(prefix)/var/log
 
 target/release/longboard:
 	$(CARGO) build --release
@@ -52,8 +54,8 @@ install: target/release/longboard
 	chown -R longboard:longboard $(DESTDIR)$(resdir)/longboard/templates
 	$(INSTALL_DATA) -d $(DESTDIR)$(resdir)/longboard/uploads
 	$(INSTALL_DATA) -d $(DESTDIR)$(logdir)/longboard
-	- gzip contrib/longboard.1 > $(DESTDIR)$(man1dir)/longboard$(man1ext).gz
 	- gzip contrib/longboard.5 > $(DESTDIR)$(man5dir)/longboard$(man5ext).gz
+	- gzip contrib/longboard.8 > $(DESTDIR)$(man8dir)/longboard$(man8ext).gz
 	- gzip contrib/longctl.1 > $(DESTDIR)$(man1dir)/longctl$(man1ext).gz
 
 uninstall:
@@ -61,8 +63,8 @@ uninstall:
 	rm -f $(DESTDIR)$(bindir)/longctl
 	rm -rf $(DESTDIR)$(resdir)/longboard
 	rm -rf $(DESTDIR)$(logdir)/longboard
-	- rm -f $(DESTDIR)$(man1dir)/longboard$(man1ext).gz
 	- rm -f $(DESTDIR)$(man5dir)/longboard$(man5ext).gz
+	- rm -f $(DESTDIR)$(man8dir)/longboard$(man8ext).gz
 	- rm -f $(DESTDIR)$(man1dir)/longctl$(man1ext).gz
 
 clean:

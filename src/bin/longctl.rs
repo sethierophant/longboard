@@ -52,8 +52,8 @@ fn main_res() -> Result<()> {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("delete-staff")
-                .about("Delete a staff member")
+            SubCommand::with_name("remove-staff")
+                .about("Remove a staff member")
                 .arg(
                     Arg::with_name("name")
                         .short("u")
@@ -87,7 +87,7 @@ fn main_res() -> Result<()> {
         })?;
     }
 
-    if let Some(matches) = matches.subcommand_matches("delete-staff") {
+    if let Some(matches) = matches.subcommand_matches("remove-staff") {
         db.delete_staff(matches.value_of("name").unwrap())?;
     }
 

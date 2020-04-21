@@ -8,10 +8,6 @@ Longboard aims to be **configurable**, **performant**, and **spam-resistant**.
 
 ## Installation
 
-### From a Package
-
-TODO
-
 ### From Source
 
 Clone the repository:
@@ -28,12 +24,23 @@ And run make:
     make
     sudo make install
 
-For more installation options, see the Makefile.
+For more installation options, see the [Makefile](/Makefile).
+
+### From a Package
+
+You can use the provided [PKGBUILD](/contrib/PKGBUILD) file to build on Arch Linux.
+
+Pull requests that add packages and/or build scripts for building packages are
+welcome! In particular, I think it would be nice if we could include .deb files
+with our releases, since so many people use Debian.
 
 ## Usage
 
-See longboard(1) for usage instructions and longboard(5) for configuration
-instructions. Also, see longctl(1) for some setup and configuration actions.
+See longboard(8) for usage instructions and longboard(5) for configuration
+instructions.
+
+Longboard is also distributed with **longctl**, a command-line tool for
+configuring and moderating your imageboard. See longctl(1) for details.
 
 ## License
 
