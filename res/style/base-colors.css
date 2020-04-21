@@ -64,6 +64,10 @@ body {
     animation: 1.0s ease-out 0s highlight;
 }
 
+.post .body-contents blockquote {
+    color: var(--quote-color);
+}
+
 form.post-action input[type="submit"], a.post-action {
     color: var(--post-action-color);
     background: none;

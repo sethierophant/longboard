@@ -260,6 +260,10 @@ nav a {
     overflow: hidden;
 }
 
+.post .body-contents blockquote p::before {
+    content: ">";
+}
+
 .post .body-contents * {
     margin: 0.5em 0;
 }
