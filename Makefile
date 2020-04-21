@@ -54,9 +54,12 @@ install: target/release/longboard
 	chown -R longboard:longboard $(DESTDIR)$(resdir)/longboard/templates
 	$(INSTALL_DATA) -d $(DESTDIR)$(resdir)/longboard/uploads
 	$(INSTALL_DATA) -d $(DESTDIR)$(logdir)/longboard
-	- gzip contrib/longboard.5 > $(DESTDIR)$(man5dir)/longboard$(man5ext).gz
-	- gzip contrib/longboard.8 > $(DESTDIR)$(man8dir)/longboard$(man8ext).gz
-	- gzip contrib/longctl.1 > $(DESTDIR)$(man1dir)/longctl$(man1ext).gz
+	mkdir -p $(DESTDIR)$(man1dir)
+	mkdir -p $(DESTDIR)$(man5dir)
+	mkdir -p $(DESTDIR)$(man8dir)
+	- gzip -c contrib/longctl.1 > $(DESTDIR)$(man1dir)/longctl$(man1ext).gz
+	- gzip -c contrib/longboard.5 > $(DESTDIR)$(man5dir)/longboard$(man5ext).gz
+	- gzip -c contrib/longboard.8 > $(DESTDIR)$(man8dir)/longboard$(man8ext).gz
 
 uninstall:
 	rm -f $(DESTDIR)$(bindir)/longboard
