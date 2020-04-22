@@ -130,7 +130,9 @@ pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
 pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.upload_dir.join(file))?)
+    Ok(NamedFile::open(config.upload_dir.join(file)).or_else(|_| {
+        NamedFile::open(config.resource_dir.join("deleted.png"))
+    })?)
 }
 
 /// Serve the home page.
