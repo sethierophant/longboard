@@ -14,6 +14,7 @@ INSTALL_PROGRAM	= $(INSTALL)
 INSTALL_DATA	= $(INSTALL) -m 644
 
 CARGOFLAGS	= --locked
+CARGOFEATURES	= --all-features
 CARGO		= cargo $(CARGOFLAGS)
 
 prefix		= /usr/local
@@ -34,7 +35,7 @@ resdir		= $(prefix)/var/lib
 logdir		= $(prefix)/var/log
 
 target/release/longboard:
-	$(CARGO) build --release
+	$(CARGO) build $(CARGOFEATURES) --release
 
 all: target/release/longboard
 
@@ -54,9 +55,9 @@ install: target/release/longboard
 	chown -R longboard:longboard $(DESTDIR)$(resdir)/longboard/templates
 	$(INSTALL_DATA) -d $(DESTDIR)$(resdir)/longboard/uploads
 	$(INSTALL_DATA) -d $(DESTDIR)$(logdir)/longboard
-	mkdir -p $(DESTDIR)$(man1dir)
-	mkdir -p $(DESTDIR)$(man5dir)
-	mkdir -p $(DESTDIR)$(man8dir)
+	- mkdir -p $(DESTDIR)$(man1dir)
+	- mkdir -p $(DESTDIR)$(man5dir)
+	- mkdir -p $(DESTDIR)$(man8dir)
 	- gzip -c contrib/longctl.1 > $(DESTDIR)$(man1dir)/longctl$(man1ext).gz
 	- gzip -c contrib/longboard.5 > $(DESTDIR)$(man5dir)/longboard$(man5ext).gz
 	- gzip -c contrib/longboard.8 > $(DESTDIR)$(man8dir)/longboard$(man8ext).gz
@@ -74,6 +75,6 @@ clean:
 	$(CARGO) clean
 
 check:
-	$(CARGO) test
+	$(CARGO) test $(CARGOFEATURES)
 
 # vi:ts=8:sw=8

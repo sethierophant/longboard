@@ -2,6 +2,7 @@
 
 use std::fs::{read_dir, read_to_string, File};
 use std::io::{BufRead, BufReader};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
@@ -51,6 +52,12 @@ pub struct Config {
     /// The file size limit for uploaded files.
     #[serde(deserialize_with = "de_file_size_limit")]
     pub file_size_limit: u64,
+    /// The list of IPs to allow unconditionally.
+    pub allow_list: Vec<IpAddr>,
+    /// The list of IPs to block unconditionally.
+    pub block_list: Vec<IpAddr>,
+    /// The list of DNSBLs to use.
+    pub dns_block_list: Vec<String>,
 }
 
 fn de_file_size_limit<'de, D>(de: D) -> std::result::Result<u64, D::Error>
@@ -283,6 +290,9 @@ impl Default for Config {
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
                 file_size_limit: 2u64.pow(20) * 2,
+                allow_list: Vec::new(),
+                block_list: Vec::new(),
+                dns_block_list: Vec::new(),
             }
         } else {
             Config {
@@ -301,6 +311,9 @@ impl Default for Config {
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
                 file_size_limit: 2u64.pow(20) * 2,
+                allow_list: Vec::new(),
+                block_list: Vec::new(),
+                dns_block_list: Vec::new(),
             }
         }
     }

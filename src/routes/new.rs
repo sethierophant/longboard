@@ -30,6 +30,7 @@ use rocket::http::{hyper::header::Location, ContentType};
 use rocket::{post, uri, Data, Responder, State};
 
 use crate::models::*;
+use crate::routes::NotBlocked;
 use crate::{config::Config, Error, Result};
 
 /// This is a workaround for Rocket's URI type not supporting fragments (the
@@ -396,6 +397,7 @@ pub fn new_thread(
     db: State<Database>,
     user: User,
     session: Option<Session>,
+    _not_blocked: NotBlocked,
 ) -> Result<FragmentRedirect> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
@@ -452,6 +454,7 @@ pub fn new_post(
     db: State<Database>,
     user: User,
     session: Option<Session>,
+    _not_blocked: NotBlocked,
 ) -> Result<FragmentRedirect> {
     if db.thread(thread_id).is_err() {
         return Err(Error::ThreadNotFound {

@@ -38,3 +38,40 @@ styles:
 
 # The maximum size for user-uploaded files.
 file_size_limit: 2M
+
+# The list of IP addresses to allow for posting. This list will override both
+# block_list and dns_block_list.
+#allow_list:
+#   - 1.2.3.4
+
+# The list of IP addresses to block from posting.
+#block_list:
+#   - 4.3.2.1
+
+# The list of DNS block lists to use.
+#
+# Before uncommenting any of the DNSBLs below, make sure that you meet the
+# block list's terms of use. In particular, you cannot use the Spamhaus lists
+# for commercial purposes.
+#
+#dns_block_list:
+#
+#   Block list provided by EFnet, includes open proxies and Tor exit nodes.
+#   - rbl.efnetrbl.org
+#
+#   Block list provided by Spamhaus, includes IP addresses that "appear to
+#   Spamhaus to be under the control of, used by, or made available for use by
+#   spammers and abusers in unsolicited bulk email or other types of
+#   Internet-based abuse that threatens networks or users".
+#   - sbl.spamhaus.org
+#
+#   Block list provided by Spamhaus, includes IP addresses of "hijacked PCs
+#   infected by illegal 3rd party exploits, including open proxies (HTTP,
+#   socks, AnalogX, wingate, etc), worms/viruses with built-in spam engines,
+#   and other types of trojan-horse exploits".
+#   - xbl.spamhaus.org
+#
+#   Block list provided by Proofpoint, Inc., includes "email servers suspected
+#   of sending or relaying spam, servers that have been hacked and hijacked,
+#   and those with Trojan infestations".
+#  - dnsbl.sorbs.net

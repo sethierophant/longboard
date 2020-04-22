@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::string::ToString;
+use std::net::ToSocketAddrs;
 
 use argon2::verify_encoded;
 
@@ -24,6 +25,103 @@ use crate::{config::Config, Error, Result};
 
 pub mod new;
 pub mod staff;
+
+/// Request guard to check if a user's IP is blocked.
+pub struct NotBlocked;
+
+impl<'a, 'r> FromRequest<'a, 'r> for NotBlocked {
+    type Error = Error;
+
+    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+        let config = request.guard::<State<Config>>()
+            .expect("expected config to be initialized");
+
+        // If we are using a local request (i.e., if we're running a test) then
+        // we might not have an IP address. In production, all requests should
+        // have an IP address.
+        let ip = if cfg!(debug_assertions) {
+            request.client_ip().unwrap_or("127.0.0.1".parse().unwrap())
+        } else {
+            request.client_ip().expect("expected client to have ip")
+        };
+
+        if ip.is_loopback() {
+            return Outcome::Success(NotBlocked);
+        }
+
+        if config.allow_list.contains(&ip) {
+            return Outcome::Success(NotBlocked);
+        }
+
+        if config.block_list.contains(&ip) {
+            return Outcome::Failure((
+                Status::Forbidden,
+                Error::IpIsBlocked { ip },
+            ));
+        }
+
+        for dnsbl in config.dns_block_list.iter() {
+            let host = format!("{}.{}:42069", ip, dnsbl);
+
+            if let Ok(mut addrs) = host.to_socket_addrs() {
+                return Outcome::Failure((
+                    Status::Forbidden,
+                    Error::IpIsBlockedDnsbl {
+                        dnsbl: dnsbl.to_string(),
+                        result: addrs.next().unwrap().ip(),
+                        ip
+                    },
+                ));
+            }
+        }
+
+        Outcome::Success(NotBlocked)
+    }
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for User {
+    type Error = Error;
+
+    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+        let db = request
+            .guard::<State<Database>>()
+            .expect("expected database to be initialized");
+
+        // If we are using a local request (i.e., if we're running a test) then
+        // we might not have an IP address. In production, all requests should
+        // have an IP address.
+        let ip = if cfg!(debug_assertions) {
+            request.client_ip().unwrap_or("127.0.0.1".parse().unwrap())
+        } else {
+            request.client_ip().expect("expected client to have ip")
+        };
+
+        match db.user(ip) {
+            Ok(user) => {
+                if user.is_banned() {
+                    Outcome::Failure((
+                        Status::Forbidden,
+                        Error::UserIsBanned {
+                            user_hash: user.hash,
+                        },
+                    ))
+                } else {
+                    Outcome::Success(user)
+                }
+            }
+            Err(Error::DatabaseError(diesel::result::Error::NotFound)) => {
+                let new_user = NewUser::from_ip(ip);
+
+                let user = db
+                    .insert_user(&new_user)
+                    .map_err(|err| Err((Status::InternalServerError, err)))?;
+
+                Outcome::Success(user)
+            }
+            Err(e) => Outcome::Failure((Status::InternalServerError, e)),
+        }
+    }
+}
 
 #[derive(FromForm, Clone)]
 pub struct UserOptions {
@@ -281,6 +379,7 @@ pub fn report(
     post_id: PostId,
     db: State<Database>,
     context: Context,
+    _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<ReportPage> {
     if db.board(board_name).is_err()
@@ -309,6 +408,7 @@ pub fn new_report(
     db: State<Database>,
     context: Context,
     user: User,
+    _not_blocked: NotBlocked,
 ) -> Result<ActionSuccessPage> {
     if db.board(board_name).is_err()
         || db.thread(thread_id).is_err()
@@ -344,6 +444,7 @@ pub fn delete(
     post_id: PostId,
     db: State<Database>,
     context: Context,
+    _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<DeletePage> {
     if db.board(board_name).is_err()
@@ -372,6 +473,7 @@ pub fn handle_delete(
     delete_data: Form<DeleteData>,
     db: State<Database>,
     context: Context,
+    _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<ActionSuccessPage> {
     if db.board(board_name).is_err()

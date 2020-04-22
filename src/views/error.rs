@@ -27,6 +27,28 @@ impl BadRequestPage {
 impl_template_responder!(BadRequestPage, "pages/error/400");
 
 #[derive(Debug, Serialize)]
+pub struct SpamDetectedPage {
+    pub message: String,
+    pub page_info: PageInfo,
+    pub page_footer: PageFooter,
+}
+
+impl SpamDetectedPage {
+    pub fn new<S>(message: S, context: &Context) -> Result<SpamDetectedPage>
+    where
+        S: Into<String>,
+    {
+        Ok(SpamDetectedPage {
+            message: message.into(),
+            page_info: PageInfo::new("Spam Detected", context),
+            page_footer: PageFooter::new(context)?,
+        })
+    }
+}
+
+impl_template_responder!(SpamDetectedPage, "pages/error/spam-detected");
+
+#[derive(Debug, Serialize)]
 pub struct NotFoundPage {
     pub message: String,
     pub page_info: PageInfo,

@@ -37,50 +37,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for Session {
     }
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for User {
-    type Error = Error;
-
-    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let db = request
-            .guard::<State<Database>>()
-            .expect("expected database to be initialized");
-
-        // If we are using a local request (i.e., if we're running a test) then
-        // we might not have an IP address. In production, all requests should
-        // have an IP address.
-        let ip = if cfg!(debug_assertions) {
-            request.client_ip().unwrap_or("1.2.3.4".parse().unwrap())
-        } else {
-            request.client_ip().expect("expected client to have ip")
-        };
-
-        match db.user(ip) {
-            Ok(user) => {
-                if user.is_banned() {
-                    Outcome::Failure((
-                        Status::Forbidden,
-                        Error::UserIsBanned {
-                            user_hash: user.hash,
-                        },
-                    ))
-                } else {
-                    Outcome::Success(user)
-                }
-            }
-            Err(Error::DatabaseError(diesel::result::Error::NotFound)) => {
-                let new_user = NewUser::from_ip(ip);
-
-                let user = db
-                    .insert_user(&new_user)
-                    .map_err(|err| Err((Status::InternalServerError, err)))?;
-
-                Outcome::Success(user)
-            }
-            Err(e) => Outcome::Failure((Status::InternalServerError, e)),
-        }
-    }
-}
-
 /// Serve the login page for staff members.
 #[get("/staff/login")]
 pub fn login(context: Context, _user: User) -> Result<LoginPage> {

@@ -17,6 +17,10 @@ use crate::views::Context;
 /// Our error type.
 #[derive(Debug, Display, From)]
 pub enum Error {
+    #[display(fmt = "The IP {} was in the server block list.", ip)]
+    IpIsBlocked { ip: IpAddr },
+    #[display(fmt = "The IP {} was in found in {} ({}).", ip, dnsbl, result)]
+    IpIsBlockedDnsbl { dnsbl: String, result: IpAddr, ip: IpAddr },
     #[display(fmt = "Banned user {} attempted to access page", user_hash)]
     UserIsBanned { user_hash: String },
     #[display(fmt = "User with ip {} was not found in the database", ip_addr)]
@@ -153,6 +157,22 @@ impl<'r> Responder<'r> for Error {
                 Ok(res)
             }
 
+            Error::IpIsBlocked { .. } 
+            | Error::IpIsBlockedDnsbl { .. } => {
+                warn!("{}", &self);
+
+                let context = req.guard::<Context>().unwrap();
+                let page = SpamDetectedPage::new(
+                    "Your IP address was found in a block list.".to_string(),
+                    &context
+                );
+
+                let mut res = page.respond_to(req)?;
+                res.set_status(Status::Forbidden);
+
+                Ok(res)
+            }
+
             Error::PostNotFound { .. }
             | Error::BoardNotFound { .. }
             | Error::ThreadNotFound { .. }
@@ -167,6 +187,7 @@ impl<'r> Responder<'r> for Error {
 
                 Ok(res)
             }
+
 
             Error::NotAuthenticated => {
                 // If the client isn't authenticated, just redirect them to the
