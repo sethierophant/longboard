@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 use std::fs::read_to_string;
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::string::ToString;
-use std::net::ToSocketAddrs;
 
 use argon2::verify_encoded;
 
@@ -33,7 +33,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for NotBlocked {
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let config = request.guard::<State<Config>>()
+        let config = request
+            .guard::<State<Config>>()
             .expect("expected config to be initialized");
 
         // If we are using a local request (i.e., if we're running a test) then
@@ -69,7 +70,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for NotBlocked {
                     Error::IpIsBlockedDnsbl {
                         dnsbl: dnsbl.to_string(),
                         result: addrs.next().unwrap().ip(),
-                        ip
+                        ip,
                     },
                 ));
             }

@@ -10,6 +10,8 @@ use argon2::hash_encoded;
 
 use chrono::offset::Utc;
 
+use diesel::Connection;
+
 use image::error::ImageError;
 use image::ImageFormat;
 
@@ -85,11 +87,13 @@ impl MultipartEntriesExt for Entries {
             .find(|(k, _)| *k == "boundary")
             .ok_or(Error::FormDataBadContentType)?;
 
-        Ok(Multipart::with_body(data.open().take(file_size_limit), boundary)
-            .save()
-            .temp()
-            .into_entries()
-            .ok_or(Error::FormDataCouldntParse)?)
+        Ok(
+            Multipart::with_body(data.open().take(file_size_limit), boundary)
+                .save()
+                .temp()
+                .into_entries()
+                .ok_or(Error::FormDataCouldntParse)?,
+        )
     }
 
     fn param<S>(&self, name: S) -> Option<&str>
@@ -422,19 +426,26 @@ pub fn new_thread(
     let models = create_new_models(entries, &config, &db, user, session)?;
 
     if let (mut new_post, Some(mut new_file)) = models {
-        let new_thread_id = db.insert_thread(NewThread {
-            subject,
-            board: board_name.clone(),
-            locked: false,
-            pinned: false,
-        })?;
-        new_post.thread = new_thread_id;
-        new_post.board = board_name.clone();
+        let (new_thread_id, new_post_id) =
+            db.pool.get()?.transaction::<_, Error, _>(|| {
+                let new_thread_id = db.insert_thread(NewThread {
+                    subject,
+                    board: board_name.clone(),
+                    locked: false,
+                    pinned: false,
+                })?;
+                new_post.thread = new_thread_id;
+                new_post.board = board_name.clone();
 
-        let new_post_id = db.insert_post(new_post)?;
-        new_file.post = new_post_id;
+                let new_post_id = db.insert_post(new_post)?;
+                new_file.post = new_post_id;
 
-        db.insert_file(new_file)?;
+                db.insert_file(new_file)?;
+
+                db.trim_board(&board_name, crate::DEFAULT_THREAD_LIMIT)?;
+
+                Ok((new_thread_id, new_post_id))
+            })?;
 
         let uri = uri!(crate::routes::thread: board_name, new_thread_id);
         Ok(FragmentRedirect::to(uri, new_post_id))
@@ -473,16 +484,21 @@ pub fn new_post(
 
     new_post.thread = thread_id;
     new_post.board = board_name.clone();
-    let new_post_id = db.insert_post(new_post)?;
 
-    if let Some(mut new_file) = new_file {
-        new_file.post = new_post_id;
-        db.insert_file(new_file)?;
-    }
+    let new_post_id = db.pool.get()?.transaction::<_, Error, _>(|| {
+        let new_post_id = db.insert_post(new_post)?;
 
-    if !no_bump {
-        db.bump_thread(thread_id)?;
-    }
+        if let Some(mut new_file) = new_file {
+            new_file.post = new_post_id;
+            db.insert_file(new_file)?;
+        }
+
+        if !no_bump {
+            db.bump_thread(thread_id)?;
+        }
+
+        Ok(new_post_id)
+    })?;
 
     let uri = uri!(crate::routes::thread: board_name, thread_id);
     Ok(FragmentRedirect::to(uri, new_post_id))

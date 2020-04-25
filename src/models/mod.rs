@@ -9,6 +9,7 @@ use chrono::DateTime;
 
 use diesel::dsl::count;
 use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sql_types::{Integer, Text};
 use diesel::{delete, insert_into, prelude::*, sql_query, update};
 
 use diesel_migrations::embed_migrations;
@@ -217,7 +218,7 @@ impl Page {
 
 /// A connection to the database. Used for creating and retrieving data.
 pub struct Database {
-    pool: Pool<ConnectionManager<PgConnection>>,
+    pub pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl Debug for Database {
@@ -310,6 +311,70 @@ impl Database {
         Ok(())
     }
 
+    /// Trim a board; delete any threads past the thread limit.
+    ///
+    /// This function deletes recursively, it will also delete any posts, files,
+    /// and reports associated with old threads. Returns the IDs of the threads
+    /// that were deleted.
+    pub fn trim_board<S>(&self, board_name: S, max_threads: u32) -> Result<()>
+    where
+        S: AsRef<str>,
+    {
+        self.pool.get()?.transaction::<_, Error, _>(|| {
+            let query = "DELETE FROM report R \
+                               USING post P, thread T \
+                               WHERE R.post = P.id \
+                                 AND P.thread = ANY ( \
+                                     SELECT id FROM thread \
+                                      WHERE board = $1 \
+                                   ORDER BY bump_date DESC \
+                                     OFFSET $2);";
+            sql_query(query)
+                .bind::<Text, _>(board_name.as_ref())
+                .bind::<Integer, i32>(max_threads.try_into().unwrap())
+                .execute(&self.pool.get()?)?;
+
+            let query = "DELETE FROM file F \
+                               USING post P, thread T \
+                               WHERE F.post = P.id \
+                                 AND P.thread = ANY( \
+                                     SELECT id FROM thread \
+                                      WHERE board = $1 \
+                                   ORDER BY bump_date DESC \
+                                     OFFSET $2);";
+            sql_query(query)
+                .bind::<Text, _>(board_name.as_ref())
+                .bind::<Integer, i32>(max_threads.try_into().unwrap())
+                .execute(&self.pool.get()?)?;
+
+            let query = "DELETE FROM post \
+                               WHERE thread = ANY( \
+                                     SELECT id FROM thread \
+                                      WHERE board = $1 \
+                                   ORDER BY bump_date DESC \
+                                     OFFSET $2)";
+            sql_query(query)
+                .bind::<Text, _>(board_name.as_ref())
+                .bind::<Integer, i32>(max_threads.try_into().unwrap())
+                .execute(&self.pool.get()?)?;
+
+            let query = "DELETE FROM thread \
+                               WHERE id = ANY( \
+                                     SELECT id FROM thread \
+                                      WHERE board = $1 \
+                                   ORDER BY bump_date DESC \
+                                     OFFSET $2)";
+            sql_query(query)
+                .bind::<Text, _>(board_name.as_ref())
+                .bind::<Integer, i32>(max_threads.try_into().unwrap())
+                .execute(&self.pool.get()?)?;
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
     /// Get a thread.
     pub fn thread(&self, thread_id: ThreadId) -> Result<Thread> {
         use crate::schema::thread::columns::id;
@@ -397,10 +462,10 @@ impl Database {
             ))
             .filter(post_columns::board.eq(board_name.as_ref()))
             .filter(sql("post.id IN (\
-                             SELECT id FROM post AS inner_post \
-                                 WHERE inner_post.thread = thread.id \
-                                 ORDER BY id ASC \
-                                 LIMIT 1)"))
+                                 SELECT id FROM post AS inner_post \
+                                  WHERE inner_post.thread = thread.id \
+                                  ORDER BY id ASC \
+                                  LIMIT 1)"))
             .order_by(thread_columns::bump_date.desc())
             .load(&self.pool.get()?)?)
     }
@@ -431,31 +496,35 @@ impl Database {
     }
 
     /// Delete a thread.
-    pub fn delete_thread(&self, thread_id: ThreadId) -> Result<()> {
-        let query = format!(
-            "DELETE FROM report R USING post P \
-                             WHERE R.post = P.id AND P.thread = {}",
-            thread_id
-        );
-        sql_query(query).execute(&self.pool.get()?)?;
+    pub fn delete_thread(&self, tid: ThreadId) -> Result<()> {
+        use crate::schema::post::columns::thread as post_thread;
+        use crate::schema::post::dsl::post as table_post;
+        use crate::schema::thread::columns::id as thread_id;
+        use crate::schema::thread::dsl::thread as table_thread;
 
-        let query = format!(
-            "DELETE FROM file F USING post P \
-                             WHERE F.post = P.id AND P.thread = {}",
-            thread_id
-        );
-        sql_query(query).execute(&self.pool.get()?)?;
-
-        {
-            use crate::schema::post::columns::thread;
-            use crate::schema::post::dsl::post;
-            delete(post.filter(thread.eq(thread_id)))
+        self.pool.get()?.transaction::<_, Error, _>(|| {
+            let query = "DELETE FROM report R \
+                               USING post P \
+                               WHERE R.post = P.id AND P.thread = $1";
+            sql_query(query)
+                .bind::<Integer, _>(tid)
                 .execute(&self.pool.get()?)?;
-        }
 
-        use crate::schema::thread::columns::id;
-        use crate::schema::thread::dsl::thread;
-        delete(thread.filter(id.eq(thread_id))).execute(&self.pool.get()?)?;
+            let query = "DELETE FROM file F \
+                               USING post P \
+                               WHERE F.post = P.id AND P.thread = $1";
+            sql_query(query)
+                .bind::<Integer, _>(tid)
+                .execute(&self.pool.get()?)?;
+
+            delete(table_post.filter(post_thread.eq(tid)))
+                .execute(&self.pool.get()?)?;
+
+            delete(table_thread.filter(thread_id.eq(tid)))
+                .execute(&self.pool.get()?)?;
+
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -509,22 +578,27 @@ impl Database {
         use crate::schema::post::columns::{id, thread};
         use crate::schema::post::dsl::post;
 
-        let first_post: Post = post
-            .filter(thread.eq(thread_id))
-            .order(id.asc())
-            .limit(1)
-            .first(&self.pool.get()?)?;
+        let mut posts: Vec<Post> = Vec::new();
 
-        let mut posts: Vec<Post> = post
-            .filter(id.ne(first_post.id))
-            .filter(thread.eq(thread_id))
-            .order(id.desc())
-            .limit(limit.into())
-            .load(&self.pool.get()?)?;
+        self.pool.get()?.transaction::<_, Error, _>(|| {
+            let first_post: Post = post
+                .filter(thread.eq(thread_id))
+                .order(id.asc())
+                .limit(1)
+                .first(&self.pool.get()?)?;
 
-        posts.reverse();
+            posts = post
+                .filter(id.ne(first_post.id))
+                .filter(thread.eq(thread_id))
+                .order(id.desc())
+                .limit(limit.into())
+                .load(&self.pool.get()?)?;
 
-        posts.insert(0, first_post);
+            posts.reverse();
+            posts.insert(0, first_post);
+
+            Ok(())
+        })?;
 
         Ok(posts)
     }
@@ -616,96 +690,106 @@ impl Database {
     }
 
     /// Delete a post.
-    pub fn delete_post(&self, post_id: PostId) -> Result<()> {
-        {
-            use crate::schema::report::columns::post;
-            use crate::schema::report::dsl::report;
-            delete(report.filter(post.eq(post_id)))
+    pub fn delete_post(&self, pid: PostId) -> Result<()> {
+        self.pool.get()?.transaction::<_, Error, _>(|| {
+            use crate::schema::file::columns::post as file_post;
+            use crate::schema::file::dsl::file as table_file;
+            use crate::schema::post::columns::id as post_id;
+            use crate::schema::post::dsl::post as table_post;
+            use crate::schema::report::columns::post as report_post;
+            use crate::schema::report::dsl::report as table_report;
+
+            delete(table_report.filter(report_post.eq(pid)))
                 .execute(&self.pool.get()?)?;
-        }
 
-        {
-            use crate::schema::file::columns::post;
-            use crate::schema::file::dsl::file;
-            delete(file.filter(post.eq(post_id))).execute(&self.pool.get()?)?;
-        }
+            delete(table_file.filter(file_post.eq(pid)))
+                .execute(&self.pool.get()?)?;
 
-        use crate::schema::post::columns::id;
-        use crate::schema::post::dsl::post;
-        delete(post.filter(id.eq(post_id))).execute(&self.pool.get()?)?;
+            delete(table_post.filter(post_id.eq(pid)))
+                .execute(&self.pool.get()?)?;
+
+            Ok(())
+        })?;
 
         Ok(())
     }
 
     /// Get the URI for a post.
     pub fn post_uri(&self, post_id: PostId) -> Result<String> {
-        let thread_id: ThreadId = {
-            use crate::schema::post::columns::{id, thread};
-            use crate::schema::post::dsl::post;
+        let thread_uri = self.pool.get()?.transaction::<_, Error, _>(|| {
+            let thread_id: ThreadId = {
+                use crate::schema::post::columns::{id, thread};
+                use crate::schema::post::dsl::post;
 
-            post.filter(id.eq(post_id))
-                .select(thread)
-                .limit(1)
-                .first(&self.pool.get()?)?
-        };
+                post.filter(id.eq(post_id))
+                    .select(thread)
+                    .limit(1)
+                    .first(&self.pool.get()?)?
+            };
 
-        let board_name: String = {
-            use crate::schema::thread::columns::{board, id};
-            use crate::schema::thread::dsl::thread;
+            let board_name: String = {
+                use crate::schema::thread::columns::{board, id};
+                use crate::schema::thread::dsl::thread;
 
-            thread
-                .filter(id.eq(thread_id))
-                .select(board)
-                .limit(1)
-                .first(&self.pool.get()?)?
-        };
+                thread
+                    .filter(id.eq(thread_id))
+                    .select(board)
+                    .limit(1)
+                    .first(&self.pool.get()?)?
+            };
 
-        let thread_uri = uri!(crate::routes::thread: board_name, thread_id);
+            Ok(uri!(crate::routes::thread: board_name, thread_id))
+        })?;
+
         Ok(format!("{}#{}", thread_uri.to_string(), post_id))
     }
 
     /// Get the thread that a post belongs to.
     pub fn parent_thread(&self, post_id: PostId) -> Result<Thread> {
-        let thread_id: ThreadId = {
-            use crate::schema::post::columns::{id, thread};
-            use crate::schema::post::dsl::post;
+        let parent = self.pool.get()?.transaction::<_, Error, _>(|| {
+            use crate::schema::thread::columns::id;
+            use crate::schema::thread::dsl::thread;
 
-            post.filter(id.eq(post_id))
-                .select(thread)
+            let thread_id: ThreadId = {
+                use crate::schema::post::columns::{id, thread};
+                use crate::schema::post::dsl::post;
+
+                post.filter(id.eq(post_id))
+                    .select(thread)
+                    .limit(1)
+                    .first(&self.pool.get()?)?
+            };
+
+            Ok(thread
+                .filter(id.eq(thread_id))
                 .limit(1)
-                .first(&self.pool.get()?)?
-        };
+                .first(&self.pool.get()?)?)
+        })?;
 
-        use crate::schema::thread::columns::id;
-        use crate::schema::thread::dsl::thread;
-
-        Ok(thread
-            .filter(id.eq(thread_id))
-            .limit(1)
-            .first(&self.pool.get()?)?)
+        Ok(parent)
     }
 
     pub fn is_first_post(&self, post_id: PostId) -> Result<bool> {
-        let post: Post = {
-            use crate::schema::post::columns::id;
-            use crate::schema::post::dsl::post;
+        let first_post_id =
+            self.pool.get()?.transaction::<_, Error, _>(|| {
+                use crate::schema::post::columns::{id, thread};
+                use crate::schema::post::dsl::post;
 
-            post.filter(id.eq(post_id))
-                .limit(1)
-                .first(&self.pool.get()?)?
-        };
+                let Post { thread_id, .. } = {
+                    post.filter(id.eq(post_id))
+                        .limit(1)
+                        .first(&self.pool.get()?)?
+                };
 
-        let first_post_id: PostId = {
-            use crate::schema::post::columns::{id, thread};
-            use crate::schema::post::dsl::post as post_;
+                let first_post_id: i32 = post
+                    .filter(thread.eq(thread_id))
+                    .select(id)
+                    .order(id.asc())
+                    .limit(1)
+                    .first(&self.pool.get()?)?;
 
-            post_
-                .filter(thread.eq(post.thread_id))
-                .select(id)
-                .order(id.asc())
-                .limit(1)
-                .first(&self.pool.get()?)?
-        };
+                Ok(first_post_id)
+            })?;
 
         Ok(post_id == first_post_id)
     }
