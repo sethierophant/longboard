@@ -4,7 +4,11 @@
 
 ## Goals
 
-Longboard aims to be **configurable**, **performant**, and **spam-resistant**.
+Longboard aims to be:
+
+- Configurable, well-documented, and easy to install.
+- Spam-resistant.
+- Performant.
 
 ## Installation
 
@@ -28,7 +32,8 @@ For more installation options, see the [Makefile](/Makefile).
 
 ### From a Package
 
-You can use the provided [PKGBUILD](/contrib/PKGBUILD) file to build on Arch Linux.
+You can use the provided [PKGBUILD](/contrib/PKGBUILD) file to build on Arch
+Linux.
 
 Pull requests that add packages and/or build scripts for building packages are
 welcome! In particular, I think it would be nice if we could include .deb files
@@ -41,6 +46,12 @@ instructions.
 
 Longboard is also distributed with **longctl**, a command-line tool for
 configuring and moderating your imageboard. See longctl(1) for details.
+
+## Contributing
+
+All contributions are welcome! If there's any features you want to see, please
+open an issue for a feature request. Also, bug reports are very much
+appreciated.
 
 ## License
 
