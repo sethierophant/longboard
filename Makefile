@@ -31,8 +31,9 @@ man1ext		= .1
 man5ext		= .5
 man8ext		= .8
 sysconfdir	= $(prefix)/etc
-resdir		= $(prefix)/var/lib
-logdir		= $(prefix)/var/log
+localstatedir	= $(prefix)/var
+resdir		= $(localstatedir)/lib
+logdir		= $(localstatedir)/log
 
 target/release/longboard:
 	$(CARGO) build $(CARGOFEATURES) --release

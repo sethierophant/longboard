@@ -20,7 +20,7 @@ pkgver() {
 
 build() {
 	cd "$srcdir/${pkgname%-git}"
-	make prefix=/usr
+	make
 }
 
 check() {
@@ -30,5 +30,6 @@ check() {
 
 package() {
 	cd "$srcdir/${pkgname%-git}"
-	make DESTDIR="$pkgdir/" install
+	make prefix=/usr sysconfdir=/etc localstatedir=/var DESTDIR="$pkgdir/" \
+        install
 }
