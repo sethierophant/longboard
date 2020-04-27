@@ -12,6 +12,9 @@ Longboard aims to be:
 
 ## Installation
 
+Dependencies:
+    - PostgreSQL
+
 ### From Source
 
 Clone the repository:
@@ -19,16 +22,17 @@ Clone the repository:
     git clone https://github.com/sethierophant/longboard
     cd longboard
 
-Create the system user for longboard:
-
-    sudo useradd -r longboard
-
 And run make:
 
     make
     sudo make install
 
 For more installation options, see the [Makefile](/Makefile).
+
+After installing, set up the database:
+
+    sudo -u postgres -- psql -c 'CREATE ROLE longboard LOGIN'
+    sudo -u postgres -- psql -c 'CREATE DATABASE longboard WITH OWNER LONGBOARD'
 
 ### From a Package
 

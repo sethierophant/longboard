@@ -8,7 +8,7 @@
 
 SHELL		= /bin/sh
 
-INSTALLFLAGS	= -o longboard -g longboard
+INSTALLFLAGS	=
 INSTALL		= install $(INSTALLFLAGS)
 INSTALL_PROGRAM	= $(INSTALL)
 INSTALL_DATA	= $(INSTALL) -m 644

@@ -27,6 +27,11 @@ pub struct Config {
     pub address: String,
     /// Port to bind to.
     pub port: u16,
+    /// File to log to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_file: Option<PathBuf>,
+    /// URL to connect to the database.
+    pub database_uri: String,
     /// Where the site resources (styles, templates, ...) are.
     pub resource_dir: PathBuf,
     /// Where the user-uploaded files are.
@@ -39,11 +44,6 @@ pub struct Config {
     /// The path to a notice file to be displayed at the top of each board.
     #[serde(rename = "notice")]
     pub notice_path: Option<PathBuf>,
-    /// URL to connect to the database.
-    pub database_uri: String,
-    /// File to log to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub log_file: Option<PathBuf>,
     /// Filter rules to apply to posts.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub filter_rules: Vec<Rule>,
@@ -75,9 +75,10 @@ where
                 .as_str()
                 .parse()
                 .map_err(|err| {
-                    SerdeError::custom(
-                        format!("invalid file size limit: {}", err)
-                    )
+                    SerdeError::custom(format!(
+                        "invalid file size limit: {}",
+                        err
+                    ))
                 })?;
 
             let multiplier = match captures.get(2) {
@@ -314,7 +315,7 @@ impl Default for Config {
                 database_uri: "postgres://longboard:@localhost/longboard"
                     .into(),
                 log_file: Some(PathBuf::from(
-                    "/var/log/longboard/longboard.log",
+                    "/var/log/longboard.log",
                 )),
                 names_path: None,
                 notice_path: None,

@@ -1,14 +1,15 @@
 #![feature(proc_macro_hygiene)]
 
 use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 use clap::{App, Arg};
 
 use fern::colors::{Color, ColoredLevelConfig};
 
-use log::{debug, info};
+use log::{debug, info, log_enabled};
 
-use longboard::{new_instance, Config, Result};
+use longboard::{new_instance, Config, Error, Result};
 
 fn main_res() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -24,6 +25,22 @@ fn main_res() -> Result<()> {
                 .help("Config file to use"),
         )
         .arg(
+            Arg::with_name("log-file")
+                .short("l")
+                .long("log-file")
+                .value_name("FILE")
+                .takes_value(true)
+                .help("Log file to use (- for stdout)"),
+        )
+        .arg(
+            Arg::with_name("database-uri")
+                .short("u")
+                .long("database-uri")
+                .value_name("URI")
+                .takes_value(true)
+                .help("URI to use to connect to the database"),
+        )
+        .arg(
             Arg::with_name("log-all")
                 .short("a")
                 .long("log-all")
@@ -37,11 +54,22 @@ fn main_res() -> Result<()> {
         )
         .get_matches();
 
-    let conf = if let Some(path) = matches.value_of("config") {
+    let mut conf = if let Some(path) = matches.value_of("config") {
         Config::new(path)?
     } else {
         Config::new_default()?
     };
+
+    if let Some(path) = matches.value_of("log-file") {
+        conf.log_file = match path {
+            "-" => None,
+            _ => Some(PathBuf::from(path)),
+        };
+    }
+
+    if let Some(uri) = matches.value_of("database-uri") {
+        conf.database_uri = uri.to_string();
+    }
 
     let log_to_file = conf.log_file.is_some();
 
@@ -81,7 +109,14 @@ fn main_res() -> Result<()> {
             let log_file = OpenOptions::new()
                 .append(true)
                 .create(true)
-                .open(log_path)?;
+                .open(log_path)
+                .map_err(|cause| Error::IoErrorMsg {
+                    cause,
+                    msg: format!(
+                        "Couldn't open log file at {}",
+                        log_path.display()
+                    ),
+                })?;
             dispatch.chain(log_file).apply()?
         }
         None => dispatch.chain(std::io::stdout()).apply()?,

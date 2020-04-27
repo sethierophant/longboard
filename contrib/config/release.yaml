@@ -6,6 +6,9 @@ address: 0.0.0.0
 # The port that the server binds to.
 port: 80
 
+# The file to log to.
+log_file: /var/log/longboard.log
+
 # How to connect to the database.
 database_uri: postgres://longboard:@localhost/longboard
 
@@ -16,13 +19,13 @@ resource_dir: /var/lib/longboard
 upload_dir: /var/lib/longboard/uploads
 
 # Where the staff-added pages are stored.
-pages_dir: /etc/longboard/pages
+#pages_dir: /etc/longboard/pages
 
 # List of names to use for anonymous posters.
-names: /etc/longboard/names.txt
+#names: /etc/longboard/names.txt
 
 # A notice message that will be displayed at the top of each board/thread.
-notice: /etc/longboard/notice.md
+#notice: /etc/longboard/notice.md
 
 # Rules to filter posts with. The pattern is parsed as a regex.
 # See https://docs.rs/regex/1.3.7/regex/#syntax for regex syntax.

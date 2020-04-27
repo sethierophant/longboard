@@ -4,15 +4,29 @@
 longboard \- imageboard engine
 .SH Synopsis
 .B longboard
-[\fB-c\fR \fIconfig\fR] [\fB-d\fR] [\fB-a\fR] [\fB-h\fR] [\fB-V\fR]
+[\fB-c\fR \fIconfig\fR] 
+[\fB-l\fR \fIlogfile\fR]
+[\fB-u\fR \fIURI\fR]
+[\fB-d\fR] [\fB-a\fR] [\fB-h\fR] [\fB-V\fR]
 .SH Description
 .B longboard
 is an imageboard engine. In general, you should start this program with a daemon manager such
 as systemd.
+.PP
+Options that have the same name as options in the config file, such as
+\fB\-\-log-file\fR and \fB\-\-database-uri\fR, will override the values from
+the config file if provided.
 .SH Options
 .TP
 .BR \-c ", " \-\-config " " \fIconfig\fR
 The config file to load. Defaults to \fI/etc/longboard/config.yaml\fR.
+.TP
+.BR \-l ", " \-\-log-file " " \fIlogfile\fR
+The log file to use. If \fI-\fR is given as the value to this option, longboard
+will log to stdout.
+.TP
+.BR \-u ", " \-\-database-uri " " \fIURI\fR
+The database URI to use to connect to the PostgreSQL database.
 .TP
 .BR \-d ", " \-\-debug-config
 On startup, dump the config to the log file. This is useful for debugging the
