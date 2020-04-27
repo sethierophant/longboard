@@ -8,6 +8,7 @@ use std::string::ToString;
 
 use pulldown_cmark::{html::push_html, Parser};
 
+use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use rand::{thread_rng, Rng};
@@ -65,16 +66,25 @@ where
     D: Deserializer<'de>,
 {
     String::deserialize(de).and_then(|s| {
-        // Make sure that the pattern is a valid regex.
         let re = Regex::new("(\\d+)([kKmMgG])?").unwrap();
 
         if let Some(captures) = re.captures(&s) {
-            let size: u64 = captures.get(0).unwrap().as_str().parse().unwrap();
-            let multiplier = match captures.get(1) {
-                Some(m) => match m.as_str() {
-                    "K" | "k" => 2u64.pow(10),
-                    "M" | "m" => 2u64.pow(20),
-                    "G" | "g" => 2u64.pow(30),
+            let size: u64 = captures
+                .get(1)
+                .ok_or(SerdeError::custom("invalid file size limit"))?
+                .as_str()
+                .parse()
+                .map_err(|err| {
+                    SerdeError::custom(
+                        format!("invalid file size limit: {}", err)
+                    )
+                })?;
+
+            let multiplier = match captures.get(2) {
+                Some(m) => match &*m.as_str().to_uppercase() {
+                    "K" => 2u64.pow(10),
+                    "M" => 2u64.pow(20),
+                    "G" => 2u64.pow(30),
                     _ => unreachable!(),
                 },
                 None => 1,
@@ -82,7 +92,7 @@ where
 
             Ok(size * multiplier)
         } else {
-            Err(serde::de::Error::custom("expected file size"))
+            Err(SerdeError::custom("expected file size"))
         }
     })
 }
