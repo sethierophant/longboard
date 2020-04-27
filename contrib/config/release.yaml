@@ -71,6 +71,9 @@ file_size_limit: 2M
 #   and other types of trojan-horse exploits".
 #   - xbl.spamhaus.org
 #
+#   Block list provided by Cisco, primarily intended to be used for email spam.
+#   - bl.spamcop.net
+#
 #   Block list provided by Proofpoint, Inc., includes "email servers suspected
 #   of sending or relaying spam, servers that have been hacked and hijacked,
 #   and those with Trojan infestations".
