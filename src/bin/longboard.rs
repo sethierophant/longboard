@@ -99,13 +99,17 @@ fn main_res() -> Result<()> {
         }
     }
 
-    new_instance(conf)?.launch();
-
-    Ok(())
+    Err(Error::from(new_instance(conf)?.launch()))
 }
 
 fn main() {
     if let Err(e) = main_res() {
-        eprintln!("{}", e);
+        if log_enabled!(log::Level::Error) {
+            log::error!("{}", e);
+        } else {
+            // If an error occured before the log has been set up, write it to
+            // stderr.
+            eprintln!("{}", e);
+        }
     }
 }

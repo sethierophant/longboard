@@ -114,6 +114,9 @@ pub enum Error {
     #[display(fmt = "Couldn't connect to the PostgreSQL database: {}", _0)]
     #[from]
     ConnectionError(diesel::ConnectionError),
+    #[display(fmt = "Failed to start: {}", _0)]
+    #[from]
+    LaunchError(rocket::error::LaunchError),
     #[display(fmt = "I/O error: {}", _0)]
     #[from]
     IoError(std::io::Error),
