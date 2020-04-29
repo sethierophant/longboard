@@ -214,10 +214,24 @@ impl Database {
     where
         S: AsRef<str>,
     {
+        use crate::schema::session::columns::staff_name;
+        use crate::schema::session::dsl::session;
+
+        use crate::schema::staff_action::columns::done_by;
+        use crate::schema::staff_action::dsl::staff_action;
+
         use crate::schema::staff::columns::name as column_name;
         use crate::schema::staff::dsl::staff;
 
-        delete(staff.filter(column_name.eq(name.as_ref())))
+        let name = name.as_ref();
+
+        delete(session.filter(staff_name.eq(name)))
+            .execute(&self.pool.get()?)?;
+
+        delete(staff_action.filter(done_by.eq(name)))
+            .execute(&self.pool.get()?)?;
+
+        delete(staff.filter(column_name.eq(name)))
             .execute(&self.pool.get()?)?;
 
         Ok(())
