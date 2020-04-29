@@ -59,6 +59,9 @@ pub fn handle_login<'r>(
     let user = db.staff(&login_data.user)?;
 
     if !verify_encoded(&user.password_hash, login_data.pass.as_bytes())? {
+        // To reduce the effectiveness of brute-forcing passwords.
+        std::thread::sleep(std::time::Duration::from_secs(4));
+
         return Err(Error::StaffInvalidPassword {
             user_name: login_data.user.clone(),
         });
