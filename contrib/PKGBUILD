@@ -9,6 +9,7 @@ license=('AGPL3')
 makedepends=('cargo' 'git') # 'bzr', 'git', 'mercurial' or 'subversion'
 provides=("${pkgname%-git}")
 conflicts=("${pkgname%-git}")
+backup=('etc/longboard/config.yaml')
 source=("${pkgname%-git}::git://github.com/sethierophant/longboard")
 md5sums=('SKIP')
 
@@ -20,12 +21,7 @@ pkgver() {
 
 build() {
 	cd "$srcdir/${pkgname%-git}"
-	make
-}
-
-check() {
-	cd "$srcdir/${pkgname%-git}"
-	make check
+	make prefix=/usr sysconfdir=/etc localstatedir=/var DESTDIR="$pkgdir/"
 }
 
 package() {

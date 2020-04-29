@@ -7,16 +7,16 @@ address: 0.0.0.0
 port: 80
 
 # The file to log to.
-log_file: /var/log/longboard.log
+log_file: LOGDIR/longboard.log
 
 # How to connect to the database.
 database_uri: postgres://longboard:@localhost/longboard
 
 # Where the resources (templates, css, javascript, ...) are stored.
-resource_dir: /var/lib/longboard
+resource_dir: RESDIR/longboard
 
 # Where the user-uploaded files are stored.
-upload_dir: /var/lib/longboard/uploads
+upload_dir: RESDIR/longboard/uploads
 
 # Where the staff-added pages are stored.
 #pages_dir: /etc/longboard/pages

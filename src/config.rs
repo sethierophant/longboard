@@ -164,11 +164,14 @@ impl Config {
     }
 
     /// Get the default location of the config file.
-    pub fn default_path() -> &'static Path {
+    pub fn default_path() -> PathBuf {
         if cfg!(debug_assertions) {
-            Path::new("contrib/config/dev.yaml")
+            PathBuf::from("contrib/config/dev.yaml")
         } else {
-            Path::new("/etc/longboard/config.yaml")
+            let sysconfdir = option_env!("sysconfdir").unwrap_or("/local/etc/");
+            PathBuf::from(sysconfdir)
+                .join("longboard")
+                .join("config.yaml")
         }
     }
 
@@ -286,6 +289,9 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Config {
+        let resdir = option_env!("resdir").unwrap_or("/var/lib/");
+        let logdir = option_env!("logdir").unwrap_or("/var/log/");
+
         if cfg!(debug_assertions) {
             Config {
                 address: "0.0.0.0".into(),
@@ -309,14 +315,14 @@ impl Default for Config {
             Config {
                 address: "0.0.0.0".into(),
                 port: 80,
-                resource_dir: PathBuf::from("/var/lib/longboard"),
-                upload_dir: PathBuf::from("/var/lib/longboard/uploads"),
+                resource_dir: PathBuf::from(resdir).join("longboard"),
+                upload_dir: PathBuf::from(resdir)
+                    .join("longboard")
+                    .join("uploads"),
                 pages_dir: None,
                 database_uri: "postgres://longboard:@localhost/longboard"
                     .into(),
-                log_file: Some(PathBuf::from(
-                    "/var/log/longboard.log",
-                )),
+                log_file: Some(PathBuf::from(logdir).join("longboard.log")),
                 names_path: None,
                 notice_path: None,
                 filter_rules: Vec::new(),
