@@ -13,7 +13,8 @@ Longboard aims to be:
 ## Installation
 
 Dependencies:
-    - PostgreSQL
+
+- PostgreSQL
 
 ### From Source
 
@@ -29,11 +30,6 @@ And run make:
 
 For more installation options, see the [Makefile](/Makefile).
 
-After installing, set up the database:
-
-    sudo -u postgres -- psql -c 'CREATE ROLE longboard LOGIN'
-    sudo -u postgres -- psql -c 'CREATE DATABASE longboard WITH OWNER LONGBOARD'
-
 ### From a Package
 
 You can use the provided [PKGBUILD](/contrib/PKGBUILD) file to build on Arch
@@ -43,7 +39,26 @@ Pull requests that add packages and/or build scripts for building packages are
 welcome! In particular, I think it would be nice if we could include .deb files
 with our releases, since so many people use Debian.
 
-## Usage
+## Setup
+
+Set up the database:
+
+    sudo -u postgres -- psql -c 'CREATE ROLE longboard LOGIN'
+    sudo -u postgres -- psql -c 'CREATE DATABASE longboard WITH OWNER longboard'
+
+Longboard will automatically create the tables that it needs.
+
+Add an administrator, so you can use the web moderator interface:
+
+    longctl add-staff -r administrator -u NAME -p PASSWORD
+
+Start and enable the system service:
+
+    systemctl start longboard && systemctl enable longboard
+
+And you should have a longboard instance running on localhost:80!
+
+## Configuring
 
 See longboard(8) for usage instructions and longboard(5) for configuration
 instructions.
