@@ -17,9 +17,11 @@ use crate::views::Context;
 /// Our error type.
 #[derive(Debug, Display, From)]
 pub enum Error {
-    #[display(fmt = "The IP {} was in the server block list.", ip)]
+    #[display(fmt = "A database operation was called on a mock database")]
+    DatabaseIsMock,
+    #[display(fmt = "The IP {} was in the server block list", ip)]
     IpIsBlocked { ip: IpAddr },
-    #[display(fmt = "The IP {} was in found in {} ({}).", ip, dnsbl, result)]
+    #[display(fmt = "The IP {} was in found in {} ({})", ip, dnsbl, result)]
     IpIsBlockedDnsbl {
         dnsbl: String,
         result: IpAddr,
@@ -117,6 +119,9 @@ pub enum Error {
     #[display(fmt = "Failed to start: {}", _0)]
     #[from]
     LaunchError(rocket::error::LaunchError),
+    #[display(fmt = "Couldn't parse post: {}", _0)]
+    #[from]
+    ParseError(String),
     #[display(fmt = "I/O error: {}", _0)]
     #[from]
     IoError(std::io::Error),

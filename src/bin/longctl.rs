@@ -71,7 +71,7 @@ fn main_res() -> Result<()> {
         Config::new_default()?
     };
 
-    let db = Database::open(&conf.database_uri)?;
+    let db = Database::new(&conf.database_uri)?;
 
     if let Some(matches) = matches.subcommand_matches("add-staff") {
         let pass = matches.value_of("pass").unwrap().as_bytes();

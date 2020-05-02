@@ -13,6 +13,17 @@
                     </option>
                 {{/each}}
             </select>
+            <label for="code_highlighting">Code Highlighting</label>
+            {{#if options.code_highlighting}}
+                <input name="code_highlighting" type="checkbox" checked>
+            {{else}}
+                <input name="code_highlighting" type="checkbox">
+            {{/if}}
+            <aside class="cookies-notice">
+                This site uses HTML cookies to manage options for users; when
+                you click "Save", cookies will be set to keep track of your
+                preferences.
+            </aside>
             <input type="submit" value="Save">
         </form>
     </section>

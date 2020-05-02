@@ -1,9 +1,5 @@
 @import url('https://fonts.googleapis.com/css?family=Roboto+Condensed:400:700:900|Roboto+Mono|Oswald:700&display=swap');
 
-pre {
-    overflow-x: scroll;
-}
-
 input, textarea {
     border: none;
 }
@@ -264,6 +260,11 @@ nav a {
     content: ">";
 }
 
+.post .body-contents pre.blockcode {
+    padding: 0.5em;
+    overflow-x: auto;
+}
+
 .post .body-contents * {
     margin: 0.5em 0;
 }
@@ -491,18 +492,27 @@ form.post-action input[type=submit]:hover {
     margin: 2em auto 1em;
     padding: 0.6em;
     display: grid;
-    grid-template-columns: 6em auto;
-    width: 25em;
+    grid-template-columns: max-content max-content;
+    max-width: 25em;
     grid-gap: 0.2em;
+    overflow: hidden;
+}
+
+.user-options-form label, .user-options-form input {
+    align-self: center;
 }
 
 .user-options-form label {
-    align-self: center;
+    margin-right: 0.8em;
 }
 
 .user-options-form input {
     margin: 0.2em 0;
     padding: 0.2em 0.4em;
+}
+
+.user-options-form input[type="checkbox"] {
+    height: 1em;
 }
 
 .user-options-form input[type="submit"] {
@@ -514,6 +524,14 @@ form.post-action input[type=submit]:hover {
     text-align: center;
     font-size: 1.4em;
     margin-top: 0;
+}
+
+.user-options-form .cookies-notice {
+    grid-column: 1 / 3;
+    margin: 1em auto;
+    max-width: 25em;
+    font-style: italic;
+    font-size: 0.8em;
 }
 
 .staff-page {

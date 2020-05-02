@@ -10,9 +10,9 @@ use argon2::verify_encoded;
 
 use pulldown_cmark::{html, Parser};
 
-use rocket::http::{hyper::header::Location, Cookie, Status};
+use rocket::http::Status;
 use rocket::request::{Form, FromForm, FromRequest, Outcome, Request};
-use rocket::response::{NamedFile, Response};
+use rocket::response::NamedFile;
 use rocket::{get, post, routes, uri, Route, State};
 
 use rocket_contrib::templates::Template;
@@ -24,7 +24,10 @@ use crate::views::*;
 use crate::{config::Config, Error, Result};
 
 pub mod new;
+pub mod options;
 pub mod staff;
+
+pub use options::UserOptions;
 
 /// Request guard to check if a user's IP is blocked.
 pub struct NotBlocked;
@@ -124,41 +127,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     }
 }
 
-#[derive(FromForm, Clone)]
-pub struct UserOptions {
-    pub style: String,
-}
-
-impl Default for UserOptions {
-    fn default() -> UserOptions {
-        UserOptions {
-            style: "light".into(),
-        }
-    }
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for UserOptions {
-    type Error = Error;
-
-    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let cookies = request.cookies();
-
-        Outcome::Success(UserOptions {
-            style: cookies
-                .get("option-style")
-                .map(|cookie| cookie.value().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or(UserOptions::default().style),
-        })
-    }
-}
-
 /// Get all routes.
 pub fn routes() -> Vec<Route> {
     routes![
         crate::routes::home,
-        crate::routes::options,
-        crate::routes::update_options,
         crate::routes::static_file,
         crate::routes::banner,
         crate::routes::style,
@@ -174,6 +146,8 @@ pub fn routes() -> Vec<Route> {
         crate::routes::new_report,
         crate::routes::delete,
         crate::routes::handle_delete,
+        crate::routes::options::options,
+        crate::routes::options::update_options,
         crate::routes::staff::login,
         crate::routes::staff::handle_login,
         crate::routes::staff::logout,
@@ -277,28 +251,6 @@ pub fn custom_page(
     } else {
         Err(Error::CustomPageNotFound { name: page_name })
     }
-}
-
-/// Serve the user options page.
-#[get("/options", rank = 0)]
-pub fn options(context: Context) -> Result<OptionsPage> {
-    OptionsPage::new(&context)
-}
-
-/// Update user options.
-#[post("/options", rank = 0, data = "<user_options>")]
-pub fn update_options<'r>(
-    user_options: Form<UserOptions>,
-) -> Result<Response<'r>> {
-    let UserOptions { style } = user_options.into_inner();
-
-    let style_cookie = Cookie::build("option-style", style).path("/").finish();
-
-    Ok(Response::build()
-        .status(Status::SeeOther)
-        .header(Location(uri!(crate::routes::options).to_string()))
-        .header(style_cookie)
-        .finalize())
 }
 
 /// Serve a board.

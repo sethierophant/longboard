@@ -68,6 +68,10 @@ body {
     color: var(--quote-color);
 }
 
+.post .body-contents pre.blockcode code {
+    border: thin solid var(--border-color);
+}
+
 form.post-action input[type="submit"], a.post-action {
     color: var(--post-action-color);
     background: none;

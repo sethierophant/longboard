@@ -20,7 +20,7 @@ use rocket::uri;
 use crate::{Error, Result};
 
 /// Configuration options loaded from a file.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Config {
     /// Address to bind to.
@@ -28,7 +28,6 @@ pub struct Config {
     /// Port to bind to.
     pub port: u16,
     /// File to log to.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub log_file: Option<PathBuf>,
     /// URL to connect to the database.
     pub database_uri: String,
@@ -45,8 +44,7 @@ pub struct Config {
     #[serde(rename = "notice")]
     pub notice_path: Option<PathBuf>,
     /// Filter rules to apply to posts.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub filter_rules: Vec<Rule>,
+    pub filter_rules: Vec<FilterRule>,
     /// Custom styles.
     #[serde(rename = "styles")]
     pub custom_styles: Vec<String>,
@@ -336,27 +334,24 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 /// A rule for filtering/enhancing user posts.
-pub struct Rule {
+pub struct FilterRule {
     #[serde(deserialize_with = "de_pattern")]
-    pub pattern: String,
+    pub pattern: Regex,
     pub replace_with: String,
 }
 
-fn de_pattern<'de, D>(de: D) -> std::result::Result<String, D::Error>
+fn de_pattern<'de, D>(de: D) -> std::result::Result<Regex, D::Error>
 where
     D: Deserializer<'de>,
 {
-    String::deserialize(de).and_then(|s| {
-        // Make sure that the pattern is a valid regex.
-        let _ = Regex::new(&s).map_err(serde::de::Error::custom)?;
-        Ok(s)
-    })
+    String::deserialize(de)
+        .and_then(|s| Regex::new(&s).map_err(serde::de::Error::custom))
 }
 
 /// A banner to be displayed at the top of the page.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(transparent)]
 pub struct Banner {
     pub name: String,

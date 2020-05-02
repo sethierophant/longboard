@@ -24,6 +24,7 @@ use log::{info, warn};
 pub mod config;
 pub mod error;
 pub mod models;
+pub mod parse;
 pub mod routes;
 pub mod views;
 
@@ -111,7 +112,7 @@ pub fn new_instance(conf: Config) -> Result<Rocket> {
 
     Ok(rocket::custom(rocket_conf)
         .mount("/", crate::routes::routes())
-        .manage(Database::open(&conf.database_uri)?)
+        .manage(Database::new(&conf.database_uri)?)
         .manage(conf)
         .attach(Template::fairing())
         .attach(LogFairing))

@@ -93,6 +93,8 @@ pub struct PageInfo {
     pub version: String,
     /// Which style to use.
     pub style: String,
+    /// Whether to use javascript to do code highlighting.
+    pub code_highlighting: bool,
 }
 
 impl PageInfo {
@@ -104,6 +106,7 @@ impl PageInfo {
             title: title.into(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             style: context.options.style.clone(),
+            code_highlighting: context.options.code_highlighting,
         }
     }
 }
@@ -537,6 +540,7 @@ pub struct OptionsPage {
     page_info: PageInfo,
     page_nav: PageNav,
     page_footer: PageFooter,
+    options: UserOptions,
     styles: Vec<StyleOption>,
 }
 
@@ -546,6 +550,7 @@ impl OptionsPage {
             page_info: PageInfo::new("Options", context),
             page_nav: PageNav::new(context)?,
             page_footer: PageFooter::new(context)?,
+            options: context.options.clone(),
             styles: context
                 .config
                 .custom_styles

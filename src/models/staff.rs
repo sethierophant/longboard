@@ -195,7 +195,7 @@ impl Database {
         Ok(staff
             .filter(column_name.eq(name.as_ref()))
             .limit(1)
-            .first(&self.pool.get()?)?)
+            .first(&self.pool()?.get()?)?)
     }
 
     /// Insert a new staff member.
@@ -204,7 +204,7 @@ impl Database {
 
         insert_into(staff)
             .values(new_staff)
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -226,13 +226,13 @@ impl Database {
         let name = name.as_ref();
 
         delete(session.filter(staff_name.eq(name)))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         delete(staff_action.filter(done_by.eq(name)))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         delete(staff.filter(column_name.eq(name)))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -248,7 +248,7 @@ impl Database {
         let session: Session = session_table
             .filter(id.eq(session_id.as_ref()))
             .limit(1)
-            .first(&self.pool.get()?)?;
+            .first(&self.pool()?.get()?)?;
 
         if session.expires < Utc::now() {
             self.delete_session(session.staff_name)?;
@@ -264,7 +264,7 @@ impl Database {
 
         insert_into(session)
             .values(new_session)
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -278,7 +278,7 @@ impl Database {
         use crate::schema::session::dsl::session;
 
         delete(session.filter(id.eq(session_id.as_ref())))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -298,14 +298,14 @@ impl Database {
         Ok(anon_user
             .filter(ip.eq(user_ip.to_string()))
             .limit(1)
-            .first(&self.pool.get()?)?)
+            .first(&self.pool()?.get()?)?)
     }
 
     /// Get all users.
     pub fn all_users(&self) -> Result<Vec<User>> {
         use crate::schema::anon_user::dsl::anon_user;
 
-        Ok(anon_user.load(&self.pool.get()?)?)
+        Ok(anon_user.load(&self.pool()?.get()?)?)
     }
 
     /// Get the total number of posts a user has made.
@@ -316,7 +316,7 @@ impl Database {
         let count: i64 = post
             .filter(column_user_id.eq(user_id))
             .count()
-            .first(&self.pool.get()?)?;
+            .first(&self.pool()?.get()?)?;
 
         Ok(count.try_into().unwrap())
     }
@@ -327,7 +327,7 @@ impl Database {
 
         let user = insert_into(anon_user)
             .values(new_user)
-            .get_result(&self.pool.get()?)?;
+            .get_result(&self.pool()?.get()?)?;
 
         Ok(user)
     }
@@ -343,7 +343,7 @@ impl Database {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(ban_expires.eq(Some(Utc::now() + ban_duration)))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -355,7 +355,7 @@ impl Database {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(ban_expires.eq::<Option<DateTime<Utc>>>(None))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -370,7 +370,7 @@ impl Database {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(note.eq(Some(new_note.into())))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -382,7 +382,7 @@ impl Database {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(note.eq::<Option<String>>(None))
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }
@@ -393,8 +393,8 @@ impl Database {
         use crate::schema::post::columns::user_id;
         use crate::schema::post::dsl::post;
 
-        let count: usize =
-            delete(post.filter(user_id.eq(id))).execute(&self.pool.get()?)?;
+        let count: usize = delete(post.filter(user_id.eq(id)))
+            .execute(&self.pool()?.get()?)?;
 
         Ok(count.try_into().unwrap())
     }
@@ -403,7 +403,7 @@ impl Database {
     pub fn all_staff_actions(&self) -> Result<Vec<StaffAction>> {
         use crate::schema::staff_action::dsl::staff_action;
 
-        Ok(staff_action.load(&self.pool.get()?)?)
+        Ok(staff_action.load(&self.pool()?.get()?)?)
     }
 
     /// Get a staff action.
@@ -417,7 +417,7 @@ impl Database {
         Ok(staff_action
             .filter(id.eq(action_id))
             .limit(1)
-            .first(&self.pool.get()?)?)
+            .first(&self.pool()?.get()?)?)
     }
 
     /// Record an action that a staff member did.
@@ -429,7 +429,7 @@ impl Database {
 
         insert_into(staff_action)
             .values(new_action)
-            .execute(&self.pool.get()?)?;
+            .execute(&self.pool()?.get()?)?;
 
         Ok(())
     }

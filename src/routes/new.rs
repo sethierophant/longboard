@@ -15,23 +15,18 @@ use diesel::Connection;
 use image::error::ImageError;
 use image::ImageFormat;
 
-use maplit::{hashmap, hashset};
-
 use mime_guess::get_mime_extensions;
 
 use multipart::server::save::{SavedData, SavedField};
 use multipart::server::{Entries, Multipart};
 
-use pulldown_cmark::{html::push_html, Options, Parser};
-
 use rand::{thread_rng, Rng};
-
-use regex::{Captures, Regex};
 
 use rocket::http::{hyper::header::Location, ContentType};
 use rocket::{post, uri, Data, Responder, State};
 
 use crate::models::*;
+use crate::parse::PostBody;
 use crate::routes::NotBlocked;
 use crate::{config::Config, Error, Result};
 
@@ -232,48 +227,11 @@ where
 /// Parse a post's body.
 fn parse_body<S>(body: S, conf: &Config, db: &Database) -> Result<String>
 where
-    S: AsRef<str>,
+    S: Into<String>,
 {
-    // FIXME: This is definitely not the most efficient way to do this.
+    let body = PostBody::parse(body, &conf.filter_rules, db)?;
 
-    // First pass: replace post references with links
-    let re = Regex::new(r">>(?P<id>\d+)").unwrap();
-    let mut body = re
-        .replace_all(body.as_ref(), |captures: &Captures| {
-            let id: PostId =
-                captures.name("id").unwrap().as_str().parse().unwrap();
-
-            match db.post_uri(id) {
-                Ok(uri) => format!(
-                    "<a class=\"post-ref\" href=\"{}\">&gt;&gt;{}</a>",
-                    uri, id
-                ),
-                Err(_) => format!("<a>&gt;&gt;{}</a>", id),
-            }
-        })
-        .into_owned();
-
-    // Second pass: run wordfilters
-    for rule in &conf.filter_rules {
-        body = Regex::new(&rule.pattern)?
-            .replace_all(&body, rule.replace_with.as_str())
-            .into_owned();
-    }
-
-    // Third pass: parse markdown
-    let mut opts = Options::empty();
-    opts.insert(Options::ENABLE_TABLES);
-    opts.insert(Options::ENABLE_STRIKETHROUGH);
-
-    let mut html = String::new();
-    push_html(&mut html, Parser::new_ext(&body, opts));
-
-    // Fourth pass: sanitize HTML
-    Ok(ammonia::Builder::new()
-        .link_rel(Some("noopener noreferrer nofollow"))
-        .allowed_classes(hashmap! { "a" => hashset!["post-ref"] })
-        .clean(&html)
-        .to_string())
+    Ok(body.into_html())
 }
 
 /// Create a new post and optionally a new file if the post has one. These are
@@ -427,7 +385,7 @@ pub fn new_thread(
 
     if let (mut new_post, Some(mut new_file)) = models {
         let (new_thread_id, new_post_id) =
-            db.pool.get()?.transaction::<_, Error, _>(|| {
+            db.pool()?.get()?.transaction::<_, Error, _>(|| {
                 let new_thread_id = db.insert_thread(NewThread {
                     subject,
                     board: board_name.clone(),
@@ -485,7 +443,7 @@ pub fn new_post(
     new_post.thread = thread_id;
     new_post.board = board_name.clone();
 
-    let new_post_id = db.pool.get()?.transaction::<_, Error, _>(|| {
+    let new_post_id = db.pool()?.get()?.transaction::<_, Error, _>(|| {
         let new_post_id = db.insert_post(new_post)?;
 
         if let Some(mut new_file) = new_file {

@@ -6,6 +6,11 @@
         <link rel="shortcut icon" href="/file/favicon.png" type="image/png"> 
         <link rel="stylesheet" href="/file/style/{{page_info.style}}.css"/>
         <script src="/file/script/all.js"></script>
+        {{#if page_info.code_highlighting}}
+            <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+            <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+            <script>hljs.initHighlightingOnLoad();</script>
+        {{/if}}
         <title>{{page_info.title}}</title>
         {{> head}}
     </head>
