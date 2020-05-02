@@ -136,6 +136,7 @@ pub fn routes() -> Vec<Route> {
         crate::routes::style,
         crate::routes::upload,
         crate::routes::custom_page,
+        crate::routes::form_help,
         crate::routes::board,
         crate::routes::board_catalog,
         crate::routes::thread,
@@ -251,6 +252,22 @@ pub fn custom_page(
     } else {
         Err(Error::CustomPageNotFound { name: page_name })
     }
+}
+
+/// Serve a page with help on creating a thread or post.
+#[get("/form-help", rank = 0)]
+pub fn form_help(context: Context) -> Result<Template> {
+    let mut data = HashMap::new();
+    data.insert(
+        "page_info".to_string(),
+        to_value(PageInfo::new("Making a New Thread or Post", &context))?,
+    );
+    data.insert(
+        "page_footer".to_string(),
+        to_value(PageFooter::new(&context)?)?,
+    );
+
+    Ok(Template::render("pages/form-help", data))
 }
 
 /// Serve a board.

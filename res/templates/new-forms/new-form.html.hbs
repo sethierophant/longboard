@@ -1,17 +1,17 @@
 <form class="new-item-form" method="POST" enctype="multipart/form-data">
     {{#if new_thread_form}}
-        <label for="subject">Subject</label>
+        <label for="subject" title="The main concept or idea of your new thread.">Subject</label>
         <input type="text" name="subject">
     {{/if}}
-    <label for="author">Name</label>
+    <label for="author" title="The name you are posting under.">Name</label>
     <input type="text" name="author">
-    <label for="contact">Contact</label>
+    <label for="contact" title="A method of contact, like an e-mail address.">Contact</label>
     <input type="text" name="contact">
     {{#unless @root.staff}}
-        <label for="ident">Identity</label>
+        <label for="ident" title="A secret identity. This will be cryptographically hashed before being displayed.">Identity</label>
         <input type="password" name="ident">
     {{else}}
-        <label for="staff-ident">Identity</label>
+        <label for="staff-ident" title="Which identity you're using to post.">Identity</label>
         <select name="staff-ident">
             <option>Anonymous</option>
             {{#if @root.staff.is_janitor}}
@@ -31,12 +31,12 @@
     {{/unless}}
     <textarea name="body"></textarea>
     <input type="file" name="file">
-    <label for="spoiler">Spoiler?</label>
+    <label for="spoiler" title="Whether the file you attatch should be hidden by default. Use this if the file is lewd, violent, or otherwise NSFW.">Spoiler?</label>
     <input type="checkbox" name="spoiler">
-    <label for="delete-pass">Password</label>
+    <label for="delete-pass" title="The password for deleting this post. If you want to delete this post in the future, you'll need this password.">Password</label>
     <input type="password" name="delete-pass">
     {{#unless new_thread_form}}
-        <label for="no-bump">No Bump?</label>
+        <label for="no-bump" name="Check this option if you don't want to bump the thread you're replying to.">No Bump?</label>
         <input type="checkbox" name="no-bump">
     {{/unless}}
     {{#if new_thread_form}}
@@ -44,4 +44,5 @@
     {{else}}
         <input type="submit" value="New Post">
     {{/if}}
+    <aside><a href="/form-help">Options and formatting</a></aside>
 </form>

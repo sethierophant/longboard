@@ -25,6 +25,10 @@ body {
     margin: 0 auto;
 }
 
+strong {
+    font-weight: 900;
+}
+
 .error h1, .action-page h1 {
     font-size: 200%;
 }
@@ -86,6 +90,44 @@ nav a {
     font-size: 1.2em;
 }
 
+.form-help {
+    max-width: 700px;
+    margin-bottom: 3em;
+}
+
+.form-help h1 {
+    font-size: 2.5em;
+}
+
+.form-help h2 {
+    text-decoration: underline;
+}
+
+.form-help dt {
+    font-weight: bold;
+}
+
+.form-help dd {
+    margin-bottom: 1em;
+}
+
+.form-help .example {
+    display: grid;
+    grid-template-columns: 50% 50%;
+    grid-gap: 1em;
+    align-items: center;
+}
+
+.form-help .example-input {
+    padding-left: 1em;
+}
+
+.form-help .example-output {
+    width: 100%;
+    padding: 0.4em;
+    box-sizing: border-box;
+}
+
 .new-item-form {
     margin: 1em auto 2em;
     padding: 0.6em;
@@ -137,6 +179,12 @@ nav a {
 .new-item-form input[type=checkbox] {
     justify-self: flex-start;
     border: 0;
+}
+
+.new-item-form aside {
+    grid-column: 1 / span 2;
+    font-size: 0.8em;
+    text-align: center;
 }
 
 .notice {
@@ -238,34 +286,42 @@ nav a {
     margin: 0.4em;
 }
 
-.post .body-contents {
+.body-contents {
     width: max-content;
     max-width: 100%;
 }
 
-.post .body-contents > :first-child {
+.body-contents > :first-child {
     margin-top: 0;
 }
 
-.post .body-contents > :last-child {
+.body-contents > :last-child {
     margin-bottom: 0;
 }
 
-.post .body-contents ul, .post .body-contents ol {
+.body-contents ul, .body-contents ol {
     /* So that padding is respected when next to a floating image. */
     overflow: hidden;
 }
 
-.post .body-contents blockquote p::before {
+.body-contents .post-ref::before {
+    content: ">>";
+}
+
+.body-contents blockquote p::before {
     content: ">";
 }
 
-.post .body-contents pre.blockcode {
+.body-contents pre.blockcode {
     padding: 0.5em;
     overflow-x: auto;
 }
 
-.post .body-contents * {
+.body-contents h3 {
+    text-transform: uppercase;
+}
+
+.body-contents * {
     margin: 0.5em 0;
 }
 

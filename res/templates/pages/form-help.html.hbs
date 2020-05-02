@@ -1,0 +1,175 @@
+{{#*inline "head"}}
+    <link rel="stylesheet" href="/file/style/custom-page.css">
+{{/inline}}
+{{#*inline "body"}}
+    <section class="form-help">
+        <h1>Making a New Thread or Post</h1>
+        <h2>Options</h2>
+        <p>
+            There's a lot of different options available to you when creating a
+            new thread or post. Here's what they do.
+        </p>
+        <dl>
+        <dt>Subject</dt>
+        <dd>
+            The main topic of your thread.
+        </dd>
+        <dt>Name</dt>
+        <dd>
+            The name you're posting under. This doesn't have to be your real
+            name, and in most cases, this shouldn't be your real name. If you
+            don't choose a name, one will be chosen for you.
+        </dd>
+        <dt>Contact</dt>
+        <dd>
+            A way for other posters to contact you in private, such as an
+            e-mail address, IRC nick, ...
+        </dd>
+        <dt>Identity</dt>
+        <dd>
+            A secret identity that will be cryptographically hashed and
+            displayed next to the name you choose. This is a way of proving to
+            other users that you are who you say you are. Any other poster can
+            use a name that you also use, but this identity is a secret only
+            known to you.
+        </dd>
+        <dd>
+            Only use this field if it's really necessary, most of the posts
+            made on an anonymous imageboard should be anonymous.
+        </dd>
+        <dt>File</dt>
+        <dd>
+            An image or file to attach to your post.
+        </dd>
+        <dt>Spoiler</dt>
+        <dd>
+            Whether or not the image attached to your post should be hidden by
+            default. This option should be checked if your image is lewd,
+            violent, or otherwise NSFW. 
+        </dd>
+        <dd>
+            In general, assume that everyone else using this site is in a café or
+            public library. Err on the side of caution.
+        </dd>
+        <dt>Password</dt>
+        <dd>
+            A password for post deletion. If at some point in the future you
+            want to delete this post (or delete the file attached to the post),
+            you'll need this password.
+        </dd>
+        <dt>No Bump</dt>
+        <dd>
+            Don't bump the thread you're replying to. The default behavior is
+            to bump a thread whenever it is replied to, this option disables
+            that behavior.
+        </dd>
+        <h2>Formatting</h2>
+        <p>
+            Any post you make is split up into <em>blocks</em>. A block can be
+            a header:
+        </p>
+        <section class="example">
+            <section class="example-input">
+                <p><code># Noots general<br>Post stacks, post research, rant about what works / what doesn't work / why people who use noots are idiots</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <h3>Noots general</h3>
+                <p>Post stacks, post research, rant about what works / what doesn't work / why people who use noots are idiots</p>
+            </section>
+        </section>
+        <p>A quote:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>&gt;I used the strongest, fastest-hitting form of meth there is, and wow, it ruined my life!</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <blockquote><p>I used the strongest, fastest-hitting form of meth there is, and wow, it ruined my life!</p></blockquote>
+            </section>
+        </section>
+        <p>
+            A block of code (if you don't specify a language, highlight.js
+            will try to guess what the language is):
+        </p>
+        <section class="example">
+            <section class="example-input">
+                <pre><code>``` C
+/* between values */
+if(lo &lt;= x &amp;&amp; x &lt;= hi) { ... }
+
+/* not between */
+if(x &lt; lo &amp;&amp; hi &lt; x) { ... } 
+```</code></pre>
+            </section>
+            <section class="example-output body-contents">
+                <pre class="blockcode"><code class="language-C">/* between values */
+if(lo &lt;= x &amp;&amp; x &lt;= hi) { ... }
+
+/* not between */
+if(x &lt; lo &amp;&amp; hi &lt; x) { ... }</code></pre>
+            </section>
+        </section>
+        <p>Or just normal text:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>Yes, inhaling burnt matter is bad for your lungs, you needed an expert opinion to realize this?</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <p>Yes, inhaling burnt matter is bad for your lungs, you needed an expert opinion to realize this?</p>
+            </section>
+        </section>
+        <p>
+            Additionally, within header, quote, and normal text blocks there are
+            some formatting options you can use.
+        </p>
+        <p>You can bold text:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>I didn't put anything in your mouth, Lain. Read my posts again if you think I did. I never made a claim about what you believe, because **I didn't understand it**.</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <p>I didn't put anything in your mouth, Lain. Read my posts again if you think I did. I never made a claim about what you believe, because <strong>I didn't understand it</strong>.</p>
+            </section>
+        </section>
+        <p>You can italicize text:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>I'm just realizing that you seem to have taken my "people produce art" bit as a *description* of our reality rather than part of my hypothetical scenario as I intended it.</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <p>I'm just realizing that you seem to have taken my "people produce art" bit as a <em>description</em> of our reality rather than part of my hypothetical scenario as I intended it.</p>
+            </section>
+        </section>
+        <p>You can hide text:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>
+                    Try the 8/x/ bunker on the webring, it might be depressing
+                    but it's all that exists now. <br>~I miss /occult/~
+                </code></p>
+            </section>
+            <section class="example-output body-contents">
+                <p>Try the 8/x/ bunker on the webring, it might be depressing but it's all that exists now.</p>
+                <p><span class="spoiler">I miss /occult/</span></p>
+            </section>
+        </section>
+        <p>You can embed code in your text:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>nsa has declassified their `python3` training book</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <p>nsa has declassified their <code>python3</code> training book</p>
+            </section>
+        </section>
+        <p>And you can reference other posts:</p>
+        <section class="example">
+            <section class="example-input">
+                <p><code>&gt;&gt;1729<br>Awesome!</code></p>
+            </section>
+            <section class="example-output body-contents">
+                <p><a class="post-ref">1729</a></p>
+                <p>Awesome!</p>
+            </section>
+        </section>
+{{/inline}}
+{{> pages/page}}

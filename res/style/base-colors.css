@@ -15,6 +15,15 @@ body {
     color: var(--text-color);
 }
 
+.form-help .example-input {
+    border-left: thick solid var(--shadow-color);
+}
+
+.form-help .example-output {
+    background-color: var(--background-color);
+    border: thin solid var(--border-color);
+}
+
 .new-item-form {
     background-color: var(--background-color);
     border: thin solid var(--border-color);
@@ -64,12 +73,22 @@ body {
     animation: 1.0s ease-out 0s highlight;
 }
 
-.post .body-contents blockquote {
+.body-contents blockquote {
     color: var(--quote-color);
 }
 
-.post .body-contents pre.blockcode code {
+.body-contents pre.blockcode code {
     border: thin solid var(--border-color);
+}
+
+.body-contents .spoiler {
+    padding: 0 0.2em;
+    background-color: black;
+    color: black;
+}
+
+.body-contents .spoiler:hover {
+    color: white;
 }
 
 form.post-action input[type="submit"], a.post-action {
@@ -125,7 +144,7 @@ form.post-action input[type=text] {
 }
 
 .post-preview .body {
-    border-left: solid 5px var(--shadow-color);
+    border-left: solid thick var(--shadow-color);
 }
 
 .user-options-form {
