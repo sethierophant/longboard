@@ -529,10 +529,12 @@ form.post-action input[type=submit]:hover {
     flex-flow: column nowrap;
     align-items: center;
     margin: 1em 4em;
+    overflow: hidden;
 }
 
 .recent .recent-posts .post-preview, .recent .recent-files .file-preview {
     align-self: flex-start;
+    max-width: 100%;
 }
 
 .file-preview .post-image {
