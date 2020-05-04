@@ -477,7 +477,7 @@ where
         .arg("-i")
         .arg(source_path)
         .arg("-ss")
-        .arg("00:00:01.00")
+        .arg("00:00:00.69")
         .arg("-vframes")
         .arg("1")
         .arg(thumb_path)
