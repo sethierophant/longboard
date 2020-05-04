@@ -14,6 +14,9 @@ select {
     font-family: 'Roboto Condensed';
 }
 
+ul {
+    list-style: ' ‐‐ ';
+}
 
 html, body {
     height: 100%;

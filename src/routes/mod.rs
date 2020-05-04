@@ -256,7 +256,7 @@ pub fn custom_page(
 
 /// Serve a page with help on creating a thread or post.
 #[get("/form-help", rank = 0)]
-pub fn form_help(context: Context) -> Result<Template> {
+pub fn form_help(context: Context, config: State<Config>) -> Result<Template> {
     let mut data = HashMap::new();
     data.insert(
         "page_info".to_string(),
@@ -265,6 +265,20 @@ pub fn form_help(context: Context) -> Result<Template> {
     data.insert(
         "page_footer".to_string(),
         to_value(PageFooter::new(&context)?)?,
+    );
+    data.insert(
+        "file_size_limit".to_string(),
+        to_value(config.file_size_limit)?,
+    );
+    data.insert(
+        "allowed_file_types".to_string(),
+        to_value(
+            config
+                .allowed_file_types
+                .iter()
+                .map(|content_type| content_type.to_string())
+                .collect::<Vec<String>>(),
+        )?,
     );
 
     Ok(Template::render("pages/form-help", data))

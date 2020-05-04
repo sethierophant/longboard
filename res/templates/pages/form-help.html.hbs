@@ -10,59 +10,72 @@
             new thread or post. Here's what they do.
         </p>
         <dl>
-        <dt>Subject</dt>
-        <dd>
-            The main topic of your thread.
-        </dd>
-        <dt>Name</dt>
-        <dd>
-            The name you're posting under. This doesn't have to be your real
-            name, and in most cases, this shouldn't be your real name. If you
-            don't choose a name, one will be chosen for you.
-        </dd>
-        <dt>Contact</dt>
-        <dd>
-            A way for other posters to contact you in private, such as an
-            e-mail address, IRC nick, ...
-        </dd>
-        <dt>Identity</dt>
-        <dd>
-            A secret identity that will be cryptographically hashed and
-            displayed next to the name you choose. This is a way of proving to
-            other users that you are who you say you are. Any other poster can
-            use a name that you also use, but this identity is a secret only
-            known to you.
-        </dd>
-        <dd>
-            Only use this field if it's really necessary, most of the posts
-            made on an anonymous imageboard should be anonymous.
-        </dd>
-        <dt>File</dt>
-        <dd>
-            An image or file to attach to your post.
-        </dd>
-        <dt>Spoiler</dt>
-        <dd>
-            Whether or not the image attached to your post should be hidden by
-            default. This option should be checked if your image is lewd,
-            violent, or otherwise NSFW. 
-        </dd>
-        <dd>
-            In general, assume that everyone else using this site is in a café or
-            public library. Err on the side of caution.
-        </dd>
-        <dt>Password</dt>
-        <dd>
-            A password for post deletion. If at some point in the future you
-            want to delete this post (or delete the file attached to the post),
-            you'll need this password.
-        </dd>
-        <dt>No Bump</dt>
-        <dd>
-            Don't bump the thread you're replying to. The default behavior is
-            to bump a thread whenever it is replied to, this option disables
-            that behavior.
-        </dd>
+            <dt>Subject</dt>
+            <dd>
+                The main topic of your thread.
+            </dd>
+            <dt>Name</dt>
+            <dd>
+                The name you're posting under. This doesn't have to be your
+                real name, and in most cases, this shouldn't be your real name.
+                If you don't choose a name, one will be chosen for you.
+            </dd>
+            <dt>Contact</dt>
+            <dd>
+                A way for other posters to contact you in private, such as an
+                e-mail address, IRC nick, ...
+            </dd>
+            <dt>Identity</dt>
+            <dd>
+                A secret identity that will be cryptographically hashed and
+                displayed next to the name you choose. This is a way of proving
+                to other users that you are who you say you are. Any other
+                poster can use a name that you also use, but this identity is a
+                secret only known to you.
+            </dd>
+            <dd>
+                Only use this field if it's really necessary, most of the posts
+                made on an anonymous imageboard should be anonymous.
+            </dd>
+            <dt>File</dt>
+            <dd>
+                An image or file to attach to your post.
+            </dd>
+            <dd>
+                This file must be under the site file size limit, which is
+                {{file_size_limit}} bytes.
+            </dd>
+            <dd>
+                This file must also be one of the allowed file types, which are:
+                <ul>
+                    {{#each allowed_file_types}}
+                        <li>{{this}}</li>
+                    {{/each}}
+                </ul>
+            </dd>
+            <dt>Spoiler</dt>
+            <dd>
+                Whether or not the image attached to your post should be hidden
+                by default. This option should be checked if your image is
+                lewd, violent, or otherwise NSFW. 
+            </dd>
+            <dd>
+                In general, assume that everyone else using this site is in a
+                café or public library. Err on the side of caution.
+            </dd>
+            <dt>Password</dt>
+            <dd>
+                A password for post deletion. If at some point in the future
+                you want to delete this post (or delete the file attached to
+                the post), you'll need this password.
+            </dd>
+            <dt>No Bump</dt>
+            <dd>
+                Don't bump the thread you're replying to. The default behavior
+                is to bump a thread whenever it is replied to, this option
+                disables that behavior.
+            </dd>
+        </dl>
         <h2>Formatting</h2>
         <p>
             Any post you make is split up into <em>blocks</em>. A block can be
@@ -171,5 +184,6 @@ if(x &lt; lo &amp;&amp; hi &lt; x) { ... }</code></pre>
                 <p>Awesome!</p>
             </section>
         </section>
+    </section>
 {{/inline}}
 {{> pages/page}}
