@@ -23,16 +23,45 @@ function expandImage(target) {
 
 /* Expand a post's video. */
 function expandVideo(target) {
+    var close = document.createElement('a');
+    close.href = "#";
+    close.classList.add("video-close");
+    close.textContent = "[Close]";
+
+    close.addEventListener('click', function(ev) {
+        ev.preventDefault();
+
+        closeVideo(ev.target)
+    });
+
     var video = document.createElement('video');
     video.controls = "controls";
     video.src = target.dataset.uri;
+    video.poster = target.dataset.thumbUri;
 
     video.dataset.uri = target.dataset.uri;
-    video.dataset.thumbUri = target.dataset.uri;
+    video.dataset.thumbUri = target.dataset.thumbUri;
     video.dataset.isVideo = "is-video";
     video.dataset.expanded = "expanded";
 
+    target.parentNode.prepend(close);
     target.parentNode.replaceChild(video, target);
+}
+
+function closeVideo(target) {
+    var video = target.parentElement.querySelector('video');
+
+    var image = document.createElement('img');
+    image.src = video.dataset.thumbUri;
+
+    image.dataset.uri = video.dataset.uri;
+    image.dataset.thumbUri = video.dataset.thumbUri;
+    image.dataset.isVideo = "is-video";
+    image.addEventListener('click', onClickPostImage);
+
+    target.parentNode.replaceChild(image, video);
+
+    target.parentNode.removeChild(target);
 }
 
 /* Update the image's attributes once the image is done loading. */
