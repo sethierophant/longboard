@@ -1,3 +1,4 @@
 /target
 /uploads
 **/*.rs.bk
+.env
