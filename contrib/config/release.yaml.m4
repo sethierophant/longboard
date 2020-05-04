@@ -27,6 +27,18 @@ upload_dir: RESDIR/longboard/uploads
 # A notice message that will be displayed at the top of each board/thread.
 #notice: /etc/longboard/notice.md
 
+# The allowed file types for file uploads.
+allowed_file_types:
+    - image/png
+    - image/jpeg
+    - image/gif
+    - image/webp
+    - image/pnm
+    - image/tiff
+    - video/webm
+    - video/mp4
+    - video/ogg
+
 # Rules to filter posts with. The pattern is parsed as a regex.
 # See https://docs.rs/regex/1.3.7/regex/#syntax for regex syntax.
 filter_rules:
@@ -40,7 +52,7 @@ styles:
     - dark
 
 # The maximum size for user-uploaded files.
-file_size_limit: 2M
+file_size_limit: 4M
 
 # The list of IP addresses to allow for posting. This list will override both
 # block_list and dns_block_list.

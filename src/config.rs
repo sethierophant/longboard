@@ -6,6 +6,8 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
+use mime::Mime;
+
 use pulldown_cmark::{html::push_html, Parser};
 
 use serde::de::Error as SerdeError;
@@ -43,6 +45,9 @@ pub struct Config {
     /// The path to a notice file to be displayed at the top of each board.
     #[serde(rename = "notice")]
     pub notice_path: Option<PathBuf>,
+    /// Allowed file types for file uploads.
+    #[serde(deserialize_with = "de_allowed_file_types")]
+    pub allowed_file_types: Vec<Mime>,
     /// Filter rules to apply to posts.
     pub filter_rules: Vec<FilterRule>,
     /// Custom styles.
@@ -57,6 +62,27 @@ pub struct Config {
     pub block_list: Vec<IpAddr>,
     /// The list of DNSBLs to use.
     pub dns_block_list: Vec<String>,
+}
+
+fn de_allowed_file_types<'de, D>(
+    de: D,
+) -> std::result::Result<Vec<Mime>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Vec::<String>::deserialize(de).and_then(|types| {
+        types
+            .into_iter()
+            .map(|s| {
+                s.parse::<Mime>().map_err(|err| {
+                    SerdeError::custom(format!(
+                        "couldn't parse MIME type: {}",
+                        err
+                    ))
+                })
+            })
+            .collect::<std::result::Result<_, D::Error>>()
+    })
 }
 
 fn de_file_size_limit<'de, D>(de: D) -> std::result::Result<u64, D::Error>
@@ -302,6 +328,7 @@ impl Default for Config {
                 log_file: None,
                 names_path: None,
                 notice_path: None,
+                allowed_file_types: Vec::new(),
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
                 file_size_limit: 2u64.pow(20) * 2,
@@ -323,6 +350,7 @@ impl Default for Config {
                 log_file: Some(PathBuf::from(logdir).join("longboard.log")),
                 names_path: None,
                 notice_path: None,
+                allowed_file_types: Vec::new(),
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
                 file_size_limit: 2u64.pow(20) * 2,

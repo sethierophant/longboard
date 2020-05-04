@@ -14,9 +14,11 @@ use diesel::{delete, insert_into, prelude::*, sql_query, update};
 
 use diesel_migrations::embed_migrations;
 
+use mime::Mime;
+
 use rocket::uri;
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::schema::{board, file, post, report, thread};
 use crate::{Error, Result};
@@ -110,20 +112,74 @@ impl Post {
 }
 
 /// A user-uploaded file.
-#[derive(Debug, Queryable, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct File {
     /// The name the file is saved at.
     pub save_name: String,
     /// The name of the thumbnail of the file, if any.
-    pub thumb_name: Option<String>,
+    pub thumb_name: String,
     /// The original name of the file, if any.
     pub orig_name: Option<String>,
-    /// The content-type of the file, if any.
-    pub content_type: Option<String>,
+    /// The content-type of the file.
+    #[serde(serialize_with = "se_content_type")]
+    pub content_type: Mime,
     /// The post that the file belongs to.
     pub post_id: PostId,
     /// Whether or not the file should be hidden by default.
     pub is_spoiler: bool,
+}
+
+fn se_content_type<S>(
+    content_type: &Mime,
+    se: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    content_type.to_string().serialize(se)
+}
+
+impl From<DbFile> for File {
+    fn from(file: DbFile) -> File {
+        File {
+            save_name: file.save_name,
+            thumb_name: file.thumb_name,
+            orig_name: file.orig_name,
+            content_type: file.content_type.parse().unwrap(),
+            post_id: file.post_id,
+            is_spoiler: file.is_spoiler,
+        }
+    }
+}
+
+/// The database representation of a file.
+#[derive(Debug, Queryable, Serialize)]
+struct DbFile {
+    /// The name the file is saved at.
+    pub save_name: String,
+    /// The name of the thumbnail of the file, if any.
+    pub thumb_name: String,
+    /// The original name of the file, if any.
+    pub orig_name: Option<String>,
+    /// The content-type of the file.
+    pub content_type: String,
+    /// The post that the file belongs to.
+    pub post_id: PostId,
+    /// Whether or not the file should be hidden by default.
+    pub is_spoiler: bool,
+}
+
+impl From<File> for DbFile {
+    fn from(file: File) -> DbFile {
+        DbFile {
+            save_name: file.save_name,
+            thumb_name: file.thumb_name,
+            orig_name: file.orig_name,
+            content_type: file.content_type.to_string(),
+            post_id: file.post_id,
+            is_spoiler: file.is_spoiler,
+        }
+    }
 }
 
 impl File {
@@ -131,10 +187,8 @@ impl File {
         uri!(crate::routes::upload: PathBuf::from(&self.save_name)).to_string()
     }
 
-    pub fn thumb_uri(&self) -> Option<String> {
-        self.thumb_name.as_ref().map(|thumb_name| {
-            uri!(crate::routes::upload: PathBuf::from(thumb_name)).to_string()
-        })
+    pub fn thumb_uri(&self) -> String {
+        uri!(crate::routes::upload: PathBuf::from(&self.thumb_name)).to_string()
     }
 }
 
@@ -183,9 +237,9 @@ pub struct NewPost {
 #[table_name = "file"]
 pub struct NewFile {
     pub save_name: String,
-    pub thumb_name: Option<String>,
+    pub thumb_name: String,
     pub orig_name: Option<String>,
-    pub content_type: Option<String>,
+    pub content_type: String,
     pub is_spoiler: bool,
     pub post: PostId,
 }
@@ -822,7 +876,10 @@ impl Database {
         use crate::schema::file::columns::post;
         use crate::schema::file::dsl::file;
 
-        Ok(file.filter(post.eq(post_id)).load(&self.pool()?.get()?)?)
+        let files: Vec<DbFile> =
+            file.filter(post.eq(post_id)).load(&self.pool()?.get()?)?;
+
+        Ok(files.into_iter().map(File::from).collect())
     }
 
     /// Insert a new file into the database.
@@ -917,7 +974,7 @@ impl Database {
         use crate::schema::post::columns::time_stamp;
         use crate::schema::post::dsl::post as post_table;
 
-        Ok(file
+        let files: Vec<DbFile> = file
             .inner_join(post_table)
             .order(time_stamp.desc())
             .limit(limit.into())
@@ -929,6 +986,8 @@ impl Database {
                 post,
                 is_spoiler,
             ))
-            .load(&self.pool()?.get()?)?)
+            .load(&self.pool()?.get()?)?;
+
+        Ok(files.into_iter().map(File::from).collect())
     }
 }

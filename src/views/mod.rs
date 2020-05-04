@@ -44,7 +44,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
             .expect("couldn't load session from cookies");
 
         let staff =
-            session.and_then(|session| database.staff(session.staff_name).ok());
+            session.and_then(|session| database.staff(session.staff.name).ok());
 
         Outcome::Success(Context {
             database,
@@ -201,6 +201,7 @@ impl Serialize for FileView {
         let uri = self.0.uri();
         let thumb_uri = self.0.thumb_uri();
         let is_spoiler = self.0.is_spoiler;
+        let content_type = self.0.content_type.clone();
 
         let mut data = to_value(&self.0).expect("could not serialize file");
 
@@ -208,14 +209,24 @@ impl Serialize for FileView {
 
         obj.insert("uri".into(), JsonValue::String(uri));
 
-        if let Some(thumb_uri) = thumb_uri {
-            if is_spoiler {
-                obj.insert(
-                    "thumb_uri".into(),
-                    JsonValue::from("/file/spoiler.png"),
-                );
-            } else {
-                obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri));
+        if is_spoiler {
+            obj.insert(
+                "thumb_uri".into(),
+                JsonValue::from("/file/spoiler.png"),
+            );
+        } else {
+            obj.insert("thumb_uri".into(), JsonValue::String(thumb_uri));
+        }
+
+        match content_type.type_() {
+            name if name == "image" => {
+                obj.insert("is_image".into(), JsonValue::Bool(true));
+            }
+            name if name == "video" => {
+                obj.insert("is_video".into(), JsonValue::Bool(true));
+            }
+            _ => {
+                log::warn!("Unknown content type {} for upload", content_type);
             }
         }
 

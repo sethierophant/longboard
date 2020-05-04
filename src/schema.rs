@@ -18,9 +18,9 @@ table! {
 table! {
     file (save_name) {
         save_name -> Text,
-        thumb_name -> Nullable<Text>,
+        thumb_name -> Text,
         orig_name -> Nullable<Text>,
-        content_type -> Nullable<Text>,
+        content_type -> Text,
         post -> Int4,
         is_spoiler -> Bool,
     }

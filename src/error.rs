@@ -1,8 +1,11 @@
 //! Error types.
 
 use std::net::IpAddr;
+use std::process::ExitStatus;
 
 use log::{error, warn};
+
+use mime::Mime;
 
 use rocket::http::{hyper::header::Location, Status};
 use rocket::response::{Responder, Response};
@@ -10,7 +13,7 @@ use rocket::{uri, Request};
 
 use derive_more::{Display, From};
 
-use crate::models::{PostId, ThreadId};
+use crate::models::{staff::Role, PostId, ThreadId};
 use crate::views::error::*;
 use crate::views::Context;
 
@@ -52,16 +55,23 @@ pub enum Error {
     MissingPostParam { param: String },
     #[display(fmt = "Couldn't parse multipart/form-data")]
     FormDataCouldntParse,
-    #[display(fmt = "Bad Content-Type for multipart/form-data")]
+    #[display(fmt = "Bad content type for multipart/form-data")]
     FormDataBadContentType,
+    #[display(fmt = "Uploaded file was missing a content type")]
+    UploadMissingContentType,
+    #[display(
+        fmt = "Unsupported content type {} for uploaded files",
+        content_type
+    )]
+    UploadBadContentType { content_type: Mime },
     #[display(fmt = "Invalid password")]
     DeleteInvalidPassword,
     #[display(fmt = "Deleting files only is not a valid option for threads")]
     CannotDeleteThreadFilesOnly,
-    #[display(fmt = "No staff member with username '{}'", user_name)]
-    StaffInvalidUsername { user_name: String },
-    #[display(fmt = "Invaid password for username '{}'", user_name)]
-    StaffInvalidPassword { user_name: String },
+    #[display(fmt = "No staff member with username '{}'", staff_name)]
+    StaffInvalidUsername { staff_name: String },
+    #[display(fmt = "Invaid password for username '{}'", staff_name)]
+    StaffInvalidPassword { staff_name: String },
     #[display(fmt = "Missing session cookie")]
     MissingSessionCookie,
     #[display(fmt = "Invalid session cookie")]
@@ -80,6 +90,20 @@ pub enum Error {
     NamesFileEmpty,
     #[display(fmt = "Path for {} at {} does not exist", name, path)]
     ConfigPathNotFound { name: String, path: String },
+    #[display(fmt = "Unknown role: {}", role)]
+    UnknownRole { role: String },
+    #[display(
+        fmt = "Staff member {} does not have the authority of {}",
+        staff_name,
+        role
+    )]
+    UnauthorizedRole { staff_name: String, role: Role },
+    #[display(fmt = "ffmpeg returned {}: {}", status, stderr)]
+    FfmpegError {
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
     #[display(fmt = "Couldn't create regex: {}", _0)]
     #[from]
     RegexError(regex::Error),

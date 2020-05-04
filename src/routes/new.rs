@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::string::ToString;
 
 use argon2::hash_encoded;
@@ -12,8 +13,9 @@ use chrono::offset::Utc;
 
 use diesel::Connection;
 
-use image::error::ImageError;
 use image::ImageFormat;
+
+use mime::Mime;
 
 use mime_guess::get_mime_extensions;
 
@@ -22,8 +24,11 @@ use multipart::server::{Entries, Multipart};
 
 use rand::{thread_rng, Rng};
 
-use rocket::http::{hyper::header::Location, ContentType};
-use rocket::{post, uri, Data, Responder, State};
+use rocket::http::hyper::header::Location;
+use rocket::http::{ContentType, Status};
+use rocket::response::Redirect;
+use rocket::{data, Outcome};
+use rocket::{post, uri, Data, Request, Responder, State};
 
 use crate::models::*;
 use crate::parse::PostBody;
@@ -52,57 +57,73 @@ impl FragmentRedirect {
     }
 }
 
-/// Helper functions for entries from a parsed `multipart/form-data`
-pub trait MultipartEntriesExt: Sized {
-    fn parse(
-        content_type: &ContentType,
-        data: Data,
-        file_size_limit: u64,
-    ) -> Result<Self>;
-    fn param<S>(&self, name: S) -> Option<&str>
-    where
-        S: AsRef<str>;
-    fn field<S>(&self, name: S) -> Option<&SavedField>
-    where
-        S: AsRef<str>;
-}
+#[derive(Debug)]
+pub struct MultipartEntries(Entries);
 
-impl MultipartEntriesExt for Entries {
-    fn parse(
-        content_type: &ContentType,
-        data: Data,
-        file_size_limit: u64,
-    ) -> Result<Entries> {
+impl data::FromDataSimple for MultipartEntries {
+    type Error = Error;
+
+    fn from_data(req: &Request, data: Data) -> data::Outcome<Self, Error> {
+        let content_type = req
+            .guard::<&ContentType>()
+            .expect("expected request to have a content type");
+        let config = req
+            .guard::<State<Config>>()
+            .expect("expected config to be initialized");
+
         if !content_type.is_form_data() {
-            return Err(Error::FormDataBadContentType);
+            return Outcome::Failure((
+                Status::BadRequest,
+                Error::FormDataBadContentType,
+            ));
         }
 
-        let (_, boundary) = content_type
-            .params()
-            .find(|(k, _)| *k == "boundary")
-            .ok_or(Error::FormDataBadContentType)?;
+        let boundary =
+            match content_type.params().find(|(k, _)| *k == "boundary") {
+                Some((_, boundary)) => boundary,
+                None => {
+                    return Outcome::Failure((
+                        Status::BadRequest,
+                        Error::FormDataBadContentType,
+                    ));
+                }
+            };
 
-        Ok(
-            Multipart::with_body(data.open().take(file_size_limit), boundary)
-                .save()
-                .temp()
-                .into_entries()
-                .ok_or(Error::FormDataCouldntParse)?,
-        )
+        let stream = data.open().take(config.file_size_limit);
+
+        let entries = match Multipart::with_body(stream, boundary)
+            .save()
+            .temp()
+            .into_entries()
+        {
+            Some(entries) => entries,
+            None => {
+                return Outcome::Failure((
+                    Status::BadRequest,
+                    Error::FormDataCouldntParse,
+                ))
+            }
+        };
+
+        Outcome::Success(MultipartEntries(entries))
     }
+}
 
+impl MultipartEntries {
     fn param<S>(&self, name: S) -> Option<&str>
     where
         S: AsRef<str>,
     {
-        if let Some(fields) = self.fields.get(name.as_ref()) {
-            if let SavedField {
-                data: SavedData::Text(text),
-                ..
-            } = &fields[0]
-            {
-                if !text.trim().is_empty() {
-                    return Some(text);
+        if let Some(fields) = self.0.fields.get(name.as_ref()).as_ref() {
+            if let Some(field) = fields.first() {
+                if let SavedField {
+                    data: SavedData::Text(text),
+                    ..
+                } = field
+                {
+                    if !text.trim().is_empty() {
+                        return Some(text);
+                    }
                 }
             }
         }
@@ -114,9 +135,12 @@ impl MultipartEntriesExt for Entries {
     where
         S: AsRef<str>,
     {
-        if let Some(fields) = self.fields.get(name.as_ref()) {
-            if fields[0].headers.content_type.is_some() {
-                return Some(&fields[0]);
+        if let Some(fields) = self.0.fields.get(name.as_ref()) {
+            if let Some(field) = fields.first() {
+                if field.headers.content_type.is_some() && field.data.size() > 0
+                {
+                    return Some(field);
+                }
             }
         }
 
@@ -124,44 +148,236 @@ impl MultipartEntriesExt for Entries {
     }
 }
 
+fn create_thread(
+    board_name: String,
+    entries: MultipartEntries,
+    config: &Config,
+    db: &Database,
+    user: User,
+    session: Option<Session>,
+) -> Result<ThreadId> {
+    if entries.field("file").is_none() {
+        return Err(Error::MissingThreadParam {
+            param: "file".into(),
+        });
+    }
+
+    let subject = entries
+        .param("subject")
+        .ok_or(Error::MissingThreadParam {
+            param: "subject".into(),
+        })?
+        .to_string();
+
+    let new_thread_id = db.insert_thread(NewThread {
+        subject,
+        board: board_name.clone(),
+        locked: false,
+        pinned: false,
+    })?;
+
+    create_post(
+        board_name.clone(),
+        new_thread_id,
+        entries,
+        config,
+        db,
+        user,
+        session,
+    )?;
+
+    db.trim_board(&board_name, crate::DEFAULT_THREAD_LIMIT)?;
+
+    Ok(new_thread_id)
+}
+
+/// Crate a new post.
+///
+/// If the post has an attatched file, the file is also created.
+fn create_post(
+    board_name: String,
+    thread_id: ThreadId,
+    entries: MultipartEntries,
+    config: &Config,
+    db: &Database,
+    user: User,
+    session: Option<Session>,
+) -> Result<PostId> {
+    let body_param = entries
+        .param("body")
+        .filter(|body| !body.trim().is_empty())
+        .ok_or(Error::MissingPostParam {
+            param: "body".into(),
+        })?;
+
+    let body =
+        PostBody::parse(body_param, &config.filter_rules, db)?.into_html();
+
+    let author_name = if let Some(param) = entries.param("author") {
+        param.to_string()
+    } else {
+        config.choose_name()?
+    };
+
+    // TODO: actually parse if this is an email, domain, ...
+    let author_contact = entries.param("contact").map(ToString::to_string);
+
+    let author_ident = match entries.param("ident") {
+        Some(ident) => {
+            let salt: [u8; 20] = thread_rng().gen();
+            let hash = hash_encoded(
+                ident.as_bytes(),
+                &salt,
+                &argon2::Config::default(),
+            )
+            .expect("could not hash ident with Argon2");
+
+            Some(hash)
+        }
+        None => {
+            if let Some(session) = session {
+                if let Some(ident) = entries.param("staff-ident") {
+                    if ident == "Anonymous" {
+                        None
+                    } else {
+                        let role: Role = ident.parse()?;
+
+                        if session.staff.is_authorized(role) {
+                            Some(ident.to_string())
+                        } else {
+                            return Err(Error::UnauthorizedRole {
+                                staff_name: session.staff.name,
+                                role,
+                            });
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+    };
+
+    let delete_hash = entries.param("delete-pass").map(|pass| {
+        let salt = b"longboard-delete";
+
+        hash_encoded(pass.as_bytes(), salt, &argon2::Config::default())
+            .expect("could not hash delete password with Argon2")
+    });
+
+    let no_bump = entries.param("no-bump").is_some();
+
+    let new_post_id = db.insert_post(NewPost {
+        body,
+        author_name,
+        author_contact,
+        author_ident,
+        delete_hash,
+        thread: thread_id,
+        board: board_name,
+        user_id: user.id,
+        no_bump,
+    })?;
+
+    if !no_bump {
+        db.bump_thread(thread_id)?;
+    }
+
+    if entries.field("file").is_some() {
+        create_file(new_post_id, entries, config, db)?;
+    };
+
+    Ok(new_post_id)
+}
+
+/// Create a new file for a post.
+fn create_file(
+    post_id: PostId,
+    entries: MultipartEntries,
+    config: &Config,
+    db: &Database,
+) -> Result<()> {
+    let field = entries.field("file").unwrap();
+
+    let content_type = match field.headers.content_type.as_ref() {
+        Some(content_type) => content_type,
+        None => return Err(Error::UploadMissingContentType),
+    };
+
+    // This converts from rocket::http::hyper::mime::Mime (re-export of mime
+    // v0.2.6) to mime::Mime (mime v0.3.16).
+    let content_type: Mime = content_type.to_string().parse().unwrap();
+
+    if !config.allowed_file_types.contains(&content_type) {
+        return Err(Error::UploadBadContentType { content_type });
+    }
+
+    let save_path = save_file(field, &content_type, &config.upload_dir)?;
+    let save_name = save_path
+        .file_name()
+        .expect("bad filename for save path")
+        .to_string_lossy()
+        .into_owned();
+
+    let orig_name = field.headers.filename.clone();
+
+    let thumb_path = create_thumbnail(&save_path, &content_type)?;
+    let thumb_name = thumb_path
+        .file_name()
+        .expect("bad thumb path")
+        .to_string_lossy()
+        .into_owned();
+
+    let is_spoiler = entries.param("spoiler").is_some();
+
+    db.insert_file(NewFile {
+        save_name,
+        orig_name,
+        thumb_name,
+        content_type: content_type.to_string(),
+        is_spoiler,
+        post: post_id,
+    })?;
+
+    Ok(())
+}
+
 /// Copy a file from the user's request into the uploads dir. Returns the path
 /// the file was saved under.
-fn save_file<P>(field: &SavedField, upload_dir: P) -> Result<PathBuf>
+fn save_file<P>(
+    field: &SavedField,
+    content_type: &Mime,
+    upload_dir: P,
+) -> Result<PathBuf>
 where
     P: AsRef<Path>,
 {
-    let mime_ext =
-        field
-            .headers
-            .content_type
-            .as_ref()
-            .and_then(|content_type| {
-                get_mime_extensions(&content_type)
-                    .and_then(|v| v.first())
-                    .map(|ext| if *ext == "jpe" { "jpg" } else { ext })
-            });
+    let mut mime_ext = match get_mime_extensions(&content_type) {
+        Some(&[ext, ..]) => ext,
+        _ => {
+            return Err(Error::UploadBadContentType {
+                content_type: content_type.clone(),
+            })
+        }
+    };
 
-    let file_ext = field
-        .headers
-        .filename
-        .as_ref()
-        .and_then(|filename| Path::new(filename).extension())
-        .and_then(|ext| ext.to_str());
+    if mime_ext == "jpe" {
+        mime_ext = "jpg";
+    }
 
     let epoch = Utc::now().format("%s").to_string();
     let mut num = 0;
     let mut suffix = String::new();
 
-    let mut new_path: PathBuf;
-
     // Loop until we generate a filename that isn't already taken.
+    let mut new_path: PathBuf;
     loop {
         let new_base_name = format!("{}{}", epoch, suffix);
-        let mut new_file_name = PathBuf::from(new_base_name);
 
-        if let Some(ext) = mime_ext.or(file_ext) {
-            new_file_name.set_extension(ext);
-        }
+        let mut new_file_name = PathBuf::from(new_base_name);
+        new_file_name.set_extension(mime_ext);
 
         new_path = upload_dir.as_ref().join(new_file_name);
 
@@ -180,245 +396,139 @@ where
         )
     })?;
 
-    let mut readable = field.data.readable()?;
+    let mut file_data = field.data.readable()?;
 
-    io::copy(&mut readable, &mut new_file)?;
+    io::copy(&mut file_data, &mut new_file)?;
 
     Ok(new_path)
 }
 
-/// Create a thumbnail from a saved file. If the file is not an image, returns
-/// Ok(None).
-fn create_thumbnail<P>(source: P) -> Result<Option<PathBuf>>
+/// Create a thumbnail from a saved file.
+fn create_thumbnail<P>(save_path: P, content_type: &Mime) -> Result<PathBuf>
 where
     P: AsRef<Path>,
 {
-    let source = source.as_ref();
+    let save_path = save_path.as_ref();
 
-    let format = match ImageFormat::from_path(source) {
-        Ok(format) => format,
-        Err(ImageError::Decoding(..)) => return Ok(None),
-        Err(e) => return Err(e.into()),
-    };
-
-    let msg = format!("Couldn't open uploaded file {}", source.display());
-
-    let source_file =
-        File::open(source).map_err(|err| Error::from_io_error(err, msg))?;
-    let source_reader = BufReader::new(source_file);
-    let image = image::load(source_reader, format)?;
-
-    let thumb = image.thumbnail(200, 200);
-
-    let source_stem = source
+    let save_path_stem = save_path
         .file_stem()
         .expect("bad thumb path")
         .to_str()
         .expect("bad thumb path");
-    let thumb_stem = format!("{}-thumb.png", source_stem);
+    let thumb_stem = format!("{}-thumb.png", save_path_stem);
     let thumb_name = Path::new(&thumb_stem).with_extension("png");
-    let thumb_path = source.parent().expect("bad thumb path").join(thumb_name);
+    let thumb_path =
+        save_path.parent().expect("bad thumb path").join(thumb_name);
+
+    match content_type.type_() {
+        name if name == "image" => {
+            create_image_thumbnail(save_path, &thumb_path)?
+        }
+        name if name == "video" => {
+            create_video_thumbnail(save_path, &thumb_path)?
+        }
+        _ => {
+            return Err(Error::UploadBadContentType {
+                content_type: content_type.clone(),
+            })
+        }
+    }
+
+    Ok(thumb_path)
+}
+
+fn create_image_thumbnail<P1, P2>(source_path: P1, thumb_path: P2) -> Result<()>
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    let source_path = source_path.as_ref();
+    let thumb_path = thumb_path.as_ref();
+
+    let source_file =
+        File::open(source_path).map_err(|cause| Error::IoErrorMsg {
+            cause,
+            msg: format!(
+                "Couldn't open uploaded file {}",
+                source_path.display()
+            ),
+        })?;
+
+    let format = ImageFormat::from_path(source_path)?;
+
+    let image = image::load(BufReader::new(source_file), format)?;
+
+    let thumb = image.thumbnail(200, 200);
 
     thumb.save(&thumb_path)?;
 
-    Ok(Some(thumb_path))
+    Ok(())
 }
 
-/// Parse a post's body.
-fn parse_body<S>(body: S, conf: &Config, db: &Database) -> Result<String>
+fn create_video_thumbnail<P1, P2>(source_path: P1, thumb_path: P2) -> Result<()>
 where
-    S: Into<String>,
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
 {
-    let body = PostBody::parse(body, &conf.filter_rules, db)?;
+    let source_path = source_path.as_ref();
+    let thumb_path = thumb_path.as_ref();
 
-    Ok(body.into_html())
-}
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(source_path)
+        .arg("-ss")
+        .arg("00:00:01.00")
+        .arg("-vframes")
+        .arg("1")
+        .arg(thumb_path)
+        .output()?;
 
-/// Create a new post and optionally a new file if the post has one. These are
-/// models that should be inserted into the database.
-///
-/// Note that the IDs for the parents of both models still need to be set.
-fn create_new_models(
-    entries: Entries,
-    config: &Config,
-    db: &Database,
-    user: User,
-    session: Option<Session>,
-) -> Result<(NewPost, Option<NewFile>)> {
-    let missing_body_err = Error::MissingThreadParam {
-        param: "body".into(),
-    };
-
-    let body = entries
-        .param("body")
-        .map(|body| parse_body(body, config, db))
-        .transpose()?
-        .filter(|body| !body.trim().is_empty())
-        .ok_or(missing_body_err)?;
-
-    let author_name = if let Some(param) = entries.param("author") {
-        param.to_string()
-    } else {
-        config.choose_name()?
-    };
-
-    let author_contact = entries.param("contact").map(ToString::to_string);
-
-    let author_ident = match entries.param("ident") {
-        Some(ident) => {
-            let salt: [u8; 20] = thread_rng().gen();
-            let hash = hash_encoded(
-                ident.as_bytes(),
-                &salt,
-                &argon2::Config::default(),
-            )
-            .expect("could not hash ident with Argon2");
-
-            Some(hash)
-        }
-        None => {
-            if session.is_some() {
-                entries.param("staff-ident").and_then(|ident| {
-                    if ident == "Anonymous" {
-                        None
-                    } else {
-                        Some(ident.to_string())
-                    }
-                })
-            } else {
-                None
-            }
-        }
-    };
-
-    let delete_hash = entries.param("delete-pass").map(|pass| {
-        let salt = b"longboard-delete";
-        hash_encoded(pass.as_bytes(), salt, &argon2::Config::default())
-            .expect("could not hash delete password with Argon2")
-    });
-
-    let no_bump = entries.param("no-bump").is_some();
-
-    let new_post = NewPost {
-        body,
-        author_name,
-        author_contact,
-        author_ident,
-        delete_hash,
-        thread: 0,
-        board: String::new(),
-        user_id: user.id,
-        no_bump,
-    };
-
-    let field = entries.field("file").filter(|field| field.data.size() > 0);
-
-    let new_file = if let Some(field) = field {
-        let save_path = save_file(field, &config.upload_dir)?;
-        let save_name = save_path
-            .file_name()
-            .expect("bad filename for save path")
-            .to_string_lossy()
-            .into_owned();
-
-        let orig_name = field.headers.filename.clone();
-
-        let thumb_path = create_thumbnail(&save_path)?;
-        let thumb_name = thumb_path.and_then(|path| {
-            path.file_name()
-                .map(|os_str| os_str.to_string_lossy().into_owned())
+    if !output.status.success() {
+        return Err(Error::FfmpegError {
+            status: output.status,
+            stdout: String::from_utf8(output.stdout)
+                .expect("bad utf8 from ffmpeg"),
+            stderr: String::from_utf8(output.stderr)
+                .expect("bad utf8 from ffmpeg"),
         });
+    }
 
-        let content_type =
-            field.headers.content_type.as_ref().map(ToString::to_string);
+    create_image_thumbnail(thumb_path, thumb_path)?;
 
-        let is_spoiler = entries.param("spoiler").is_some();
-
-        Some(NewFile {
-            save_name,
-            orig_name,
-            thumb_name,
-            content_type,
-            is_spoiler,
-            post: 0,
-        })
-    } else {
-        None
-    };
-
-    Ok((new_post, new_file))
+    Ok(())
 }
 
 /// Handle a request to create a new thread.
-#[post("/<board_name>", data = "<data>", rank = 1)]
+#[post("/<board_name>", data = "<entries>", rank = 1)]
 pub fn new_thread(
     board_name: String,
-    content_type: &ContentType,
-    data: Data,
+    entries: MultipartEntries,
     config: State<Config>,
     db: State<Database>,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
-) -> Result<FragmentRedirect> {
+) -> Result<Redirect> {
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
 
-    let missing_subject_err = Error::MissingThreadParam {
-        param: "subject".into(),
-    };
+    let new_thread_id = db.pool()?.get()?.transaction::<_, Error, _>(|| {
+        create_thread(board_name.clone(), entries, &config, &db, user, session)
+    })?;
 
-    let missing_file_err = Error::MissingThreadParam {
-        param: "file".into(),
-    };
-
-    let entries: Entries =
-        MultipartEntriesExt::parse(content_type, data, config.file_size_limit)?;
-
-    let subject = entries
-        .param("subject")
-        .ok_or(missing_subject_err)?
-        .to_string();
-
-    let models = create_new_models(entries, &config, &db, user, session)?;
-
-    if let (mut new_post, Some(mut new_file)) = models {
-        let (new_thread_id, new_post_id) =
-            db.pool()?.get()?.transaction::<_, Error, _>(|| {
-                let new_thread_id = db.insert_thread(NewThread {
-                    subject,
-                    board: board_name.clone(),
-                    locked: false,
-                    pinned: false,
-                })?;
-                new_post.thread = new_thread_id;
-                new_post.board = board_name.clone();
-
-                let new_post_id = db.insert_post(new_post)?;
-                new_file.post = new_post_id;
-
-                db.insert_file(new_file)?;
-
-                db.trim_board(&board_name, crate::DEFAULT_THREAD_LIMIT)?;
-
-                Ok((new_thread_id, new_post_id))
-            })?;
-
-        let uri = uri!(crate::routes::thread: board_name, new_thread_id);
-        Ok(FragmentRedirect::to(uri, new_post_id))
-    } else {
-        Err(missing_file_err)
-    }
+    Ok(Redirect::to(uri!(
+        crate::routes::thread: board_name,
+        new_thread_id
+    )))
 }
 
 /// Handle a request to create a new post.
-#[post("/<board_name>/<thread_id>", data = "<data>", rank = 1)]
+#[post("/<board_name>/<thread_id>", data = "<entries>", rank = 1)]
 pub fn new_post(
     board_name: String,
     thread_id: ThreadId,
-    content_type: &ContentType,
-    data: Data,
+    entries: MultipartEntries,
     config: State<Config>,
     db: State<Database>,
     user: User,
@@ -432,30 +542,16 @@ pub fn new_post(
         });
     }
 
-    let entries: Entries =
-        MultipartEntriesExt::parse(content_type, data, config.file_size_limit)?;
-
-    let (mut new_post, new_file) =
-        create_new_models(entries, &config, &db, user, session)?;
-
-    let no_bump = new_post.no_bump;
-
-    new_post.thread = thread_id;
-    new_post.board = board_name.clone();
-
     let new_post_id = db.pool()?.get()?.transaction::<_, Error, _>(|| {
-        let new_post_id = db.insert_post(new_post)?;
-
-        if let Some(mut new_file) = new_file {
-            new_file.post = new_post_id;
-            db.insert_file(new_file)?;
-        }
-
-        if !no_bump {
-            db.bump_thread(thread_id)?;
-        }
-
-        Ok(new_post_id)
+        create_post(
+            board_name.clone(),
+            thread_id,
+            entries,
+            &config,
+            &db,
+            user,
+            session,
+        )
     })?;
 
     let uri = uri!(crate::routes::thread: board_name, thread_id);

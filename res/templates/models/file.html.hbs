@@ -1,4 +1,12 @@
 <section class="post-image">
     <a href="{{uri}}" title="{{orig_name}}">{{orig_name}}</a>
-    <img src="{{thumb_uri}}" data-uri="{{uri}}" data-thumb-uri="{{thumb_uri}}">
+    <img src="{{thumb_uri}}"
+         data-uri="{{uri}}"
+         data-thumb-uri="{{thumb_uri}}"
+         {{#if is_image}}
+             data-is-image="is-image"
+         {{/if}}
+         {{#if is_video}}
+             data-is-video="is-video"
+         {{/if}}>
 </section>

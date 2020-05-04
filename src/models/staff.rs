@@ -19,12 +19,20 @@ use crate::schema::{anon_user, session, staff, staff_action};
 use crate::{Database, Error, Result};
 
 /// A session for a staff member.
-#[derive(Debug, Queryable, Insertable)]
-#[table_name = "session"]
+#[derive(Debug)]
 pub struct Session {
     pub id: String,
     pub expires: DateTime<Utc>,
-    pub staff_name: String,
+    pub staff: Staff,
+}
+
+/// The database model for a session.
+#[derive(Debug, Queryable, Insertable)]
+#[table_name = "session"]
+struct DbSession {
+    id: String,
+    expires: DateTime<Utc>,
+    staff_name: String,
 }
 
 /// A staff member.
@@ -36,29 +44,48 @@ pub struct Staff {
     pub role: Role,
 }
 
+impl Staff {
+    /// Whether or not a staff member is authorized for a role.
+    pub fn is_authorized(&self, role: Role) -> bool {
+        self.role >= role
+    }
+}
+
 /// The authority level of a staff member.
 #[derive(
-    Clone, Debug, PartialEq, AsExpression, FromSqlRow, Serialize, Display,
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    AsExpression,
+    FromSqlRow,
+    Serialize,
+    Display,
 )]
 #[sql_type = "sql_types::Role"]
 pub enum Role {
-    #[display(fmt = "janitor")]
+    #[display(fmt = "Janitor")]
     Janitor,
-    #[display(fmt = "moderator")]
+    #[display(fmt = "Moderator")]
     Moderator,
-    #[display(fmt = "administrator")]
+    #[display(fmt = "Administrator")]
     Administrator,
 }
 
 impl FromStr for Role {
-    type Err = String;
+    type Err = Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_lowercase().as_ref() {
             "janitor" => Ok(Role::Janitor),
             "moderator" => Ok(Role::Moderator),
             "administrator" => Ok(Role::Administrator),
-            _ => Err("Unrecognized variant for enum 'role'".into()),
+            _ => Err(Error::UnknownRole {
+                role: s.to_string(),
+            }),
         }
     }
 }
@@ -78,7 +105,7 @@ pub mod sql_types {
 
     impl ToSql<Role, Pg> for super::Role {
         fn to_sql<W: Write>(&self, out: &mut Output<W, Pg>) -> SerializeResult {
-            out.write_all(self.to_string().as_bytes())?;
+            out.write_all(self.to_string().to_lowercase().as_bytes())?;
             Ok(IsNull::No)
         }
     }
@@ -87,7 +114,7 @@ pub mod sql_types {
         fn from_sql(bytes: Option<&[u8]>) -> DeserializeResult<Self> {
             std::str::from_utf8(not_none!(bytes))?
                 .parse::<super::Role>()
-                .map_err(|err| err.into())
+                .map_err(|err| err.to_string().into())
         }
     }
 }
@@ -245,7 +272,7 @@ impl Database {
         use crate::schema::session::columns::id;
         use crate::schema::session::dsl::session as session_table;
 
-        let session: Session = session_table
+        let session: DbSession = session_table
             .filter(id.eq(session_id.as_ref()))
             .limit(1)
             .first(&self.pool()?.get()?)?;
@@ -255,12 +282,30 @@ impl Database {
             return Err(Error::ExpiredSession);
         }
 
-        Ok(session)
+        use crate::schema::staff::columns::name;
+        use crate::schema::staff::dsl::staff as staff_table;
+
+        let staff: Staff = staff_table
+            .filter(name.eq(session.staff_name))
+            .limit(1)
+            .first(&self.pool()?.get()?)?;
+
+        Ok(Session {
+            id: session.id,
+            expires: session.expires,
+            staff,
+        })
     }
 
     /// Insert a session.
-    pub fn insert_session(&self, new_session: &Session) -> Result<()> {
+    pub fn insert_session(&self, new_session: Session) -> Result<()> {
         use crate::schema::session::dsl::session;
+
+        let new_session = DbSession {
+            id: new_session.id,
+            expires: new_session.expires,
+            staff_name: new_session.staff.name,
+        };
 
         insert_into(session)
             .values(new_session)

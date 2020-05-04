@@ -337,13 +337,15 @@ nav a {
     float: left;
 }
 
-.post-image img {
-    max-width: 100vw;
+.post-image img, .post-image video {
+    max-width: 100%;
     max-height: 100vh;
+
+    margin-bottom: 1.3em;
 }
 
 .post-image img[data-expanding] {
-    filter: grayscale(0.5) brightness(0.5);
+    filter: grayscale(1) brightness(0.5);
 }
 
 .post-image a {
@@ -359,10 +361,6 @@ nav a {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.post-image img {
-    margin-bottom: 1.3em;
 }
 
 .post-image.spoiler img {

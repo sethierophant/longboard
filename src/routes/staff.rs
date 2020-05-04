@@ -56,14 +56,14 @@ pub fn handle_login<'r>(
     login_data: Form<LoginData>,
     db: State<Database>,
 ) -> Result<Response<'r>> {
-    let user = db.staff(&login_data.user)?;
+    let staff = db.staff(&login_data.user)?;
 
-    if !verify_encoded(&user.password_hash, login_data.pass.as_bytes())? {
+    if !verify_encoded(&staff.password_hash, login_data.pass.as_bytes())? {
         // To reduce the effectiveness of brute-forcing passwords.
         std::thread::sleep(std::time::Duration::from_secs(4));
 
         return Err(Error::StaffInvalidPassword {
-            user_name: login_data.user.clone(),
+            staff_name: login_data.user.clone(),
         });
     }
 
@@ -76,11 +76,7 @@ pub fn handle_login<'r>(
         .http_only(true)
         .finish();
 
-    db.insert_session(&Session {
-        id,
-        expires,
-        staff_name: user.name,
-    })?;
+    db.insert_session(Session { id, expires, staff })?;
 
     Ok(Response::build()
         .status(Status::SeeOther)
@@ -154,7 +150,7 @@ pub fn close_report(
     db.delete_report(id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Closed report {}", id),
         reason,
     })?;
@@ -292,7 +288,7 @@ pub fn ban_user(
     db.ban_user(id, duration)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Banned user {}", id),
         reason,
     })?;
@@ -326,7 +322,7 @@ pub fn unban_user(
     db.unban_user(id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Unbanned user {}", id),
         reason,
     })?;
@@ -411,7 +407,7 @@ pub fn delete_posts_for_user(
     let count = db.delete_posts_for_user(id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Deleted all posts for user {} ({} total)", id, count),
         reason,
     })?;
@@ -454,7 +450,7 @@ pub fn pin(
     db.pin_thread(thread_id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Pinned thread {}", thread_id),
         reason,
     })?;
@@ -487,7 +483,7 @@ pub fn unpin(
     db.unpin_thread(thread_id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Unpinned thread {}", thread_id),
         reason,
     })?;
@@ -520,7 +516,7 @@ pub fn lock(
     db.lock_thread(thread_id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Locked thread {}", thread_id),
         reason,
     })?;
@@ -553,7 +549,7 @@ pub fn unlock(
     db.unlock_thread(thread_id)?;
 
     db.insert_staff_action(NewStaffAction {
-        done_by: session.staff_name,
+        done_by: session.staff.name,
         action: format!("Unlocked thread {}", thread_id),
         reason,
     })?;
@@ -593,7 +589,7 @@ pub fn staff_delete(
         db.delete_thread(thread.id)?;
 
         db.insert_staff_action(NewStaffAction {
-            done_by: session.staff_name,
+            done_by: session.staff.name,
             action: format!("Deleted thread {}", thread_id),
             reason,
         })?;
@@ -603,7 +599,7 @@ pub fn staff_delete(
         db.delete_post(post_id)?;
 
         db.insert_staff_action(NewStaffAction {
-            done_by: session.staff_name,
+            done_by: session.staff.name,
             action: format!("Deleted post {}", post_id),
             reason,
         })?;

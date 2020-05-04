@@ -2,6 +2,17 @@ pages_dir: contrib/config/pages
 names: contrib/config/names.txt
 notice: contrib/config/notice.md
 
+allowed_file_types:
+    - image/png
+    - image/jpeg
+    - image/gif
+    - image/webp
+    - image/pnm
+    - image/tiff
+    - video/webm
+    - video/mp4
+    - video/ogg
+
 filter_rules:
     - pattern: word\s?filter
       replace_with: language enhancer
