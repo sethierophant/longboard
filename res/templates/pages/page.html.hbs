@@ -30,15 +30,15 @@
             <footer class="page-footer">
                 <section>
                     <ul>
-                        <li><a href="/">Home</a></li>
-                        <li><a href="/options">Options</a></li>
-                        <li><a href="/staff">Staff</a></li>
+                        <li><a class="footer-link" href="/">Home</a></li>
+                        <li><a class="footer-link" href="/options">Options</a></li>
+                        <li><a class="footer-link" href="/staff">Staff</a></li>
                         {{#each page_footer.pages}}
-                            <li><a href="/page/{{name}}">{{name}}</a></li>
+                            <li><a class="footer-link" href="/page/{{name}}">{{name}}</a></li>
                         {{/each}}
                     </ul>
                 </section>
-                <span class="version">longboard {{page_info.version}}</span>
+                <a class="version" href="https://github.com/sethierophant/longboard">longboard {{page_info.version}}</a>
             </footer>
         </section>
     </body>

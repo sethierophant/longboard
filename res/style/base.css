@@ -769,7 +769,7 @@ form.post-action input[type=submit]:hover {
     box-sizing: border-box;
 }
 
-.page-footer a {
+.page-footer .footer-link {
     text-transform: uppercase;
 
     font: bold 1em 'Roboto Condensed';
