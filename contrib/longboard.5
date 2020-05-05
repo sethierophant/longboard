@@ -8,6 +8,9 @@ longboard \- imageboard engine
 The file \fBconfig.yaml\fR contains configuration information for longboard.
 The following options are recognized:
 .TP
+.B site_name
+The site name. This is displayed on the home page.
+.TP
 .B address
 The address to bind to.
 .TP
@@ -35,6 +38,9 @@ footer at the bottom of the page.
 .IP
 Typical uses for this option may be to add a rules page, FAQ page, donation
 page, ...
+.IP
+The page named \fBhome.md\fR is special and will be displayed on the home page,
+if it exists.
 .TP
 .B names
 The name list. This should be a plain text file with one name on each line. If
@@ -45,6 +51,15 @@ randomly from this file for them.
 The site notice. This file should be a markdown file. If this option is set,
 the contents of this file are rendered into HTML and displayed at the top of
 every board/thread page.
+.TP
+.B allowed_file_types
+The list of allowed file types for uploads. Right now, longboard only supports
+image and video thumbnailing, so e.g. audio files or pdf uploads won't work.
+.TP
+.B file_size_limit
+The maximum file size for user-uploaded files. This value can be a size in
+bytes, or a size with a suffix. The suffix can be K for kibibytes, M for
+mebibytes, or G for gibibytes.
 .TP
 .B filter_rules
 A list of filter rules to filter posts with. Each item in this list should have
@@ -61,11 +76,6 @@ What to replace the matched text with. This is a fixed string.
 .B styles
 A list of style sheets that the user can choose between. If you add STYLE to
 this list, then resource_dir/styles/STYLE.css should exist.
-.TP
-.B file_size_limit
-The maximum file size for user-uploaded files. This value can be a size in
-bytes, or a size with a suffix. The suffix can be K for kibibytes, M for
-mebibytes, or G for gibibytes.
 .TP
 .B allow_list
 A list of IP addresses to allow for posting. This list overrides both

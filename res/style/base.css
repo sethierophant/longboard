@@ -32,13 +32,74 @@ strong {
     font-weight: 900;
 }
 
+nav ul {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+    padding: 0;
+    margin: 0.6em 0;
+}
+
+nav li {
+    list-style: none;
+    margin: 0 1em;
+}
+
+nav a {
+    text-decoration: none;
+}
+
 .error h1, .action-page h1 {
     font-size: 200%;
 }
 
+.home {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
 .site-name {
     font-family: 'Oswald';
+    font-size: 3em;
+    margin-bottom: 0.2em;
     text-align: center;
+}
+
+.site-description {
+    margin: 2em 0;
+    padding: 0 4em;
+}
+
+.recent {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+}
+
+.recent .recent-posts {
+    max-width: 300px;
+}
+
+.recent .recent-posts, .recent .recent-files {
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+    margin: 1em 4em;
+    overflow: hidden;
+}
+
+.recent .recent-posts .post-preview, .recent .recent-files .file-preview {
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+.file-preview .post-image {
+    float: none;
+    margin: 0.4em 0;
+}
+
+.post-preview .body {
+    padding-left: 2em;
 }
 
 .page-header {
@@ -64,33 +125,6 @@ strong {
 
 .page-header .board-description {
     margin-top: 0;
-}
-
-nav ul {
-    display: flex;
-    flex-flow: row wrap;
-    justify-content: center;
-    padding: 0;
-    margin: 0.6em 0;
-}
-
-nav li {
-    list-style: none;
-    margin: 0 1em;
-}
-
-nav a {
-    text-decoration: none;
-}
-
-.site-name h1 {
-    font-size: 3em;
-    margin-bottom: 0.2em;
-}
-
-.site-stats {
-    text-align: center;
-    font-size: 1.2em;
 }
 
 .form-help {
@@ -513,43 +547,6 @@ form.post-action input[type=submit]:hover {
     word-wrap: anywhere;
     font-size: 1em;
     margin-top: 2em;
-}
-
-.home {
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.recent {
-    display: flex;
-    flex-flow: row wrap;
-    justify-content: center;
-}
-
-.recent .recent-posts {
-    max-width: 300px;
-}
-
-.recent .recent-posts, .recent .recent-files {
-    display: flex;
-    flex-flow: column nowrap;
-    align-items: center;
-    margin: 1em 4em;
-    overflow: hidden;
-}
-
-.recent .recent-posts .post-preview, .recent .recent-files .file-preview {
-    align-self: flex-start;
-    max-width: 100%;
-}
-
-.file-preview .post-image {
-    float: none;
-    margin: 0.4em 0;
-}
-
-.post-preview .body {
-    padding-left: 2em;
 }
 
 .user-options-form {

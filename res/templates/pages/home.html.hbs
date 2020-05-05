@@ -3,7 +3,12 @@
         {{> page-nav}}
     {{/with}}
     <section class="home">
-        <section class="site-name"><h1>Longboard {{page_info.version}}</h1></section>
+        <h1 class="site-name">{{site_name}}</h1>
+        {{#with site_description}}
+            <section class="site-description">
+                {{{this}}}
+            </section>
+        {{/with}}
         <section class="recent">
             <section class="recent-files">
                 <h1>Recent Images</h1>

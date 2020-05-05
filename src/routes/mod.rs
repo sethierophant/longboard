@@ -209,22 +209,15 @@ pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
     })?)
 }
 
-/// Serve the home page.
-#[get("/", rank = 0)]
-pub fn home(context: Context) -> Result<HomePage> {
-    HomePage::new(&context)
-}
+/// Load a admin-created page.
+fn load_page<S>(page_name: S, config: &Config) -> Result<String>
+where
+    S: AsRef<str>,
+{
+    let page_name = page_name.as_ref().to_lowercase();
 
-/// Serve a admin-created page.
-#[get("/page/<page_name>", rank = 1)]
-pub fn custom_page(
-    page_name: String,
-    config: State<Config>,
-    context: Context,
-) -> Result<Template> {
-    if let Some(pages_dir) = &config.pages_dir {
-        let page_path =
-            pages_dir.join(format!("{}.md", &page_name.to_lowercase()));
+    if let Some(ref pages_dir) = config.pages_dir {
+        let page_path = pages_dir.join(format!("{}.md", page_name));
 
         let page_contents = read_to_string(page_path).map_err(|_err| {
             Error::CustomPageNotFound {
@@ -236,22 +229,44 @@ pub fn custom_page(
         let mut page_html = String::new();
         html::push_html(&mut page_html, parser);
 
-        let mut data = HashMap::new();
-        data.insert(
-            "page_info".to_string(),
-            to_value(PageInfo::new(&page_name, &context))?,
-        );
-        data.insert(
-            "page_footer".to_string(),
-            to_value(PageFooter::new(&context)?)?,
-        );
-        data.insert("page_name".to_string(), JsonValue::String(page_name));
-        data.insert("content".to_string(), JsonValue::String(page_html));
-
-        Ok(Template::render("pages/custom-page", data))
+        Ok(page_html)
     } else {
-        Err(Error::CustomPageNotFound { name: page_name })
+        Err(Error::CustomPageNotFound {
+            name: page_name.clone(),
+        })
     }
+}
+
+/// Serve the home page.
+#[get("/", rank = 0)]
+pub fn home(config: State<Config>, context: Context) -> Result<HomePage> {
+    let contents = load_page("home", &config).ok();
+    HomePage::new(contents, &context)
+}
+
+/// Serve a admin-created page.
+#[get("/page/<page_name>", rank = 1)]
+pub fn custom_page(
+    page_name: String,
+    config: State<Config>,
+    context: Context,
+) -> Result<Template> {
+    let mut data = HashMap::new();
+
+    let page_html = load_page(&page_name, &config)?;
+    data.insert("content".to_string(), JsonValue::String(page_html));
+
+    data.insert(
+        "page_info".to_string(),
+        to_value(PageInfo::new(&page_name, &context))?,
+    );
+    data.insert(
+        "page_footer".to_string(),
+        to_value(PageFooter::new(&context)?)?,
+    );
+    data.insert("page_name".to_string(), JsonValue::String(page_name));
+
+    Ok(Template::render("pages/custom-page", data))
 }
 
 /// Serve a page with help on creating a thread or post.

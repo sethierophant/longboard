@@ -514,16 +514,23 @@ pub struct HomePage {
     page_info: PageInfo,
     page_nav: PageNav,
     page_footer: PageFooter,
+    site_name: String,
+    site_description: Option<String>,
     recent_posts: Vec<RecentPost>,
     recent_files: Vec<RecentFile>,
 }
 
 impl HomePage {
-    pub fn new(context: &Context) -> Result<HomePage> {
+    pub fn new(
+        site_description: Option<String>,
+        context: &Context,
+    ) -> Result<HomePage> {
         Ok(HomePage {
-            page_info: PageInfo::new("LONGBOARD", context),
+            page_info: PageInfo::new(&context.config.site_name, context),
             page_nav: PageNav::new(context)?,
             page_footer: PageFooter::new(context)?,
+            site_name: context.config.site_name.clone(),
+            site_description,
             recent_posts: RecentPost::load(
                 context.database,
                 crate::DEFAULT_RECENT_POSTS,

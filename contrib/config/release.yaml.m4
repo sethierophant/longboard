@@ -1,5 +1,8 @@
 # Configuration file for longboard.
 
+# The site name. This is displayed on the home page.
+site_name: Longboard
+
 # The address that the server binds to.
 address: 0.0.0.0
 
@@ -39,6 +42,9 @@ allowed_file_types:
     - video/mp4
     - video/ogg
 
+# The maximum size for user-uploaded files.
+file_size_limit: 4M
+
 # Rules to filter posts with. The pattern is parsed as a regex.
 # See https://docs.rs/regex/1.3.7/regex/#syntax for regex syntax.
 filter_rules:
@@ -50,9 +56,6 @@ filter_rules:
 styles:
     - light
     - dark
-
-# The maximum size for user-uploaded files.
-file_size_limit: 4M
 
 # The list of IP addresses to allow for posting. This list will override both
 # block_list and dns_block_list.

@@ -25,6 +25,8 @@ use crate::{Error, Result};
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// Name of the website.
+    pub site_name: String,
     /// Address to bind to.
     pub address: String,
     /// Port to bind to.
@@ -243,14 +245,20 @@ impl Config {
             for entry in iter? {
                 let entry = entry?;
 
+                let name = entry
+                    .path()
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                if name.to_lowercase() == "home" {
+                    continue;
+                }
+
                 pages.push(Page {
-                    name: entry
-                        .path()
-                        .file_stem()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    name,
                     path: entry.path(),
                 })
             }
@@ -318,6 +326,7 @@ impl Default for Config {
 
         if cfg!(debug_assertions) {
             Config {
+                site_name: "LONGBOARD".into(),
                 address: "0.0.0.0".into(),
                 port: 8000,
                 resource_dir: PathBuf::from("res"),
@@ -338,6 +347,7 @@ impl Default for Config {
             }
         } else {
             Config {
+                site_name: "LONGBOARD".into(),
                 address: "0.0.0.0".into(),
                 port: 80,
                 resource_dir: PathBuf::from(resdir).join("longboard"),

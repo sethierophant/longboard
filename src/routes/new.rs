@@ -481,7 +481,11 @@ where
         .arg("-vframes")
         .arg("1")
         .arg(thumb_path)
-        .output()?;
+        .output()
+        .map_err(|cause| Error::IoErrorMsg {
+            cause,
+            msg: "Error running ffmpeg".into(),
+        })?;
 
     if !output.status.success() {
         return Err(Error::FfmpegError {
