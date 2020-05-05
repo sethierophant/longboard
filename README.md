@@ -2,19 +2,49 @@
 
 ![Screenshot of a page](/../screenshots/screenshot.png?raw=True)
 
-## Goals
+## Features
 
-Longboard aims to be:
+- Image and video uploads (with thumbnails)
+- Markdown-style post formatting
+- Web interface for moderation
+- ... and much more!
 
-- Configurable, well-documented, and easy to install.
-- Spam-resistant.
-- Performant.
+### Goals
+
+**Configurable, well-documented, and easy to install**. The default install
+comes with manual pages, a well-commented config file, and a .service file for
+starting with SystemD.
+
+**Spam-resistant**. Longboard comes with a web interface for moderating posts
+and support for using DNSBLs.
+
+**Performant**. Because most usages of longboard will probably be on low-cost
+or donation-run servers, performance is a major goal.
+
+[siege][3] metrics for a 1CPU/1GB VPS:
+
+    siege -f urls.txt -b -t 10m
+
+    {       "transactions":                       27582,
+            "availability":                       99.89,
+            "elapsed_time":                      599.77,
+            "data_transferred":                  608.85,
+            "response_time":                       0.44,
+            "transaction_rate":                   45.99,
+            "throughput":                          1.02,
+            "concurrency":                        20.36,
+            "successful_transactions":            27582,
+            "failed_transactions":                   30,
+            "longest_transaction":                59.03,
+            "shortest_transaction":                0.10
+    }
 
 ## Installation
 
 Dependencies:
 
 - PostgreSQL
+- FFmpeg (for video thumbnails)
 
 ### From Source
 
@@ -78,3 +108,4 @@ appreciated.
 
 [1]: https://en.wikipedia.org/wiki/Imageboard
 [2]: https://www.gnu.org/licenses/agpl-3.0.en.html
+[3]: https://www.joedog.org/siege-home/
