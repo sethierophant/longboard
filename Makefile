@@ -46,7 +46,9 @@ export sysconfdir
 export resdir
 export logdir
 
-target/release/longboard: src/
+.PHONY: target/release/longboard
+
+target/release/longboard:
 	$(CARGO) build $(CARGOFEATURES) --release
 
 all: target/release/longboard
