@@ -179,6 +179,7 @@ parser! {
             attempt(quote_parser(db)),
             text_parser(db),
         )))
+        .skip(eof())
         .map(PostBody)
     }
 }
@@ -203,7 +204,7 @@ impl PostBody {
                 .into_owned();
         }
 
-        content = Regex::new(r"\r\n+")
+        content = Regex::new(r"(\r\n)+")
             .unwrap()
             .replace_all(&content, "\n")
             .into_owned();
@@ -211,6 +212,8 @@ impl PostBody {
         if !content.ends_with('\n') {
             content.push('\n');
         }
+
+        log::debug!("Parser input: {:?}", &content);
 
         let (output, _input) = post_body_parser(db)
             .easy_parse(position::Stream::new(content.as_str()))

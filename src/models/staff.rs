@@ -56,6 +56,7 @@ impl Staff {
     Copy,
     Clone,
     Debug,
+    Display,
     PartialEq,
     Eq,
     PartialOrd,
@@ -63,15 +64,11 @@ impl Staff {
     AsExpression,
     FromSqlRow,
     Serialize,
-    Display,
 )]
 #[sql_type = "sql_types::Role"]
 pub enum Role {
-    #[display(fmt = "Janitor")]
     Janitor,
-    #[display(fmt = "Moderator")]
     Moderator,
-    #[display(fmt = "Administrator")]
     Administrator,
 }
 
