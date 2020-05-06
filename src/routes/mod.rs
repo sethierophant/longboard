@@ -232,7 +232,7 @@ where
         Ok(page_html)
     } else {
         Err(Error::CustomPageNotFound {
-            name: page_name.clone(),
+            name: page_name,
         })
     }
 }

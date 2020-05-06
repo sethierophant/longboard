@@ -3,7 +3,7 @@ Requires=postgresql.service
 After=postgresql.service
 
 [Service]
-Type=simple
+Type=exec
 ExecStart=BINDIR/longboard
 
 [Install]

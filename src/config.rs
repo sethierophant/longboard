@@ -50,14 +50,14 @@ pub struct Config {
     /// Allowed file types for file uploads.
     #[serde(deserialize_with = "de_allowed_file_types")]
     pub allowed_file_types: Vec<Mime>,
+    /// The file size limit for uploaded files.
+    #[serde(deserialize_with = "de_file_size_limit")]
+    pub file_size_limit: u64,
     /// Filter rules to apply to posts.
     pub filter_rules: Vec<FilterRule>,
     /// Custom styles.
     #[serde(rename = "styles")]
     pub custom_styles: Vec<String>,
-    /// The file size limit for uploaded files.
-    #[serde(deserialize_with = "de_file_size_limit")]
-    pub file_size_limit: u64,
     /// The list of IPs to allow unconditionally.
     pub allow_list: Vec<IpAddr>,
     /// The list of IPs to block unconditionally.

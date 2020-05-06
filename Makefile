@@ -68,8 +68,6 @@ install: target/release/longboard
 	mkdir -p $(DESTDIR)$(sysconfdir)/longboard
 	$(M4) contrib/config/release.yaml.m4 \
 		>$(DESTDIR)$(sysconfdir)/longboard/config.yaml
-	$(INSTALL_DATA) -D contrib/config/pages/rules.md \
-		$(DESTDIR)$(sysconfdir)/longboard/pages/rules.md
 ifdef servicedir
 	mkdir -p $(DESTDIR)$(servicedir)
 	$(M4) contrib/longboard.service.m4 \
