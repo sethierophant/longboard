@@ -475,12 +475,13 @@ impl Database {
     where
         S: AsRef<str>,
     {
-        use crate::schema::thread::columns::{board, bump_date};
+        use crate::schema::thread::columns::{board, bump_date, pinned};
         use crate::schema::thread::dsl::thread;
 
         Ok(thread
             .filter(board.eq(board_name.as_ref()))
-            .order(bump_date.desc())
+            .order_by(pinned.desc())
+            .then_order_by(bump_date.desc())
             .limit(page.width as i64)
             .offset(page.offset() as i64)
             .load(&self.pool()?.get()?)?)
@@ -542,7 +543,8 @@ impl Database {
                                   WHERE inner_post.thread = thread.id \
                                   ORDER BY id ASC \
                                   LIMIT 1)"))
-            .order_by(thread_columns::bump_date.desc())
+            .order_by(thread_columns::pinned.desc())
+            .then_order_by(thread_columns::bump_date.desc())
             .load(&self.pool()?.get()?)?)
     }
 
