@@ -55,7 +55,7 @@ nav a {
 }
 
 .home {
-    max-width: 600px;
+    max-width: 700px;
     margin: 0 auto;
 }
 
@@ -67,8 +67,9 @@ nav a {
 }
 
 .site-description {
-    margin: 2em 0;
-    padding: 0 4em;
+    margin: 2em auto;
+    padding: 0 3em;
+    width: max-content;
 }
 
 .recent {
@@ -85,7 +86,7 @@ nav a {
     display: flex;
     flex-flow: column nowrap;
     align-items: center;
-    margin: 1em 4em;
+    margin: 1em 3em;
     overflow: hidden;
 }
 
