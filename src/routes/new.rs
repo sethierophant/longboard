@@ -240,15 +240,25 @@ fn create_post(
                     if ident == "Anonymous" {
                         None
                     } else {
-                        let role: Role = ident.parse()?;
+                        let named_role = format!(
+                            "{} ({})",
+                            session.staff.name,
+                            session.staff.role,
+                        );
 
-                        if session.staff.is_authorized(role) {
+                        if ident == named_role {
                             Some(ident.to_string())
                         } else {
-                            return Err(Error::UnauthorizedRole {
-                                staff_name: session.staff.name,
-                                role,
-                            });
+                            let role: Role = ident.parse()?;
+
+                            if session.staff.is_authorized(role) {
+                                Some(ident.to_string())
+                            } else {
+                                return Err(Error::UnauthorizedRole {
+                                    staff_name: session.staff.name,
+                                    role,
+                                });
+                            }
                         }
                     }
                 } else {
