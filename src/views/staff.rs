@@ -10,6 +10,7 @@ use crate::models::{Board, Report};
 use crate::views::{Context, PageFooter, PageInfo};
 use crate::{Database, Result};
 
+/// A wrapper type for using a `Staff` in a template.
 #[derive(Debug)]
 pub struct StaffView(pub Staff);
 
@@ -36,6 +37,7 @@ impl Serialize for StaffView {
     }
 }
 
+/// A wrapper type for using a `Report` in a template.
 #[derive(Debug)]
 pub struct ReportView {
     report: Report,
@@ -43,6 +45,7 @@ pub struct ReportView {
 }
 
 impl ReportView {
+    /// Create a new `ReportView`.
     fn new(report_id: i32, db: &Database) -> Result<ReportView> {
         let report = db.report(report_id)?;
         let post_uri = db.post(report.post_id)?.uri();
@@ -72,6 +75,7 @@ impl Serialize for ReportView {
     }
 }
 
+/// A wrapper type for using a `User` in a template.
 #[derive(Debug)]
 pub struct UserView {
     user: User,
@@ -107,6 +111,7 @@ impl Serialize for UserView {
     }
 }
 
+/// The overview page for staff members.
 #[derive(Debug, Serialize)]
 pub struct OverviewPage {
     page_info: PageInfo,
@@ -118,6 +123,7 @@ pub struct OverviewPage {
 }
 
 impl OverviewPage {
+    /// Create a new overview page.
     pub fn new(context: &Context) -> Result<OverviewPage> {
         let users = context
             .database
@@ -149,6 +155,7 @@ impl OverviewPage {
 
 impl_template_responder!(OverviewPage, "pages/staff/overview");
 
+/// The login page for staff members.
 #[derive(Debug, Serialize)]
 pub struct LoginPage {
     pub page_info: PageInfo,
@@ -166,6 +173,7 @@ impl LoginPage {
 
 impl_template_responder!(LoginPage, "pages/staff/login");
 
+/// The page with a history of staff actions.
 #[derive(Debug, Serialize)]
 pub struct HistoryPage {
     page_info: PageInfo,

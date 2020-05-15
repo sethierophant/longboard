@@ -46,6 +46,7 @@ pub struct Board {
 }
 
 impl Board {
+    /// The URI for the board.
     pub fn uri(&self) -> String {
         uri!(crate::routes::board: &self.name, 1).to_string()
     }
@@ -104,6 +105,7 @@ pub struct Post {
 }
 
 impl Post {
+    /// The URI of the post.
     pub fn uri(&self) -> String {
         let uri =
             uri!(crate::routes::thread: &self.board_name, &self.thread_id);
@@ -129,6 +131,7 @@ pub struct File {
     pub is_spoiler: bool,
 }
 
+/// A helper for serializing MIME types.
 fn se_content_type<S>(
     content_type: &Mime,
     se: S,
@@ -183,10 +186,12 @@ impl From<File> for DbFile {
 }
 
 impl File {
+    /// The URI of the file.
     pub fn uri(&self) -> String {
         uri!(crate::routes::upload: PathBuf::from(&self.save_name)).to_string()
     }
 
+    /// The URI of the file's thumbnail.
     pub fn thumb_uri(&self) -> String {
         uri!(crate::routes::upload: PathBuf::from(&self.thumb_name)).to_string()
     }
@@ -253,7 +258,7 @@ pub struct NewReport {
     pub user_id: UserId,
 }
 
-/// A page location.
+/// A page location for a paginated resource, for example a page of threads.
 pub struct Page {
     /// The page number.
     pub num: u32,
@@ -270,6 +275,7 @@ impl Page {
     }
 }
 
+/// A PostgreSQL connection pool.
 type ConnectionPool = Pool<ConnectionManager<PgConnection>>;
 
 /// A connection to the database. Used for creating and retrieving data.
@@ -300,12 +306,14 @@ impl Debug for Database {
 }
 
 impl Database {
-    /// Get the connection pool, if this database is not a mock database.
+    /// Get the connection pool.
+    ///
+    /// If this database is a mock database, fails with Error::DatabaseIsMock.
     pub fn pool(&self) -> Result<&ConnectionPool> {
         self.pool.as_ref().ok_or(Error::DatabaseIsMock)
     }
 
-    /// Create a database with a new connection pool.
+    /// Connect to the database with a new connection pool.
     pub fn new<S>(url: S) -> Result<Database>
     where
         S: AsRef<str>,
@@ -316,7 +324,7 @@ impl Database {
         Ok(Database { pool: Some(pool) })
     }
 
-    /// Create a new database for unit tests.
+    /// Create a new Database for unit tests.
     ///
     /// Any database operation will fail with Error::DatabaseIsMock.
     pub fn mock() -> Database {
@@ -343,7 +351,7 @@ impl Database {
             .first(&self.pool()?.get()?)?)
     }
 
-    /// Insert a new board into the database.
+    /// Insert a new board.
     pub fn insert_board(&self, new_board: Board) -> Result<()> {
         use crate::schema::board::dsl::board;
 
@@ -374,6 +382,8 @@ impl Database {
     }
 
     /// Delete a board.
+    ///
+    /// FIXME: This function should delete recursively, like e.g. `trim_board`.
     pub fn delete_board<S>(&self, board_name: S) -> Result<()>
     where
         S: AsRef<str>,
@@ -464,9 +474,11 @@ impl Database {
 
     /// Get a single page of threads on a board.
     ///
-    /// The order here is the bump order of the thread, i.e. sort by the
-    /// timestamp of the most recent post made to the thread which isn't a "no
-    /// bump" post.
+    /// The order is the bump order of the thread, i.e. sort by the timestamp of
+    /// the most recent post made to the thread which isn't a "no bump" post.
+    ///
+    /// Pinned threads are always displayed first and the order of pinned
+    /// threads is their bump order as well.
     pub fn thread_page<S>(
         &self,
         board_name: S,
@@ -574,6 +586,9 @@ impl Database {
     }
 
     /// Delete a thread.
+    ///
+    /// This function will recursively delete all reports, posts, and files
+    /// associated with the thread as well.
     pub fn delete_thread(&self, tid: ThreadId) -> Result<()> {
         use crate::schema::post::columns::thread as post_thread;
         use crate::schema::post::dsl::post as table_post;
@@ -848,6 +863,7 @@ impl Database {
         Ok(parent)
     }
 
+    /// Check whether a post is the first post in a thread (the original post).
     pub fn is_first_post(&self, post_id: PostId) -> Result<bool> {
         let first_post_id =
             self.pool()?.get()?.transaction::<_, Error, _>(|| {

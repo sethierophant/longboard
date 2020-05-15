@@ -1,4 +1,7 @@
 //! An imageboard engine.
+//!
+//! In order to add a page, you'll want to add a route in `routes`, and you'll
+//! probably also want to add a view in `views`. See both modules for examples.
 
 #![feature(proc_macro_hygiene)]
 #![feature(decl_macro)]

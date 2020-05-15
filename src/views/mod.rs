@@ -62,6 +62,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
 
 /// Implement `Responder` for a type which implements `Serialize`, given a path
 /// to a template file that should be loaded.
+///
+/// The type is serialized and passed directly into that template, which is
+/// rendered as HTML.
 #[macro_export]
 macro_rules! impl_template_responder {
     ($t:ty, $template:expr) => {
@@ -98,6 +101,7 @@ pub struct PageInfo {
 }
 
 impl PageInfo {
+    /// Create a new `PageInfo`.
     pub fn new<S>(title: S, context: &Context) -> PageInfo
     where
         S: Into<String>,
@@ -119,6 +123,7 @@ pub struct PageFooter {
 }
 
 impl PageFooter {
+    /// Create a new `PageFooter`.
     pub fn new(context: &Context) -> Result<PageFooter> {
         Ok(PageFooter {
             pages: context.config.pages()?,
@@ -129,10 +134,12 @@ impl PageFooter {
 /// The board navigation at the top of the page.
 #[derive(Debug, Serialize)]
 pub struct PageNav {
+    /// A list of all site boards.
     pub boards: Vec<Board>,
 }
 
 impl PageNav {
+    /// Create a new `PageNav`.
     pub fn new(context: &Context) -> Result<PageNav> {
         Ok(PageNav {
             boards: context.database.all_boards()?,
@@ -153,6 +160,7 @@ pub struct PageHeader {
 }
 
 impl PageHeader {
+    /// Create a new `PageHeader`.
     fn new<S>(board_name: S, context: &Context) -> Result<PageHeader>
     where
         S: AsRef<str>,
@@ -342,6 +350,7 @@ pub struct ThreadView {
 }
 
 impl ThreadView {
+    /// Create a new `ThreadView`.
     pub fn new(thread_id: ThreadId, db: &Database) -> Result<ThreadView> {
         Ok(ThreadView {
             thread: db.thread(thread_id)?,
@@ -378,6 +387,7 @@ impl Serialize for ThreadView {
 pub struct DeepPost(PostView, Option<FileView>);
 
 impl DeepPost {
+    /// Create a new `DeepPost`.
     fn new(post_id: PostId, db: &Database) -> Result<DeepPost> {
         let post = PostView(db.post(post_id)?);
         let file = db.files_in_post(post_id)?.pop().map(FileView);
@@ -521,6 +531,7 @@ pub struct HomePage {
 }
 
 impl HomePage {
+    /// Create a new home page.
     pub fn new(
         site_description: Option<String>,
         context: &Context,
@@ -563,6 +574,7 @@ pub struct OptionsPage {
 }
 
 impl OptionsPage {
+    /// Create a new options page.
     pub fn new(context: &Context) -> Result<OptionsPage> {
         Ok(OptionsPage {
             page_info: PageInfo::new("Options", context),
@@ -619,6 +631,7 @@ pub struct BoardPage {
 }
 
 impl BoardPage {
+    /// Create a new board page.
     pub fn new<S>(
         board_name: S,
         page_num: u32,
@@ -684,6 +697,7 @@ pub struct BoardCatalogPage {
 }
 
 impl BoardCatalogPage {
+    /// Create a new catalog page.
     pub fn new<S>(board_name: S, context: &Context) -> Result<BoardCatalogPage>
     where
         S: AsRef<str>,
@@ -734,6 +748,7 @@ pub struct ThreadPage {
 }
 
 impl ThreadPage {
+    /// Create a new thread page.
     pub fn new<S>(
         board_name: S,
         thread_id: ThreadId,
@@ -769,6 +784,7 @@ pub struct PostPreview {
 }
 
 impl PostPreview {
+    /// Load a post preview from the database.
     pub fn new(post_id: PostId, db: &Database) -> Result<PostPreview> {
         Ok(PostPreview {
             post: DeepPost::new(post_id, db)?,
@@ -787,6 +803,7 @@ pub struct ReportPage {
 }
 
 impl ReportPage {
+    /// Create a new report page.
     pub fn new(post_id: PostId, context: &Context) -> Result<ReportPage> {
         Ok(ReportPage {
             page_info: PageInfo::new("Report post", context),
@@ -807,6 +824,7 @@ pub struct DeletePage {
 }
 
 impl DeletePage {
+    /// Create a new delete page.
     pub fn new(post_id: PostId, context: &Context) -> Result<DeletePage> {
         Ok(DeletePage {
             page_info: PageInfo::new("Delete post", context),
@@ -828,6 +846,7 @@ pub struct ActionSuccessPage {
 }
 
 impl ActionSuccessPage {
+    /// Create a new action success page.
     pub fn new<S1, S2>(
         msg: S1,
         redirect_uri: S2,

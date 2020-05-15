@@ -1,4 +1,4 @@
-//! Routes for staff member actions.
+//! Routes for staff member pages and actions.
 
 use argon2::verify_encoded;
 

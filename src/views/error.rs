@@ -4,6 +4,7 @@ use crate::impl_template_responder;
 use crate::views::{Context, PageFooter, PageInfo};
 use crate::Result;
 
+/// A page in response to a bad request.
 #[derive(Debug, Serialize)]
 pub struct BadRequestPage {
     pub message: String,
@@ -26,6 +27,7 @@ impl BadRequestPage {
 
 impl_template_responder!(BadRequestPage, "pages/error/400");
 
+/// A page in response to detected spam.
 #[derive(Debug, Serialize)]
 pub struct SpamDetectedPage {
     pub message: String,
@@ -48,6 +50,7 @@ impl SpamDetectedPage {
 
 impl_template_responder!(SpamDetectedPage, "pages/error/spam-detected");
 
+/// A page for a resource that wasn't found.
 #[derive(Debug, Serialize)]
 pub struct NotFoundPage {
     pub message: String,
@@ -70,6 +73,7 @@ impl NotFoundPage {
 
 impl_template_responder!(NotFoundPage, "pages/error/500");
 
+/// A page in response to an internal server error.
 #[derive(Debug, Serialize)]
 pub struct InternalServerErrorPage {
     pub message: String,

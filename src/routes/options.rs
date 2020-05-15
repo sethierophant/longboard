@@ -1,3 +1,5 @@
+//! Routes for user options.
+
 use rocket::http::{hyper::header::Location, Cookie, Status};
 use rocket::request::{Form, FromForm, FromRequest, Outcome};
 use rocket::{get, post, uri, Request, Response};
@@ -7,6 +9,7 @@ use serde::Serialize;
 use crate::views::{Context, OptionsPage};
 use crate::{Error, Result};
 
+/// Form data for user options.
 #[derive(FromForm, Serialize, Clone, Debug)]
 pub struct UserOptions {
     pub style: String,

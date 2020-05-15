@@ -97,5 +97,6 @@ fn main_res() -> Result<()> {
 fn main() {
     if let Err(e) = main_res() {
         eprintln!("{}", e);
+        std::process::exit(-1);
     }
 }

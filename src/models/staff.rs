@@ -116,6 +116,7 @@ pub mod sql_types {
     }
 }
 
+/// An ID for an anonymous site user.
 pub type UserId = i32;
 
 /// An anonymous site user.
@@ -163,19 +164,10 @@ impl NewUser {
         }
     }
 
-    /// The configuration to use for IP hashing.
-    fn ip_hash_config() -> argon2::Config<'static> {
-        argon2::Config {
-            mem_cost: 1024,
-            time_cost: 1,
-            ..argon2::Config::default()
-        }
-    }
-
     /// Hash a user's IP address.
     pub fn hash_ip(ip: IpAddr) -> String {
         let salt = b"longboard-user";
-        let conf = Self::ip_hash_config();
+        let conf = argon2::Config::default();
 
         let octets = match ip {
             IpAddr::V4(v4_addr) => v4_addr.octets().to_vec(),
@@ -187,18 +179,25 @@ impl NewUser {
     }
 }
 
+/// An ID for a staff member action.
 type StaffActionId = i32;
 
 /// An action done by a staff member.
 #[derive(Debug, Queryable, Serialize)]
 pub struct StaffAction {
+    /// The action's ID in the database.
     pub id: StaffActionId,
+    /// The staff member who performed the action.
     pub done_by: String,
+    /// A description of the action.
     pub action: String,
+    /// The reason the action was done.
     pub reason: String,
+    /// When the action was done.
     pub time_stamp: DateTime<Utc>,
 }
 
+/// Insertable database type for staff member actions.
 #[derive(Insertable)]
 #[table_name = "staff_action"]
 pub struct NewStaffAction {
@@ -327,13 +326,6 @@ impl Database {
 
     /// Get a user by their IP.
     pub fn user(&self, user_ip: IpAddr) -> Result<User> {
-        // It's more efficient to get every user from the database and then
-        // check each of them then it is to compute the hash of the IP address
-        // and then select only that user from the database.
-        //
-        // This is because it's much cheaper to verify an Argon2 hash than it
-        // is to compute an Argon2 hash.
-
         use crate::schema::anon_user::columns::ip;
         use crate::schema::anon_user::dsl::anon_user;
 

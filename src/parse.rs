@@ -1,3 +1,5 @@
+//! Parsing for uploaded posts.
+
 use combine::parser::char::*;
 use combine::parser::repeat::*;
 use combine::stream::position;
@@ -12,7 +14,15 @@ use crate::config::FilterRule;
 use crate::models::{Database, PostId};
 use crate::{Error, Result};
 
+// The reason that the parser is split into many small top-level parser is that
+// it greatly reduces compile times with combine 4.x.
+//
+// Defining all of these parsers as closures in the same function inflates
+// compile times to 30 minutes+ on my machine, while these top-level functions
+// can be compiled in about 1 minute.
+
 parser! {
+    /// Parse whitespace that isn't a newline.
     fn line_spaces[Input]()(Input) -> String
     where [Input: Stream<Token = char>]
     {
@@ -21,6 +31,7 @@ parser! {
 }
 
 parser! {
+    /// Parse `**strong**` text.
     fn strong_parser[Input]()(Input) -> LineItem
     where [Input: Stream<Token = char>]
     {
@@ -34,6 +45,7 @@ parser! {
 }
 
 parser! {
+    /// Parse `*emphasized*` text.
     fn emphasis_parser[Input]()(Input) -> LineItem
     where [Input: Stream<Token = char>]
     {
@@ -44,6 +56,7 @@ parser! {
 }
 
 parser! {
+    /// Parse `~spoiler~` text.
     fn spoiler_parser[Input]()(Input) -> LineItem
     where [Input: Stream<Token = char>]
     {
@@ -54,6 +67,7 @@ parser! {
 }
 
 parser! {
+    /// Parse a post ref like `>>123`.
     fn post_ref_parser['a, Input](db: &'a Database)(Input) -> LineItem
     where [Input: Stream<Token = char>]
     {
@@ -69,6 +83,7 @@ parser! {
 }
 
 parser! {
+    /// Parse `\`code\`` within a line.
     fn line_code_parser[Input]()(Input) -> LineItem
     where [Input: Stream<Token = char>]
     {
@@ -82,6 +97,8 @@ parser! {
 }
 
 parser! {
+    /// Parse any plain text within a line; anything not covered by the above
+    /// line-item parsers.
     fn line_text_parser[Input]()(Input) -> LineItem
     where [Input: Stream<Token = char>]
     {
@@ -98,6 +115,7 @@ parser! {
 }
 
 parser! {
+    /// Parse all line items.
     fn line_items_parser['a, Input](db: &'a Database)(Input)
         -> Vec<LineItem>
     where [Input: Stream<Token = char>]
@@ -114,38 +132,7 @@ parser! {
 }
 
 parser! {
-    fn header_parser['a, Input](db: &'a Database)(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        char('#')
-            .skip(line_spaces())
-            .with(line_items_parser(db))
-            .skip(newline())
-            .map(BlockItem::Header)
-    }
-}
-
-parser! {
-    fn quote_parser['a, Input](db: &'a Database)(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        char('>')
-            .skip(line_spaces())
-            .with(line_items_parser(db))
-            .skip(newline())
-            .map(BlockItem::Quote)
-    }
-}
-
-parser! {
-    fn text_parser['a, Input](db: &'a Database)(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        line_items_parser(db).skip(newline()).map(BlockItem::Text)
-    }
-}
-
-parser! {
+    /// Parse a block of code.
     fn code_parser[Input]()(Input) -> BlockItem
     where [Input: Stream<Token = char>]
     {
@@ -170,6 +157,42 @@ parser! {
 }
 
 parser! {
+    /// Parse a `#Header`.
+    fn header_parser['a, Input](db: &'a Database)(Input) -> BlockItem
+    where [Input: Stream<Token = char>]
+    {
+        char('#')
+            .skip(line_spaces())
+            .with(line_items_parser(db))
+            .skip(newline())
+            .map(BlockItem::Header)
+    }
+}
+
+parser! {
+    /// Parse a `>greentext` blockquote.
+    fn quote_parser['a, Input](db: &'a Database)(Input) -> BlockItem
+    where [Input: Stream<Token = char>]
+    {
+        char('>')
+            .skip(line_spaces())
+            .with(line_items_parser(db))
+            .skip(newline())
+            .map(BlockItem::Quote)
+    }
+}
+
+parser! {
+    /// Parse any kind of block text not covered by the above block item
+    /// parsers.
+    fn text_parser['a, Input](db: &'a Database)(Input) -> BlockItem
+    where [Input: Stream<Token = char>]
+    {
+        line_items_parser(db).skip(newline()).map(BlockItem::Text)
+    }
+}
+
+parser! {
     fn post_body_parser['a, Input](db: &'a Database)(Input) -> PostBody
     where [Input: Stream<Token = char>]
     {
@@ -184,6 +207,7 @@ parser! {
     }
 }
 
+/// A parsed post body which can be rendered into HTML.
 pub struct PostBody(Vec<BlockItem>);
 
 impl PostBody {
@@ -249,6 +273,7 @@ impl RenderOnce for PostBody {
     }
 }
 
+/// A block-level item.
 #[derive(Debug)]
 enum BlockItem {
     Header(Vec<LineItem>),
@@ -278,7 +303,7 @@ impl Render for BlockItem {
                         p {
                             @ for item in items {
                                 : item
-                            }
+                           }
                         }
                     }
                 }
@@ -321,6 +346,10 @@ impl RenderOnce for BlockItem {
     }
 }
 
+/// An item within a line.
+///
+/// Specifically, these items can appear within headers, quotes, and normal text
+/// blocks.
 #[derive(Debug)]
 enum LineItem {
     Strong(String),

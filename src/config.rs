@@ -66,6 +66,7 @@ pub struct Config {
     pub dns_block_list: Vec<String>,
 }
 
+/// Helper for deserializing allowed file types.
 fn de_allowed_file_types<'de, D>(
     de: D,
 ) -> std::result::Result<Vec<Mime>, D::Error>
@@ -87,6 +88,10 @@ where
     })
 }
 
+/// Helper for deserializing the file size limit for uploaded files.
+///
+/// Limit is number of bytes bytes and an optional prefix K, M, or G for KiB,
+/// MiB, or GiB.
 fn de_file_size_limit<'de, D>(de: D) -> std::result::Result<u64, D::Error>
 where
     D: Deserializer<'de>,
@@ -201,7 +206,7 @@ impl Config {
         }
     }
 
-    /// Get all of the banners.
+    /// Get all of the page banners.
     pub fn banners(&self) -> Result<Vec<Banner>> {
         let path = self.resource_dir.join("banners");
         let iter = read_dir(&path).map_err(|cause| Error::IoErrorMsg {
@@ -220,7 +225,7 @@ impl Config {
         Ok(banners)
     }
 
-    /// Choose a banner at random.
+    /// Choose a page banner at random.
     pub fn choose_banner(&self) -> Result<Banner> {
         let mut rng = thread_rng();
         let mut banners = self.banners()?;
@@ -380,6 +385,7 @@ pub struct FilterRule {
     pub replace_with: String,
 }
 
+/// Helper for deserializing filter rule patterns.
 fn de_pattern<'de, D>(de: D) -> std::result::Result<Regex, D::Error>
 where
     D: Deserializer<'de>,
@@ -396,6 +402,7 @@ pub struct Banner {
 }
 
 impl Banner {
+    /// The URI of the banner.
     pub fn uri(&self) -> String {
         uri!(crate::routes::banner: PathBuf::from(&self.name)).to_string()
     }

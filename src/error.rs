@@ -160,6 +160,10 @@ pub enum Error {
 }
 
 impl Error {
+    /// Convert from an I/O error with an added message.
+    ///
+    /// This is useful e.g. when opening a file; the error messages from the
+    /// standard library are usually not helpful at all.
     pub fn from_io_error<S>(cause: std::io::Error, msg: S) -> Error
     where
         S: Into<String>,
@@ -194,6 +198,13 @@ impl<'r> Responder<'r> for Error {
             }
 
             Error::IpIsBlocked { .. } | Error::IpIsBlockedDnsbl { .. } => {
+                // We don't want to show the client the exact error message, as
+                // it may contain information that we don't want spammers to
+                // know.
+                //
+                // The error message is still logged to help administrators
+                // troubleshoot issues.
+
                 warn!("{}", &self);
 
                 let context = req.guard::<Context>().unwrap();

@@ -483,7 +483,6 @@ pub fn handle_delete(
     }
 
     let post = db.post(post_id)?;
-    let thread = db.parent_thread(post_id)?;
 
     let hash = post.delete_hash.ok_or(Error::DeleteInvalidPassword)?;
 
@@ -499,7 +498,7 @@ pub fn handle_delete(
     }
 
     let msg = if delete_thread {
-        db.delete_thread(thread.id)?;
+        db.delete_thread(post.thread_id)?;
         format!("Deleted thread {} successfully.", post.thread_id)
     } else if delete_files_only {
         db.delete_files_of_post(post_id)?;
@@ -510,9 +509,9 @@ pub fn handle_delete(
     };
 
     let redirect_uri = if delete_thread {
-        uri!(board: thread.board_name, 1)
+        uri!(board: post.board_name, 1)
     } else {
-        uri!(thread: thread.board_name, thread.id)
+        uri!(thread: post.board_name, post.id)
     };
 
     Ok(ActionSuccessPage::new(
