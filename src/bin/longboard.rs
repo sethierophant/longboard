@@ -146,5 +146,7 @@ fn main() {
             // stderr.
             eprintln!("{}", e);
         }
+
+        std::process::exit(-1);
     }
 }
