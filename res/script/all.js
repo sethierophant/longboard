@@ -48,6 +48,7 @@ function expandVideo(target) {
     target.parentNode.replaceChild(video, target);
 }
 
+/* Close a post's video. */
 function closeVideo(target) {
     var video = target.parentElement.querySelector('video');
 
