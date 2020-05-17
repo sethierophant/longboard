@@ -281,9 +281,9 @@ pub fn form_help(context: Context, conf: Conf) -> Result<Template> {
         to_value(conf.file_size_limit)?,
     );
     data.insert(
-        "allowed_file_types".to_string(),
+        "allow_file_types".to_string(),
         to_value(
-            conf.allowed_file_types
+            conf.allow_file_types
                 .iter()
                 .map(|content_type| content_type.to_string())
                 .collect::<Vec<String>>(),

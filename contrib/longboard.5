@@ -52,7 +52,10 @@ The site notice. This file should be a markdown file. If this option is set,
 the contents of this file are rendered into HTML and displayed at the top of
 every board/thread page.
 .TP
-.B allowed_file_types
+.B allow_uploads
+Allow users to upload files.
+.TP
+.B allow_file_types
 The list of allowed file types for uploads. Right now, longboard only supports
 image and video thumbnailing, so e.g. audio files or pdf uploads won't work.
 .TP
@@ -60,6 +63,20 @@ image and video thumbnailing, so e.g. audio files or pdf uploads won't work.
 The maximum file size for user-uploaded files. This value can be a size in
 bytes, or a size with a suffix. The suffix can be K for kibibytes, M for
 mebibytes, or G for gibibytes.
+.TP
+.B rate_limit_same_user
+How long to rate limit posts with the same IP address. When this option is more
+than 0, a user won't be able to make a post if they've already made a post in
+the rate limit duration. For example, if the rate limit is 10 seconds, a user
+will only be able to create a post every 10 seconds.
+.IP
+This option accepts a duration suffixed with S, M, H, or D for seconds,
+minutes, hours, or days.
+.TP
+.B rate_limit_same_content
+Like \fBrate_limit_same_user\fR but instead of rate limiting based on the IP
+address, rate limit based on the post contents. Only checks the contents of the
+post body.
 .TP
 .B filter_rules
 A list of filter rules to filter posts with. Each item in this list should have
@@ -111,9 +128,15 @@ names_path
 .IP \[bu]
 notice_path
 .IP \[bu]
-allowed_file_types
+allow_uploads
+.IP \[bu]
+allow_file_types
 .IP \[bu]
 file_size_limit
+.IP \[bu]
+rate_limit_same_ip
+.IP \[bu]
+rate_limit_same_content
 .IP \[bu]
 filter_rules
 .IP \[bu]

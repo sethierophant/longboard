@@ -408,6 +408,7 @@ nav a {
 }
 
 .post-image.spoiler img {
+    cursor: help;
     width: 200px;
     height: 200px;
 }

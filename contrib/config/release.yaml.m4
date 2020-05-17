@@ -30,8 +30,11 @@ upload_dir: RESDIR/longboard/uploads
 # A notice message that will be displayed at the top of each board/thread.
 #notice: /etc/longboard/notice.md
 
+# Whether or not to allow users to upload files.
+allow_uploads: true
+
 # The allowed file types for file uploads.
-allowed_file_types:
+allow_file_types:
     - image/png
     - image/jpeg
     - image/gif
@@ -44,6 +47,12 @@ allowed_file_types:
 
 # The maximum size for user-uploaded files.
 file_size_limit: 4M
+
+# How long to rate limit posts with the same IP address.
+rate_limit_same_user: 10s
+
+# How long to rate limit posts with identical content.
+rate_limit_same_content: 2m
 
 # Rules to filter posts with. The pattern is parsed as a regex.
 # See https://docs.rs/regex/1.3.7/regex/#syntax for regex syntax.

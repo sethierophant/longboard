@@ -2,7 +2,8 @@ pages_dir: contrib/config/pages
 names: contrib/config/names.txt
 notice: contrib/config/notice.md
 
-allowed_file_types:
+allow_uploads: false
+allow_file_types:
     - image/png
     - image/jpeg
     - image/gif
@@ -12,6 +13,8 @@ allowed_file_types:
     - video/webm
     - video/mp4
     - video/ogg
+
+rate_limit_same_user: 10s
 
 filter_rules:
     - pattern: word\s?filter

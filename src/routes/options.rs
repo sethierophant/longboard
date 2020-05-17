@@ -71,8 +71,6 @@ pub fn options(context: Context) -> Result<OptionsPage> {
 pub fn update_options<'r>(
     user_options: Form<UserOptions>,
 ) -> Result<Response<'r>> {
-    log::debug!("New options: {:?}", user_options);
-
     let mut res = Response::build();
 
     res.status(Status::SeeOther);

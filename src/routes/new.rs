@@ -203,6 +203,14 @@ fn create_post(
     user: User,
     session: Option<Session>,
 ) -> Result<PostId> {
+    if db.user_rate_limit_exceeded(user.id, *conf.rate_limit_same_user)? {
+        return Err(Error::UserRateLimitExceeded);
+    }
+
+    if entries.field("file").is_some() && !conf.allow_uploads {
+        return Err(Error::FileUploadNotAllowed);
+    }
+
     let body_param = entries
         .param("body")
         .filter(|body| !body.trim().is_empty())
@@ -211,6 +219,11 @@ fn create_post(
         })?;
 
     let body = PostBody::parse(body_param, conf.filter_rules, db)?.into_html();
+
+    let limit = *conf.rate_limit_same_content;
+    if db.content_rate_limit_exceeded(&body, limit)? {
+        return Err(Error::ContentRateLimitExceeded);
+    }
 
     let author_name = if let Some(param) = entries.param("author") {
         param.to_string()
@@ -318,7 +331,7 @@ fn create_file(
     // v0.2.6) to mime::Mime (mime v0.3.16).
     let content_type: Mime = content_type.to_string().parse().unwrap();
 
-    if !conf.allowed_file_types.contains(&content_type) {
+    if !conf.allow_file_types.contains(&content_type) {
         return Err(Error::UploadBadContentType { content_type });
     }
 

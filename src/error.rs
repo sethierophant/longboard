@@ -22,16 +22,22 @@ use crate::views::Context;
 pub enum Error {
     #[display(fmt = "A database operation was called on a mock database")]
     DatabaseIsMock,
-    #[display(fmt = "The IP {} was in the server block list", ip)]
+    #[display(fmt = "The IP {} was found in the server block list", ip)]
     IpIsBlocked { ip: IpAddr },
-    #[display(fmt = "The IP {} was in found in {} ({})", ip, dnsbl, result)]
+    #[display(fmt = "The IP {} was found in {} ({})", ip, dnsbl, result)]
     IpIsBlockedDnsbl {
         dnsbl: String,
         result: IpAddr,
         ip: IpAddr,
     },
+    #[display(fmt = "File uploads are not allowed.")]
+    FileUploadNotAllowed,
     #[display(fmt = "Banned user {} attempted to access page", user_hash)]
     UserIsBanned { user_hash: String },
+    #[display(fmt = "Rate limit exceeded for IP.")]
+    UserRateLimitExceeded,
+    #[display(fmt = "Rate limit exceeded for post content.")]
+    ContentRateLimitExceeded,
     #[display(fmt = "User with ip {} was not found in the database", ip_addr)]
     UserNotFound { ip_addr: IpAddr },
     #[display(fmt = "Board '{}' not found", board_name)]
@@ -185,7 +191,8 @@ impl<'r> Responder<'r> for Error {
             | Error::StaffInvalidUsername { .. }
             | Error::StaffInvalidPassword { .. }
             | Error::ReportTooLong
-            | Error::ThreadLocked => {
+            | Error::ThreadLocked
+            | Error::FileUploadNotAllowed => {
                 warn!("{}", &self);
 
                 let context = req.guard::<Context>().unwrap();
@@ -210,6 +217,24 @@ impl<'r> Responder<'r> for Error {
                 let context = req.guard::<Context>().unwrap();
                 let page = SpamDetectedPage::new(
                     "Your IP address was found in a block list.".to_string(),
+                    &context,
+                );
+
+                let mut res = page.respond_to(req)?;
+                res.set_status(Status::Forbidden);
+
+                Ok(res)
+            }
+
+            Error::UserRateLimitExceeded | Error::ContentRateLimitExceeded => {
+                // Same as for IP being blocked; we don't want to show the exact
+                // error message to the client.
+
+                warn!("{}", &self);
+
+                let context = req.guard::<Context>().unwrap();
+                let page = SpamDetectedPage::new(
+                    "Rate limit exceeded.".to_string(),
                     &context,
                 );
 

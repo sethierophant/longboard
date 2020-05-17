@@ -5,12 +5,12 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 
 use chrono::offset::Utc;
-use chrono::DateTime;
+use chrono::{DateTime, Duration};
 
-use diesel::dsl::count;
+use diesel::dsl::{count, exists};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sql_types::{Integer, Text};
-use diesel::{delete, insert_into, prelude::*, sql_query, update};
+use diesel::{delete, insert_into, prelude::*, select, sql_query, update};
 
 use diesel_migrations::embed_migrations;
 
@@ -1007,5 +1007,40 @@ impl Database {
             .load(&self.pool()?.get()?)?;
 
         Ok(files.into_iter().map(File::from).collect())
+    }
+
+    /// Check if the user has made any posts recently.
+    pub fn user_rate_limit_exceeded(
+        &self,
+        user_id: UserId,
+        limit: Duration,
+    ) -> Result<bool> {
+        use crate::schema::post::columns as post_columns;
+        use crate::schema::post::dsl::post;
+
+        let query = post
+            .filter(post_columns::user_id.eq(user_id))
+            .filter(post_columns::time_stamp.gt(Utc::now() - limit));
+
+        Ok(select(exists(query)).get_result(&self.pool()?.get()?)?)
+    }
+
+    /// Check if a post has been made with the given content within recently.
+    pub fn content_rate_limit_exceeded<S>(
+        &self,
+        post_body: S,
+        limit: Duration,
+    ) -> Result<bool>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::post::columns as post_columns;
+        use crate::schema::post::dsl::post;
+
+        let query = post
+            .filter(post_columns::body.eq(post_body.as_ref()))
+            .filter(post_columns::time_stamp.gt(Utc::now() - limit));
+
+        Ok(select(exists(query)).get_result(&self.pool()?.get()?)?)
     }
 }

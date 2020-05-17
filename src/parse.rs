@@ -237,8 +237,6 @@ impl PostBody {
             content.push('\n');
         }
 
-        log::debug!("Parser input: {:?}", &content);
-
         let (output, _input) = post_body_parser(db)
             .easy_parse(position::Stream::new(content.as_str()))
             .map_err(|err| Error::ParseError(err.to_string()))?;

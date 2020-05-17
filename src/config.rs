@@ -1,11 +1,14 @@
 //! App configuration.
 
+use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::fs::{read_dir, read_to_string, File};
 use std::io::{BufRead, BufReader};
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
+
+use chrono::Duration;
 
 use mime::Mime;
 
@@ -94,7 +97,12 @@ impl Config {
             pages_dir: self.global_config.pages_dir.as_deref(),
             names_path: self.global_config.names_path.as_deref(),
             notice_path: self.global_config.notice_path.as_deref(),
-            allowed_file_types: self.global_config.allowed_file_types.as_ref(),
+            allow_uploads: self.global_config.allow_uploads,
+            allow_file_types: self.global_config.allow_file_types.as_ref(),
+            rate_limit_same_user: &self.global_config.rate_limit_same_user,
+            rate_limit_same_content: &self
+                .global_config
+                .rate_limit_same_content,
             file_size_limit: self.global_config.file_size_limit,
             filter_rules: self.global_config.filter_rules.as_ref(),
             custom_styles: self.global_config.custom_styles.as_slice(),
@@ -139,13 +147,24 @@ impl Config {
                 .notice_path
                 .as_deref()
                 .or(self.global_config.notice_path.as_deref()),
-            allowed_file_types: ext_conf
-                .allowed_file_types
+            allow_uploads: ext_conf
+                .allow_uploads
+                .unwrap_or(self.global_config.allow_uploads),
+            allow_file_types: ext_conf
+                .allow_file_types
                 .as_ref()
-                .unwrap_or(self.global_config.allowed_file_types.as_ref()),
+                .unwrap_or(self.global_config.allow_file_types.as_ref()),
             file_size_limit: ext_conf
                 .file_size_limit
                 .unwrap_or(self.global_config.file_size_limit),
+            rate_limit_same_user: ext_conf
+                .rate_limit_same_user
+                .as_ref()
+                .unwrap_or(&self.global_config.rate_limit_same_user),
+            rate_limit_same_content: ext_conf
+                .rate_limit_same_user
+                .as_ref()
+                .unwrap_or(&self.global_config.rate_limit_same_content),
             filter_rules: ext_conf
                 .filter_rules
                 .as_ref()
@@ -198,12 +217,20 @@ pub struct GlobalConfig {
     /// The path to a notice file to be displayed at the top of each board.
     #[serde(rename = "notice")]
     pub notice_path: Option<PathBuf>,
-    /// Allowed file types for file uploads.
-    #[serde(deserialize_with = "de_allowed_file_types")]
-    pub allowed_file_types: Vec<Mime>,
+    /// Allow users to upload files.
+    pub allow_uploads: bool,
+    /// Allow these file types for file uploads.
+    #[serde(deserialize_with = "de_allow_file_types")]
+    pub allow_file_types: Vec<Mime>,
     /// The file size limit for uploaded files.
     #[serde(deserialize_with = "de_file_size_limit")]
     pub file_size_limit: u64,
+    /// How long to rate limit posts with the same IP address.
+    #[serde(deserialize_with = "de_duration")]
+    pub rate_limit_same_user: Duration,
+    /// How long to rate limit posts with identical content.
+    #[serde(deserialize_with = "de_duration")]
+    pub rate_limit_same_content: Duration,
     /// Filter rules to apply to posts.
     pub filter_rules: Vec<FilterRule>,
     /// Custom styles.
@@ -309,10 +336,13 @@ impl Default for GlobalConfig {
                 log_file: None,
                 names_path: None,
                 notice_path: None,
-                allowed_file_types: Vec::new(),
+                allow_uploads: false,
+                allow_file_types: Vec::new(),
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
                 file_size_limit: 2u64.pow(20) * 2, // 2 MiB
+                rate_limit_same_user: Duration::zero(),
+                rate_limit_same_content: Duration::zero(),
                 allow_list: Vec::new(),
                 block_list: Vec::new(),
                 dns_block_list: Vec::new(),
@@ -332,10 +362,13 @@ impl Default for GlobalConfig {
                 log_file: Some(PathBuf::from(logdir).join("longboard.log")),
                 names_path: None,
                 notice_path: None,
-                allowed_file_types: Vec::new(),
+                allow_uploads: false,
+                allow_file_types: Vec::new(),
                 filter_rules: Vec::new(),
                 custom_styles: Vec::new(),
                 file_size_limit: 2u64.pow(20) * 2, // 2 MiB
+                rate_limit_same_user: Duration::seconds(10),
+                rate_limit_same_content: Duration::minutes(2),
                 allow_list: Vec::new(),
                 block_list: Vec::new(),
                 dns_block_list: Vec::new(),
@@ -344,8 +377,26 @@ impl Default for GlobalConfig {
     }
 }
 
+/// Helper for deserializing durations.
+fn de_duration<'de, D>(de: D) -> std::result::Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    String::deserialize(de)
+        .and_then(|s| parse_duration(s).map_err(serde::de::Error::custom))
+}
+
+/// Helper for deserializing filter rule patterns.
+fn de_pattern<'de, D>(de: D) -> std::result::Result<Regex, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    String::deserialize(de)
+        .and_then(|s| Regex::new(&s).map_err(serde::de::Error::custom))
+}
+
 /// Helper for deserializing allowed file types.
-fn de_allowed_file_types<'de, D>(
+fn de_allow_file_types<'de, D>(
     de: D,
 ) -> std::result::Result<Vec<Mime>, D::Error>
 where
@@ -381,12 +432,20 @@ pub struct ExtensionConfig {
     /// The path to a notice file to be displayed at the top of each board.
     #[serde(rename = "notice")]
     pub notice_path: Option<PathBuf>,
+    /// Whether to allow user file uploads.
+    pub allow_uploads: Option<bool>,
     /// Allowed file types for file uploads.
-    #[serde(deserialize_with = "de_option_allowed_file_types")]
-    pub allowed_file_types: Option<Vec<Mime>>,
+    #[serde(deserialize_with = "de_option_allow_file_types")]
+    pub allow_file_types: Option<Vec<Mime>>,
     /// The file size limit for uploaded files.
     #[serde(deserialize_with = "de_option_file_size_limit")]
     pub file_size_limit: Option<u64>,
+    /// How long to rate limit posts with the same IP address.
+    #[serde(deserialize_with = "de_option_duration")]
+    pub rate_limit_same_user: Option<Duration>,
+    /// How long to rate limit posts with identical content.
+    #[serde(deserialize_with = "de_option_duration")]
+    pub rate_limit_same_content: Option<Duration>,
     /// Filter rules to apply to posts.
     pub filter_rules: Option<Vec<FilterRule>>,
     /// Custom styles.
@@ -471,8 +530,11 @@ impl Default for ExtensionConfig {
             pages_dir: None,
             names_path: None,
             notice_path: None,
-            allowed_file_types: None,
+            allow_uploads: None,
+            allow_file_types: None,
             file_size_limit: None,
+            rate_limit_same_user: None,
+            rate_limit_same_content: None,
             filter_rules: None,
             custom_styles: None,
             allow_list: None,
@@ -482,8 +544,23 @@ impl Default for ExtensionConfig {
     }
 }
 
+/// Helper for deserializing durations.
+fn de_option_duration<'de, D>(
+    de: D,
+) -> std::result::Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<String>::deserialize(de).and_then(|s| match s {
+        Some(s) => parse_duration(s)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+        None => Ok(None),
+    })
+}
+
 /// Helper for deserializing allowed file types for extension configs.
-fn de_option_allowed_file_types<'de, D>(
+fn de_option_allow_file_types<'de, D>(
     de: D,
 ) -> std::result::Result<Option<Vec<Mime>>, D::Error>
 where
@@ -519,15 +596,6 @@ pub struct FilterRule {
     #[serde(deserialize_with = "de_pattern")]
     pub pattern: Regex,
     pub replace_with: String,
-}
-
-/// Helper for deserializing filter rule patterns.
-fn de_pattern<'de, D>(de: D) -> std::result::Result<Regex, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    String::deserialize(de)
-        .and_then(|s| Regex::new(&s).map_err(serde::de::Error::custom))
 }
 
 /// A banner to be displayed at the top of the page.
@@ -568,7 +636,7 @@ where
 
 /// Parse a file size limit.
 ///
-/// The limit is number of bytes and an optional prefix K, M, or G for KiB, MiB,
+/// The limit is number of bytes and an optional suffix K, M, or G for KiB, MiB,
 /// or GiB.
 fn parse_file_size_limit<S>(limit: S) -> std::result::Result<u64, String>
 where
@@ -600,6 +668,40 @@ where
     }
 }
 
+/// Parse a duration.
+///
+/// The duration is number followed by a suffix S, M, H, or D for seconds,
+/// minutes, hours, or days.
+fn parse_duration<S>(limit: S) -> std::result::Result<Duration, String>
+where
+    S: AsRef<str>,
+{
+    if limit.as_ref() == "0" {
+        return Ok(Duration::zero());
+    }
+
+    let re = Regex::new("(\\d+)([sSmMhHdD])").unwrap();
+
+    if let Some(captures) = re.captures(limit.as_ref()) {
+        let size: u64 = captures
+            .get(1)
+            .ok_or(String::from("invalid duration"))?
+            .as_str()
+            .parse()
+            .map_err(|err| format!("invalid duration: {}", err))?;
+
+        Ok(match &*captures.get(2).unwrap().as_str().to_uppercase() {
+            "S" => Duration::seconds(size.try_into().unwrap()),
+            "M" => Duration::minutes(size.try_into().unwrap()),
+            "H" => Duration::hours(size.try_into().unwrap()),
+            "D" => Duration::days(size.try_into().unwrap()),
+            _ => unreachable!(),
+        })
+    } else {
+        Err(String::from("expected duration"))
+    }
+}
+
 /// Like `Config`, but with borrowed values.
 ///
 /// These values are mostly borrowed from the global config. If an extension is
@@ -626,10 +728,16 @@ pub struct Conf<'a> {
     pub names_path: Option<&'a Path>,
     /// The path to a notice file to be displayed at the top of each board.
     pub notice_path: Option<&'a Path>,
+    /// Whether to allow user file uploads.
+    pub allow_uploads: bool,
     /// Allowed file types for file uploads.
-    pub allowed_file_types: &'a [Mime],
+    pub allow_file_types: &'a [Mime],
     /// The file size limit for uploaded files.
     pub file_size_limit: u64,
+    /// How long to rate limit posts with the same IP address.
+    pub rate_limit_same_user: &'a Duration,
+    /// How long to rate limit posts with identical content.
+    pub rate_limit_same_content: &'a Duration,
     /// Filter rules to apply to posts.
     pub filter_rules: &'a [FilterRule],
     /// Custom styles.
