@@ -1,11 +1,11 @@
 .ad l
 .TH longboard 5 2020-04-20
-.SH Name
+.SH NAME
 longboard \- imageboard engine
-.SH Synopsis
+.SH SYNOPSIS
 .B /etc/longboard/config.yaml
-.SH Description
-The file \fBconfig.yaml\fR contains configuration information for longboard.
+.SH DESCRIPTION
+The file \fBconfig.yaml\fR contains configuration options for longboard.
 The following options are recognized:
 .TP
 .B site_name
@@ -96,7 +96,45 @@ add to this list.
 .IP
 Like \fBblock_list\fR, these lists are only checked when a user is creating an
 anonymous resource, like a thread, post, or post report.
-.SH Files
+.SH EXTENSIONS
+In addition to the configuration options listed above, longboard also supports
+adding profiles to enable using different configurations for different classes
+of users. These configuration profiles are called "extensions".
+.PP
+To create a new extension, create a new YAML file in the configuration
+directory with the name of your extension. You can include the following
+options in this file:
+.IP \[bu] 3
+pages_dir
+.IP \[bu]
+names_path
+.IP \[bu]
+notice_path
+.IP \[bu]
+allowed_file_types
+.IP \[bu]
+file_size_limit
+.IP \[bu]
+filter_rules
+.IP \[bu]
+custom_styles
+.IP \[bu]
+allow_list
+.IP \[bu]
+block_list
+.IP \[bu]
+dns_block_list
+.PP
+These options are equivalent to the options for the global configuration. Any
+options not set will default to the options you set in the global
+configuration.
+.PP
+Longboard will use these extensions if the HTTP header
+\fBX-LONGBOARD-EXTENSION\fR is set. The value of this header is the extension
+name. For example, if the header is set to "\fITor\fR", longboard will load
+additional options from \fI/etc/longboard/tor.yaml\fR. You can set this header
+using a reverse proxy like nginx.
+.SH FILES
 .B /etc/longboard/config.yaml
-.SH See Also
+.SH SEE ALSO
 longboard(8), longctl(1)

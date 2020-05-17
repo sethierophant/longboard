@@ -1,25 +1,29 @@
 .ad l
 .TH longboard 8 2020-04-20
-.SH Name
+.SH NAME
 longboard \- imageboard engine
-.SH Synopsis
+.SH SYNOPSIS
 .B longboard
 [\fB-c\fR \fIconfig\fR] 
+[\fB-x\fR \fIdir\fR]
 [\fB-l\fR \fIlogfile\fR]
 [\fB-u\fR \fIURI\fR]
 [\fB-d\fR] [\fB-a\fR] [\fB-h\fR] [\fB-V\fR]
-.SH Description
+.SH DESCRIPTION
 .B longboard
-is an imageboard engine. In general, you should start this program with a daemon manager such
-as systemd.
+is an imageboard engine. In general, you should start this program with a
+daemon manager such as systemd.
 .PP
 Options that have the same name as options in the config file, such as
 \fB\-\-log-file\fR and \fB\-\-database-uri\fR, will override the values from
 the config file if provided.
-.SH Options
+.SH OPTIONS
 .TP
 .BR \-c ", " \-\-config " " \fIconfig\fR
 The config file to load. Defaults to \fI/etc/longboard/config.yaml\fR.
+.TP
+.BR \-x ", " \-\-extension-dir " " \fIdir\fR
+The directory to search for extensions.
 .TP
 .BR \-l ", " \-\-log-file " " \fIlogfile\fR
 The log file to use. If \fI-\fR is given as the value to this option, longboard
@@ -41,5 +45,5 @@ Show a help message.
 .TP
 .BR \-V ", " \-\-version
 Show the program version.
-.SH See Also
+.SH SEE ALSO
 longboard(5), longctl(1)

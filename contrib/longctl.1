@@ -1,10 +1,10 @@
 .ad l
 .TH longboard 8 2020-04-20
-.SH Name
+.SH NAME
 longboard \- imageboard engine
-.SH Synopsis
+.SH SYNOPSIS
 .B longctl
-[\fB-c\fR \fIconfig\fR] [\fB-h\fR] [\fB-V\fR] [\fICOMMAND\fR]
+[\fB-c\fR \fIconfig\fR] [\fB-x\fR \fIdir\fR] [\fB-h\fR] [\fB-V\fR] [\fICOMMAND\fR]
 .br
 .B longctl
 [\fIOPTIONS\fR...] add-staff \fB-u\fR \fINAME\fR \fB-p\fR \fIPASS\fR
@@ -12,13 +12,16 @@ longboard \- imageboard engine
 .br
 .B longctl
 [\fIOPTIONS\fR...] remove-staff \fB-u\fR \fINAME\fR
-.SH Description
+.SH DESCRIPTION
 .B longctl
 is a tool for managing a longboard instance.
-.SH Options
+.SH OPTIONS
 .TP
 .BR \-c ", " \-\-config " " \fIconfig\fR
 The config file to load. Defaults to \fI/etc/longboard/config.yaml\fR.
+.TP
+.BR \-x ", " \-\-extension-dir " " \fIdir\fR
+The directory to search for extensions.
 .TP
 .BR \-h ", " \-\-help
 Show a help message.
@@ -42,5 +45,5 @@ Remove a staff member.
 .TP
 .BR \-u ", " \-\-user " " \fINAME\fR
 The name of the staff member to remove.
-.SH See Also
+.SH SEE ALSO
 longboard(5), longboard(8)

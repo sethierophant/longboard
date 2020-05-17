@@ -21,7 +21,7 @@ use serde_json::value::{to_value, Value as JsonValue};
 
 use crate::models::*;
 use crate::views::*;
-use crate::{config::Config, Error, Result};
+use crate::{config::Conf, Error, Result};
 
 pub mod new;
 pub mod options;
@@ -36,9 +36,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for NotBlocked {
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let config = request
-            .guard::<State<Config>>()
-            .expect("expected config to be initialized");
+        let conf = request
+            .guard::<Conf>()
+            .expect("couldn't load configuration");
 
         // If we are using a local request (i.e., if we're running a test) then
         // we might not have an IP address. In production, all requests should
@@ -53,18 +53,18 @@ impl<'a, 'r> FromRequest<'a, 'r> for NotBlocked {
             return Outcome::Success(NotBlocked);
         }
 
-        if config.allow_list.contains(&ip) {
+        if conf.allow_list.contains(&ip) {
             return Outcome::Success(NotBlocked);
         }
 
-        if config.block_list.contains(&ip) {
+        if conf.block_list.contains(&ip) {
             return Outcome::Failure((
                 Status::Forbidden,
                 Error::IpIsBlocked { ip },
             ));
         }
 
-        for dnsbl in config.dns_block_list.iter() {
+        for dnsbl in conf.dns_block_list.iter() {
             let host = format!("{}.{}:42069", ip, dnsbl);
 
             if let Ok(mut addrs) = host.to_socket_addrs() {
@@ -173,50 +173,47 @@ pub fn routes() -> Vec<Route> {
 
 /// Serve a static file.
 #[get("/file/<file..>", rank = 1)]
-pub fn static_file(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.resource_dir.join(file))?)
+pub fn static_file(file: PathBuf, conf: Conf) -> Result<NamedFile> {
+    Ok(NamedFile::open(conf.resource_dir.join(file))?)
 }
 
 /// Serve a stylesheet.
 #[get("/file/style/<file..>", rank = 0)]
-pub fn style(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(
-        config.resource_dir.join("style").join(file),
-    )?)
+pub fn style(file: PathBuf, conf: Conf) -> Result<NamedFile> {
+    Ok(NamedFile::open(conf.resource_dir.join("style").join(file))?)
 }
 
 /// Serve a script.
 #[get("/file/script/<file..>", rank = 0)]
-pub fn script(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn script(file: PathBuf, conf: Conf) -> Result<NamedFile> {
     Ok(NamedFile::open(
-        config.resource_dir.join("script").join(file),
+        conf.resource_dir.join("script").join(file),
     )?)
 }
 
 /// Serve a banner.
 #[get("/file/banner/<file..>", rank = 0)]
-pub fn banner(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
+pub fn banner(file: PathBuf, conf: Conf) -> Result<NamedFile> {
     Ok(NamedFile::open(
-        config.resource_dir.join("banners").join(file),
+        conf.resource_dir.join("banners").join(file),
     )?)
 }
 
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
-pub fn upload(file: PathBuf, config: State<Config>) -> Result<NamedFile> {
-    Ok(NamedFile::open(config.upload_dir.join(file)).or_else(|_| {
-        NamedFile::open(config.resource_dir.join("deleted.png"))
-    })?)
+pub fn upload(file: PathBuf, conf: Conf) -> Result<NamedFile> {
+    Ok(NamedFile::open(conf.upload_dir.join(file))
+        .or_else(|_| NamedFile::open(conf.resource_dir.join("deleted.png")))?)
 }
 
 /// Load a admin-created page.
-fn load_page<S>(page_name: S, config: &Config) -> Result<String>
+fn load_page<S>(page_name: S, conf: Conf) -> Result<String>
 where
     S: AsRef<str>,
 {
     let page_name = page_name.as_ref().to_lowercase();
 
-    if let Some(ref pages_dir) = config.pages_dir {
+    if let Some(ref pages_dir) = conf.pages_dir {
         let page_path = pages_dir.join(format!("{}.md", page_name));
 
         let page_contents = read_to_string(page_path).map_err(|_err| {
@@ -231,16 +228,14 @@ where
 
         Ok(page_html)
     } else {
-        Err(Error::CustomPageNotFound {
-            name: page_name,
-        })
+        Err(Error::CustomPageNotFound { name: page_name })
     }
 }
 
 /// Serve the home page.
 #[get("/", rank = 0)]
-pub fn home(config: State<Config>, context: Context) -> Result<HomePage> {
-    let contents = load_page("home", &config).ok();
+pub fn home(conf: Conf, context: Context) -> Result<HomePage> {
+    let contents = load_page("home", conf).ok();
     HomePage::new(contents, &context)
 }
 
@@ -248,12 +243,12 @@ pub fn home(config: State<Config>, context: Context) -> Result<HomePage> {
 #[get("/page/<page_name>", rank = 1)]
 pub fn custom_page(
     page_name: String,
-    config: State<Config>,
+    conf: Conf,
     context: Context,
 ) -> Result<Template> {
     let mut data = HashMap::new();
 
-    let page_html = load_page(&page_name, &config)?;
+    let page_html = load_page(&page_name, conf)?;
     data.insert("content".to_string(), JsonValue::String(page_html));
 
     data.insert(
@@ -271,7 +266,7 @@ pub fn custom_page(
 
 /// Serve a page with help on creating a thread or post.
 #[get("/form-help", rank = 0)]
-pub fn form_help(context: Context, config: State<Config>) -> Result<Template> {
+pub fn form_help(context: Context, conf: Conf) -> Result<Template> {
     let mut data = HashMap::new();
     data.insert(
         "page_info".to_string(),
@@ -283,13 +278,12 @@ pub fn form_help(context: Context, config: State<Config>) -> Result<Template> {
     );
     data.insert(
         "file_size_limit".to_string(),
-        to_value(config.file_size_limit)?,
+        to_value(conf.file_size_limit)?,
     );
     data.insert(
         "allowed_file_types".to_string(),
         to_value(
-            config
-                .allowed_file_types
+            conf.allowed_file_types
                 .iter()
                 .map(|content_type| content_type.to_string())
                 .collect::<Vec<String>>(),

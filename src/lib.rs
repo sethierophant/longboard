@@ -102,11 +102,13 @@ pub mod sql_types {
 }
 
 /// Create a new rocket instance for our application.
-pub fn new_instance(conf: Config) -> Result<Rocket> {
+pub fn new_instance(config: Config) -> Result<Rocket> {
+    let conf = config.global();
+
     let template_dir = conf.resource_dir.join("templates");
 
     let rocket_conf = RocketConfig::build(Environment::Development)
-        .address(&conf.address)
+        .address(conf.address)
         .port(conf.port)
         .log_level(LoggingLevel::Off)
         .extra("template_dir", template_dir.display().to_string())
@@ -115,8 +117,8 @@ pub fn new_instance(conf: Config) -> Result<Rocket> {
 
     Ok(rocket::custom(rocket_conf)
         .mount("/", crate::routes::routes())
-        .manage(Database::new(&conf.database_uri)?)
-        .manage(conf)
+        .manage(Database::new(conf.database_uri)?)
+        .manage(config)
         .attach(Template::fairing())
         .attach(LogFairing))
 }

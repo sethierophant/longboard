@@ -11,21 +11,21 @@ use serde_json::value::{to_value, Value as JsonValue};
 use rocket::request::{FromRequest, Outcome};
 use rocket::{uri, Request, State};
 
-use crate::config::{Banner, Page as ConfigPage};
+use crate::config::{Banner, Conf, Page as ConfigPage};
 use crate::models::staff::Staff;
 use crate::models::*;
 use crate::routes::UserOptions;
-use crate::{config::Config, Error, Result};
+use crate::{Error, Result};
 
 pub mod error;
 pub mod staff;
 use staff::StaffView;
 
 /// Context that's needed to render a page.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Context<'r> {
     pub database: &'r Database,
-    pub config: &'r Config,
+    pub conf: Conf<'r>,
     pub options: UserOptions,
     pub staff: Option<Staff>,
 }
@@ -49,10 +49,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
         Outcome::Success(Context {
             database,
             staff,
-            config: req
-                .guard::<State<Config>>()
-                .expect("expected config to be initialized")
-                .inner(),
+            conf: req.guard::<Conf>().expect("couldn't load configuration"),
             options: req
                 .guard::<UserOptions>()
                 .expect("couldn't load user options from cookies"),
@@ -126,7 +123,7 @@ impl PageFooter {
     /// Create a new `PageFooter`.
     pub fn new(context: &Context) -> Result<PageFooter> {
         Ok(PageFooter {
-            pages: context.config.pages()?,
+            pages: context.conf.pages()?,
         })
     }
 }
@@ -167,8 +164,8 @@ impl PageHeader {
     {
         Ok(PageHeader {
             board: context.database.board(board_name)?,
-            banner: BannerView(context.config.choose_banner()?),
-            notice_html: context.config.notice()?,
+            banner: BannerView(context.conf.choose_banner()?),
+            notice_html: context.conf.notice()?,
         })
     }
 }
@@ -537,10 +534,10 @@ impl HomePage {
         context: &Context,
     ) -> Result<HomePage> {
         Ok(HomePage {
-            page_info: PageInfo::new(&context.config.site_name, context),
+            page_info: PageInfo::new(context.conf.site_name, context),
             page_nav: PageNav::new(context)?,
             page_footer: PageFooter::new(context)?,
-            site_name: context.config.site_name.clone(),
+            site_name: context.conf.site_name.to_string(),
             site_description,
             recent_posts: RecentPost::load(
                 context.database,
@@ -582,7 +579,7 @@ impl OptionsPage {
             page_footer: PageFooter::new(context)?,
             options: context.options.clone(),
             styles: context
-                .config
+                .conf
                 .custom_styles
                 .iter()
                 .map(|name| StyleOption {

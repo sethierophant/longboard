@@ -33,7 +33,7 @@ use rocket::{post, uri, Data, Request, Responder, State};
 use crate::models::*;
 use crate::parse::PostBody;
 use crate::routes::NotBlocked;
-use crate::{config::Config, Error, Result};
+use crate::{config::Conf, Error, Result};
 
 /// This is a workaround for Rocket's URI type not supporting fragments (the
 /// portion after #).
@@ -57,6 +57,7 @@ impl FragmentRedirect {
     }
 }
 
+/// Data guard for multipart/form-data entries.
 #[derive(Debug)]
 pub struct MultipartEntries(Entries);
 
@@ -67,9 +68,7 @@ impl data::FromDataSimple for MultipartEntries {
         let content_type = req
             .guard::<&ContentType>()
             .expect("expected request to have a content type");
-        let config = req
-            .guard::<State<Config>>()
-            .expect("expected config to be initialized");
+        let conf = req.guard::<Conf>().expect("couldn't load configuration");
 
         if !content_type.is_form_data() {
             return Outcome::Failure((
@@ -89,7 +88,7 @@ impl data::FromDataSimple for MultipartEntries {
                 }
             };
 
-        let stream = data.open().take(config.file_size_limit);
+        let stream = data.open().take(conf.file_size_limit);
 
         let entries = match Multipart::with_body(stream, boundary)
             .save()
@@ -148,10 +147,11 @@ impl MultipartEntries {
     }
 }
 
+/// Create a new thread.
 fn create_thread(
     board_name: String,
     entries: MultipartEntries,
-    config: &Config,
+    conf: Conf,
     db: &Database,
     user: User,
     session: Option<Session>,
@@ -180,7 +180,7 @@ fn create_thread(
         board_name.clone(),
         new_thread_id,
         entries,
-        config,
+        conf,
         db,
         user,
         session,
@@ -198,7 +198,7 @@ fn create_post(
     board_name: String,
     thread_id: ThreadId,
     entries: MultipartEntries,
-    config: &Config,
+    conf: Conf,
     db: &Database,
     user: User,
     session: Option<Session>,
@@ -210,13 +210,12 @@ fn create_post(
             param: "body".into(),
         })?;
 
-    let body =
-        PostBody::parse(body_param, &config.filter_rules, db)?.into_html();
+    let body = PostBody::parse(body_param, conf.filter_rules, db)?.into_html();
 
     let author_name = if let Some(param) = entries.param("author") {
         param.to_string()
     } else {
-        config.choose_name()?
+        conf.choose_name()?
     };
 
     // TODO: actually parse if this is an email, domain, ...
@@ -242,8 +241,7 @@ fn create_post(
                     } else {
                         let named_role = format!(
                             "{} ({})",
-                            session.staff.name,
-                            session.staff.role,
+                            session.staff.name, session.staff.role,
                         );
 
                         if ident == named_role {
@@ -296,7 +294,7 @@ fn create_post(
     }
 
     if entries.field("file").is_some() {
-        create_file(new_post_id, entries, config, db)?;
+        create_file(new_post_id, entries, conf, db)?;
     };
 
     Ok(new_post_id)
@@ -306,7 +304,7 @@ fn create_post(
 fn create_file(
     post_id: PostId,
     entries: MultipartEntries,
-    config: &Config,
+    conf: Conf,
     db: &Database,
 ) -> Result<()> {
     let field = entries.field("file").unwrap();
@@ -320,11 +318,11 @@ fn create_file(
     // v0.2.6) to mime::Mime (mime v0.3.16).
     let content_type: Mime = content_type.to_string().parse().unwrap();
 
-    if !config.allowed_file_types.contains(&content_type) {
+    if !conf.allowed_file_types.contains(&content_type) {
         return Err(Error::UploadBadContentType { content_type });
     }
 
-    let save_path = save_file(field, &content_type, &config.upload_dir)?;
+    let save_path = save_file(field, &content_type, conf.upload_dir)?;
     let save_name = save_path
         .file_name()
         .expect("bad filename for save path")
@@ -517,7 +515,7 @@ where
 pub fn new_thread(
     board_name: String,
     entries: MultipartEntries,
-    config: State<Config>,
+    conf: Conf,
     db: State<Database>,
     user: User,
     session: Option<Session>,
@@ -528,7 +526,7 @@ pub fn new_thread(
     }
 
     let new_thread_id = db.pool()?.get()?.transaction::<_, Error, _>(|| {
-        create_thread(board_name.clone(), entries, &config, &db, user, session)
+        create_thread(board_name.clone(), entries, conf, &db, user, session)
     })?;
 
     Ok(Redirect::to(uri!(
@@ -543,7 +541,7 @@ pub fn new_post(
     board_name: String,
     thread_id: ThreadId,
     entries: MultipartEntries,
-    config: State<Config>,
+    conf: Conf,
     db: State<Database>,
     user: User,
     session: Option<Session>,
@@ -561,7 +559,7 @@ pub fn new_post(
             board_name.clone(),
             thread_id,
             entries,
-            &config,
+            conf,
             &db,
             user,
             session,

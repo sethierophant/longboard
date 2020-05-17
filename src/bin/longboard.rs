@@ -9,7 +9,8 @@ use fern::colors::{Color, ColoredLevelConfig};
 
 use log::{debug, info, log_enabled};
 
-use longboard::{new_instance, Config, Error, Result};
+use longboard::config::{Config, ExtensionConfig, GlobalConfig};
+use longboard::{new_instance, Error, Result};
 
 fn main_res() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -23,6 +24,14 @@ fn main_res() -> Result<()> {
                 .value_name("FILE")
                 .takes_value(true)
                 .help("Config file to use"),
+        )
+        .arg(
+            Arg::with_name("extension-dir")
+                .short("x")
+                .long("extension-dir")
+                .value_name("DIR")
+                .takes_value(true)
+                .help("Directory of extension configs to use"),
         )
         .arg(
             Arg::with_name("log-file")
@@ -54,24 +63,32 @@ fn main_res() -> Result<()> {
         )
         .get_matches();
 
-    let mut conf = if let Some(path) = matches.value_of("config") {
-        Config::new(path)?
-    } else {
-        Config::new_default()?
-    };
+    let mut conf_path = GlobalConfig::default_path();
+    let mut extension_dir = ExtensionConfig::default_dir();
+
+    if let Some(path) = matches.value_of("config") {
+        conf_path = PathBuf::from(path);
+        extension_dir = conf_path.parent().expect("bad config path").to_owned();
+    }
+
+    if let Some(dir) = matches.value_of("extension-dir") {
+        extension_dir = PathBuf::from(dir);
+    }
+
+    let mut config = Config::load(&conf_path, extension_dir)?;
 
     if let Some(path) = matches.value_of("log-file") {
-        conf.log_file = match path {
+        config.global_config.log_file = match path {
             "-" => None,
             _ => Some(PathBuf::from(path)),
         };
     }
 
     if let Some(uri) = matches.value_of("database-uri") {
-        conf.database_uri = uri.to_string();
+        config.global_config.database_uri = uri.to_string();
     }
 
-    let log_to_file = conf.log_file.is_some();
+    let log_to_file = config.global().log_file.is_some();
 
     let log_all = matches.is_present("log-all");
 
@@ -104,7 +121,7 @@ fn main_res() -> Result<()> {
             metadata.target().starts_with("longboard") || log_all
         });
 
-    match conf.log_file {
+    match config.global().log_file {
         Some(ref log_path) => {
             let log_file = OpenOptions::new()
                 .append(true)
@@ -122,19 +139,15 @@ fn main_res() -> Result<()> {
         None => dispatch.chain(std::io::stdout()).apply()?,
     };
 
-    if let Some(path) = matches.value_of("config") {
-        info!("Using config file {}", path);
-    } else {
-        info!("Using config file {}", Config::default_path().display());
-    };
+    info!("Using config file {}", conf_path.display());
 
     if matches.is_present("debug-config") {
-        for line in format!("{:#?}", conf).lines() {
+        for line in format!("{:#?}", config).lines() {
             debug!("{}", line);
         }
     }
 
-    Err(Error::from(new_instance(conf)?.launch()))
+    Err(Error::from(new_instance(config)?.launch()))
 }
 
 fn main() {
