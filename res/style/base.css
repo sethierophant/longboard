@@ -100,8 +100,9 @@ nav a {
     margin: 0.4em 0;
 }
 
-.post-preview .body {
+.post-preview .body-contents {
     padding-left: 2em;
+    box-sizing: border-box;
 }
 
 .page-header {

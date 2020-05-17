@@ -135,11 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
         elem.addEventListener('load', onLoadPostImage);
     });
 
-    document.querySelectorAll('.post-ref').forEach((elem) => {
+    document.querySelectorAll('.post .post-ref').forEach((elem) => {
         elem.addEventListener('mouseenter', onMouseEnterPostRef);
     });
 
-    document.querySelectorAll('.post-ref').forEach((elem) => {
+    document.querySelectorAll('.post .post-ref').forEach((elem) => {
         elem.addEventListener('mouseleave', onMouseLeavePostRef);
     });
 })
