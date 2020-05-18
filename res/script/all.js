@@ -36,6 +36,8 @@ function expandVideo(target) {
 
     var video = document.createElement('video');
     video.controls = "controls";
+    video.autoplay = "autoplay";
+    video.loop = "loop";
     video.src = target.dataset.uri;
     video.poster = target.dataset.thumbUri;
 
