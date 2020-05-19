@@ -25,7 +25,7 @@ man5ext		= .5
 man8ext		= .8
 sysconfdir	= $(prefix)/etc
 localstatedir	= $(prefix)/var
-resdir		= $(localstatedir)/lib
+persistdir	= $(localstatedir)/lib
 logdir		= $(localstatedir)/log
 
 INSTALLFLAGS	=
@@ -38,12 +38,17 @@ CARGOFEATURES	= --all-features
 CARGO		= cargo $(CARGOFLAGS)
 
 M4FLAGS		=
-M4DEFINES	= -D BINDIR=$(bindir) -D RESDIR=$(resdir) -D LOGDIR=$(logdir)
+M4DEFINES	= -D BINDIR=$(bindir) \
+		  -D SYSCONFDIR=$(sysconfdir) \
+		  -D DATADIR=$(datadir) \
+		  -D PERSISTDIR=$(persistdir) \
+		  -D LOGDIR=$(logdir)
 M4		= m4 $(M4DEFINES) $(M4FLAGS)
 
 export bindir
 export sysconfdir
-export resdir
+export datadir
+export persistdir
 export logdir
 
 .PHONY: target/release/longboard
@@ -58,16 +63,16 @@ install: target/release/longboard
 		$(DESTDIR)$(bindir)/longboard
 	$(INSTALL_PROGRAM) -D target/release/longctl \
 		$(DESTDIR)$(bindir)/longctl
-	$(INSTALL_DATA) -D res/favicon.png -t $(DESTDIR)$(resdir)/longboard/
-	$(INSTALL_DATA) -D res/spoiler.png -t $(DESTDIR)$(resdir)/longboard/
+	$(INSTALL_DATA) -D res/favicon.png -t $(DESTDIR)$(datadir)/longboard/
+	$(INSTALL_DATA) -D res/spoiler.png -t $(DESTDIR)$(datadir)/longboard/
 	$(INSTALL_DATA) -D res/banners/* -t \
-		$(DESTDIR)$(resdir)/longboard/banners
-	$(INSTALL_DATA) -D res/script/* -t $(DESTDIR)$(resdir)/longboard/script
-	$(INSTALL_DATA) -D res/style/* -t $(DESTDIR)$(resdir)/longboard/style
-	cp -r res/templates $(DESTDIR)$(resdir)/longboard/templates
-	$(INSTALL_DATA) -d $(DESTDIR)$(resdir)/longboard/uploads
+		$(DESTDIR)$(datadir)/longboard/banners
+	$(INSTALL_DATA) -D res/script/* -t $(DESTDIR)$(datadir)/longboard/script
+	$(INSTALL_DATA) -D res/style/* -t $(DESTDIR)$(datadir)/longboard/style
+	cp -r res/templates $(DESTDIR)$(datadir)/longboard/templates
+	$(INSTALL_DATA) -d $(DESTDIR)$(persistdir)/longboard
 	$(INSTALL_DATA) -d $(DESTDIR)$(logdir)/longboard
-	mkdir -p $(DESTDIR)$(sysconfdir)/longboard
+	$(INSTALL_DATA) -d $(DESTDIR)$(sysconfdir)/longboard
 	$(M4) contrib/config/release.yaml.m4 \
 		>$(DESTDIR)$(sysconfdir)/longboard/config.yaml
 ifdef servicedir
@@ -89,7 +94,8 @@ endif
 uninstall:
 	rm -f $(DESTDIR)$(bindir)/longboard
 	rm -f $(DESTDIR)$(bindir)/longctl
-	rm -rf $(DESTDIR)$(resdir)/longboard
+	rm -rf $(DESTDIR)$(datadir)/longboard
+	rm -rf $(DESTDIR)$(persistdir)/longboard
 	rm -rf $(DESTDIR)$(logdir)/longboard
 ifdef servicedir
 	rm -f $(DESTDIR)$(servicedir)/longboard.service

@@ -132,6 +132,7 @@ pub fn routes() -> Vec<Route> {
     routes![
         crate::routes::home,
         crate::routes::static_file,
+        crate::routes::favicon,
         crate::routes::banner,
         crate::routes::style,
         crate::routes::upload,
@@ -175,6 +176,12 @@ pub fn routes() -> Vec<Route> {
 #[get("/file/<file..>", rank = 1)]
 pub fn static_file(file: PathBuf, conf: Conf) -> Result<NamedFile> {
     Ok(NamedFile::open(conf.resource_dir.join(file))?)
+}
+
+/// Serve the favicon.
+#[get("/file/favicon.png", rank = 0)]
+pub fn favicon(conf: Conf) -> Result<NamedFile> {
+    Ok(NamedFile::open(conf.favicon_path)?)
 }
 
 /// Serve a stylesheet.

@@ -13,19 +13,24 @@ backup=('etc/longboard/config.yaml')
 source=("${pkgname%-git}::git://github.com/sethierophant/longboard")
 md5sums=('SKIP')
 
+makecmd="make prefix=/usr sysconfdir=/etc localstatedir=/var DESTDIR=\"$pkgdir/\""
+
 pkgver() {
 	cd "$srcdir/${pkgname%-git}"
-	# git describe --long | sed 's/\([^-]*-\)g/r\1/;s/-/./g'
 	printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+check() {
+    cd "$srcdir/${pkgname%-git}"
+    ${makecmd} check
 }
 
 build() {
 	cd "$srcdir/${pkgname%-git}"
-	make prefix=/usr sysconfdir=/etc localstatedir=/var DESTDIR="$pkgdir/"
+	${makecmd}
 }
 
 package() {
 	cd "$srcdir/${pkgname%-git}"
-	make prefix=/usr sysconfdir=/etc localstatedir=/var DESTDIR="$pkgdir/" \
-        install
+	${makecmd} install
 }

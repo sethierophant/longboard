@@ -88,6 +88,7 @@ impl Config {
     pub fn global(&self) -> Conf {
         Conf {
             site_name: self.global_config.site_name.as_ref(),
+            favicon_path: self.global_config.favicon_path.as_ref(),
             address: self.global_config.address.as_ref(),
             port: self.global_config.port,
             log_file: self.global_config.log_file.as_deref(),
@@ -128,6 +129,7 @@ impl Config {
 
         ext_conf.map(|ext_conf| Conf {
             site_name: self.global_config.site_name.as_ref(),
+            favicon_path: self.global_config.favicon_path.as_ref(),
             address: self.global_config.address.as_ref(),
             port: self.global_config.port,
             resource_dir: self.global_config.resource_dir.as_ref(),
@@ -197,6 +199,9 @@ impl Config {
 pub struct GlobalConfig {
     /// Name of the website.
     pub site_name: String,
+    /// Path to the favicon.
+    #[serde(rename = "favicon")]
+    pub favicon_path: PathBuf,
     /// Address to bind to.
     pub address: String,
     /// Port to bind to.
@@ -309,7 +314,8 @@ impl GlobalConfig {
         if cfg!(debug_assertions) {
             PathBuf::from("contrib/config/dev.yaml")
         } else {
-            let sysconfdir = option_env!("sysconfdir").unwrap_or("/local/etc/");
+            let sysconfdir = option_env!("sysconfdir")
+                .unwrap_or("/usr/local/etc/");
 
             PathBuf::from(sysconfdir)
                 .join("longboard")
@@ -320,12 +326,14 @@ impl GlobalConfig {
 
 impl Default for GlobalConfig {
     fn default() -> GlobalConfig {
-        let resdir = option_env!("resdir").unwrap_or("/var/lib/");
+        let datadir = option_env!("datadir").unwrap_or("/usr/local/share/");
+        let persistdir = option_env!("resdir").unwrap_or("/var/lib/");
         let logdir = option_env!("logdir").unwrap_or("/var/log/");
 
         if cfg!(debug_assertions) {
             GlobalConfig {
                 site_name: "LONGBOARD".into(),
+                favicon_path: PathBuf::from("favicon.png"),
                 address: "0.0.0.0".into(),
                 port: 8000,
                 resource_dir: PathBuf::from("res"),
@@ -350,16 +358,21 @@ impl Default for GlobalConfig {
         } else {
             GlobalConfig {
                 site_name: "LONGBOARD".into(),
+                favicon_path: PathBuf::from(datadir)
+                    .join("longboard")
+                    .join("favicon.png"),
                 address: "0.0.0.0".into(),
                 port: 80,
-                resource_dir: PathBuf::from(resdir).join("longboard"),
-                upload_dir: PathBuf::from(resdir)
-                    .join("longboard")
-                    .join("uploads"),
+                resource_dir: PathBuf::from(datadir).join("longboard"),
+                upload_dir: PathBuf::from(persistdir).join("longboard"),
                 pages_dir: None,
                 database_uri: "postgres://longboard:@localhost/longboard"
                     .into(),
-                log_file: Some(PathBuf::from(logdir).join("longboard.log")),
+                log_file: Some(
+                    PathBuf::from(logdir)
+                        .join("longboard")
+                        .join("longboard.log"),
+                ),
                 names_path: None,
                 notice_path: None,
                 allow_uploads: false,
@@ -516,7 +529,8 @@ impl ExtensionConfig {
         if cfg!(debug_assertions) {
             PathBuf::from("contrib/config/")
         } else {
-            let sysconfdir = option_env!("sysconfdir").unwrap_or("/local/etc/");
+            let sysconfdir = option_env!("sysconfdir")
+                .unwrap_or("/usr/local/etc/");
 
             PathBuf::from(sysconfdir).join("longboard")
         }
@@ -709,7 +723,10 @@ where
 /// extension's config.
 #[derive(Debug, Clone)]
 pub struct Conf<'a> {
+    /// The name of the site.
     pub site_name: &'a str,
+    /// The path to the favicon.
+    pub favicon_path: &'a Path,
     /// Address to bind to.
     pub address: &'a str,
     /// Port to bind to.

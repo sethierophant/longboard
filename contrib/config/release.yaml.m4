@@ -1,73 +1,78 @@
 # Configuration file for longboard.
+#
+# See longboard(5) for more information.
 
-# The site name. This is displayed on the home page.
-site_name: Longboard
+## The site name. This is displayed on the home page.
+#site_name: Longboard
 
-# The address that the server binds to.
-address: 0.0.0.0
+## The favicon to be loaded. This file should be a PNG.
+#favicon: DATADIR/longboard/favicon.png
 
-# The port that the server binds to.
-port: 80
+## The address that the server binds to.
+#address: 0.0.0.0
 
-# The file to log to.
-log_file: LOGDIR/longboard.log
+## The port that the server binds to.
+#port: 80
 
-# How to connect to the database.
-database_uri: postgres://longboard:@localhost/longboard
+## The file to log to.
+#log_file: LOGDIR/longboard.log
 
-# Where the resources (templates, css, javascript, ...) are stored.
-resource_dir: RESDIR/longboard
+## How to connect to the database.
+#database_uri: postgres://longboard:@localhost/longboard
 
-# Where the user-uploaded files are stored.
-upload_dir: RESDIR/longboard/uploads
+## Where the resources (templates, css, javascript, ...) are stored.
+#resource_dir: DATADIR/longboard
 
-# Where the staff-added pages are stored.
+## Where the user-uploaded files are stored.
+#upload_dir: PERSISTDIR/longboard
+
+## Where the staff-added pages are stored.
 #pages_dir: /etc/longboard/pages
 
-# List of names to use for anonymous posters.
+## List of names to use for anonymous posters.
 #names: /etc/longboard/names.txt
 
-# A notice message that will be displayed at the top of each board/thread.
+## A notice message that will be displayed at the top of each board/thread.
 #notice: /etc/longboard/notice.md
 
-# Whether or not to allow users to upload files.
-allow_uploads: true
+## Whether or not to allow users to upload files.
+#allow_uploads: true
 
-# The allowed file types for file uploads.
-allow_file_types:
-    - image/png
-    - image/jpeg
-    - image/gif
-    - image/webp
-    - image/pnm
-    - image/tiff
-    - video/webm
-    - video/mp4
-    - video/ogg
+## The allowed file types for file uploads.
+#allow_file_types:
+#   - image/png
+#   - image/jpeg
+#   - image/gif
+#   - image/webp
+#   - image/pnm
+#   - image/tiff
+#   - video/webm
+#   - video/mp4
+#   - video/ogg
 
-# The maximum size for user-uploaded files.
-file_size_limit: 4M
+## The maximum size for user-uploaded files.
+#file_size_limit: 4M
 
-# How long to rate limit posts with the same IP address.
-rate_limit_same_user: 10s
+## How long to rate limit posts with the same IP address.
+#rate_limit_same_user: 10s
 
-# How long to rate limit posts with identical content.
-rate_limit_same_content: 2m
+## How long to rate limit posts with identical content.
+#rate_limit_same_content: 2m
 
-# Rules to filter posts with. The pattern is parsed as a regex.
-# See https://docs.rs/regex/1.3.7/regex/#syntax for regex syntax.
-filter_rules:
-    - pattern: word\s?filter
-      replace_with: language enhancer
+## Rules to filter posts with. The pattern is parsed as a regex.
+## See https://docs.rs/regex/1.3.7/regex/#syntax for regex syntax.
+#filter_rules:
+#   - pattern: word\s?filter
+#     replace_with: language enhancer
 
-# Stylesheets to use. Any style you add here will be selectable by your users
-# to use, provided it exists in $RESOURCE_DIR/styles/.
-styles:
-    - light
-    - dark
+## Stylesheets to use. Any style you add here will be selectable by your users
+## to use, provided it exists in $RESOURCE_DIR/styles/.
+#styles:
+#   - light
+#   - dark
 
-# The list of IP addresses to allow for posting. This list will override both
-# block_list and dns_block_list.
+## The list of IP addresses to allow for posting. This list will override both
+## block_list and dns_block_list.
 #allow_list:
 #   - 1.2.3.4
 
