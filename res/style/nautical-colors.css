@@ -1,0 +1,21 @@
+:root {
+    --text-color: white;
+    --quote-color: darkgreen;
+    --bright-color: hsl(60, 80%, 70%);
+    --less-bright-color: hsl(60, 40%, 70%);
+    --dull-color: hsl(0, 0%, 75%);
+    --background-gradient-start: #024249;
+    --background-gradient-end: #024249;
+    --footer-background-color: var(--backgroudn-gradient-end);
+    --form-item-background-color: hsl(0, 0%, 90%);
+    --form-submit-text-color: black;
+    --form-submit-background-color: hsl(0, 0%, 90%);
+    --form-submit-hover-color: hsl(0, 0%, 80%);
+    --background-color: hsl(190, 50%, 30%);
+    --background-color-highlight: hsl(190, 50%, 35%);
+    --border-color: black;
+    --shadow-color: hsl(0, 0%, 10%);
+    --post-action-color: white;
+    --post-action-hover-color: hsl(0, 0%, 80%);
+    --post-action-reason-color: hsl(0, 0%, 80%);
+}

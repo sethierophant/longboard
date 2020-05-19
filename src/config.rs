@@ -333,7 +333,7 @@ impl Default for GlobalConfig {
         if cfg!(debug_assertions) {
             GlobalConfig {
                 site_name: "LONGBOARD".into(),
-                favicon_path: PathBuf::from("favicon.png"),
+                favicon_path: PathBuf::from("res/favicon.png"),
                 address: "0.0.0.0".into(),
                 port: 8000,
                 resource_dir: PathBuf::from("res"),

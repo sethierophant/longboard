@@ -33,7 +33,7 @@ impl UserOptions {
 impl Default for UserOptions {
     fn default() -> UserOptions {
         UserOptions {
-            style: "light".into(),
+            style: "default".into(),
             code_highlighting: true,
         }
     }

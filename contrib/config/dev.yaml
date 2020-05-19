@@ -2,7 +2,7 @@ pages_dir: contrib/config/pages
 names: contrib/config/names.txt
 notice: contrib/config/notice.md
 
-allow_uploads: false
+allow_uploads: true
 allow_file_types:
     - image/png
     - image/jpeg
@@ -14,14 +14,8 @@ allow_file_types:
     - video/mp4
     - video/ogg
 
-rate_limit_same_user: 10s
-
-filter_rules:
-    - pattern: word\s?filter
-      replace_with: language enhancer
-    - pattern: big dick
-      replace_with: sizable dongus
-
 styles:
-    - dark
-    - light
+    - blood
+    - nautical
+    - peace
+    - yotsuba

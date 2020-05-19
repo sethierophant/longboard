@@ -1,0 +1,21 @@
+:root {
+    --bright-color: hsl(250, 100%, 30%);
+    --less-bright-color: hsl(250, 70%, 20%);
+    --dull-color: maroon;
+    --form-item-background-color: #FFFEFE;
+    --form-submit-text-color: hsl(0, 0%, 98%);
+    --form-submit-background-color: hsl(0, 100%, 20%);
+    --form-submit-hover-color: hsl(0, 100%, 26%);
+    --text-color: maroon;
+    --quote-color: #789922;
+    --background-color: #F0E0D6;
+    --background-color-highlight: #FFC0A6;
+    --border-color: var(--text-color);
+    --shadow-color: #AE4444;
+    --background-gradient-start: #FFE;
+    --background-gradient-end: #FFFFE0;
+    --footer-background-color: var(--backgroudn-gradient-end);
+    --post-action-color: black;
+    --post-action-hover-color: #4A4A4A;
+    --post-action-reason-color: #EAEAEA;
+}
