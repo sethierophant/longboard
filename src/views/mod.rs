@@ -479,17 +479,40 @@ impl Serialize for DeepThread {
 }
 
 /// A recent post to be displayed on the home page.
-#[derive(Debug, Serialize)]
-#[serde(transparent)]
-pub struct RecentPost(PostView);
+#[derive(Debug)]
+pub struct RecentPost {
+    thread_subject: String,
+    post: PostView,
+}
 
 impl RecentPost {
     fn load(db: &Database, limit: u32) -> Result<Vec<RecentPost>> {
-        Ok(db
-            .recent_posts(limit)?
+        db.recent_posts(limit)?
             .into_iter()
-            .map(|post| RecentPost(PostView(post)))
-            .collect())
+            .map(|post| Ok(RecentPost {
+                thread_subject: db.thread(post.thread_id)?.subject,
+                post: PostView(post),
+            }))
+            .collect()
+    }
+}
+
+impl Serialize for RecentPost {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut data = to_value(&self.post).expect("could not serialize post");
+
+        data.as_object_mut().unwrap().insert(
+            "thread_subject".into(),
+            JsonValue::String(self.thread_subject.clone()),
+        );
+
+        data.serialize(serializer)
     }
 }
 

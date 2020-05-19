@@ -69,7 +69,7 @@ nav a {
 .site-description {
     margin: 2em auto;
     padding: 0 3em;
-    width: max-content;
+    text-align: center;
 }
 
 .recent {
@@ -100,8 +100,13 @@ nav a {
     margin: 0.4em 0;
 }
 
+.post-preview .thread-subject {
+    font-weight: bold;
+}
+
 .post-preview .body-contents {
     padding-left: 2em;
+    margin: 0.4em 0;
     box-sizing: border-box;
 }
 
@@ -522,7 +527,7 @@ form.post-action input[type=submit]:hover {
 }
 
 .catalog-item img {
-    max-width: 180px;
+    max-width: calc(180px - 2em);
     max-height: 140px;
 }
 

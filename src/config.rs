@@ -314,8 +314,8 @@ impl GlobalConfig {
         if cfg!(debug_assertions) {
             PathBuf::from("contrib/config/dev.yaml")
         } else {
-            let sysconfdir = option_env!("sysconfdir")
-                .unwrap_or("/usr/local/etc/");
+            let sysconfdir =
+                option_env!("sysconfdir").unwrap_or("/usr/local/etc/");
 
             PathBuf::from(sysconfdir)
                 .join("longboard")
@@ -529,8 +529,8 @@ impl ExtensionConfig {
         if cfg!(debug_assertions) {
             PathBuf::from("contrib/config/")
         } else {
-            let sysconfdir = option_env!("sysconfdir")
-                .unwrap_or("/usr/local/etc/");
+            let sysconfdir =
+                option_env!("sysconfdir").unwrap_or("/usr/local/etc/");
 
             PathBuf::from(sysconfdir).join("longboard")
         }

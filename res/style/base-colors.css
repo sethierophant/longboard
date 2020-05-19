@@ -123,6 +123,14 @@ form.post-action input[type=text] {
     opacity: 0.5;
 }
 
+.post .post-id a {
+    color: var(--less-bright-color);
+}
+
+.post .file-name {
+    color: var(--less-bright-color);
+}
+
 .action .post {
     background-color: var(--background-color)
     border: thin solid var(--border-color);
