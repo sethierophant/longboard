@@ -275,7 +275,7 @@ impl GlobalConfig {
         if !conf.upload_dir.exists() {
             return Err(Error::ConfigPathNotFound {
                 name: "uploads dir".to_string(),
-                path: conf.resource_dir.display().to_string(),
+                path: conf.upload_dir.display().to_string(),
             });
         }
 
