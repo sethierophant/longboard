@@ -69,8 +69,22 @@ body {
     box-shadow: 5px 5px 0px var(--shadow-color);
 }
 
+.post.highlighted {
+    background-color: var(--background-color-highlight);
+}
+
 .post:target {
     animation: 1.0s ease-out 0s highlight;
+}
+
+@keyframes highlight {
+    from {
+        background-color: var(--background-color-highlight);
+    }
+
+    to {
+        background-color: var(--background-color);
+    }
 }
 
 .body-contents blockquote {
@@ -103,16 +117,6 @@ form.post-action input[type="submit"]:hover, a.post-action:hover{
 form.post-action input[type=text] {
     color: var(--text-color);
     background-color: var(--post-action-reason-color);
-}
-
-@keyframes highlight {
-    from {
-        background-color: var(--background-color-highlight)
-    }
-
-    to {
-        background-color: var(--background-color);
-    }
 }
 
 .post-info .post-ident {

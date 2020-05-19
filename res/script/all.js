@@ -77,11 +77,10 @@ function onLoadPostImage(ev) {
 
 /* Display a preview of a post when the cursor hovers over a post reference. */
 function onMouseEnterPostRef(ev) {
-    var targetRect = ev.target.getBoundingClientRect();
-
     var id = ev.target.textContent.replace(">>", "");
-
     var post = document.getElementById(id);
+
+    var targetRect = ev.target.getBoundingClientRect();
 
     if (post === null) {
         var url = window.location.href.replace(/#.*/gi, "");
@@ -98,13 +97,19 @@ function onMouseEnterPostRef(ev) {
                 addPostPreview(template.content.firstChild, targetRect);
             });
     } else {
-        addPostPreview(post.cloneNode(true), targetRect);
+        let postRect = post.getBoundingClientRect();
+
+        if (postRect.top >= 0 && postRect.bottom <= window.innerHeight) {
+            post.classList.add('highlighted');
+        } else {
+            addPostPreview(post.cloneNode(true), targetRect);
+        }
     }
 }
 
 /* Insert a post preview into the DOM. */
 function addPostPreview(postPreview, targetRect) {
-    postPreview.classList.add("post-fixed");
+    postPreview.classList.add('post-fixed');
 
     document.body.appendChild(postPreview);
 
@@ -128,6 +133,10 @@ function addPostPreview(postPreview, targetRect) {
 function onMouseLeavePostRef(ev) {
     document.querySelectorAll('.post-fixed').forEach((elem) => {
         elem.remove();
+    });
+
+    document.querySelectorAll('.highlighted').forEach((elem) => {
+        elem.classList.remove('highlighted');
     });
 }
 
