@@ -83,6 +83,50 @@ parser! {
 }
 
 parser! {
+    /// Parse a http link.
+    fn link_parser[Input]()(Input) -> LineItem
+    where [Input: Stream<Token = char>]
+    {
+        let link_char = || satisfy(|c: char| {
+            let special_link_chars = [
+                '-',
+                '.',
+                '_',
+                '~',
+                ':',
+                '/',
+                '?',
+                '#',
+                '[',
+                ']',
+                '@',
+                '!',
+                '$',
+                '&',
+                '\'',
+                '(',
+                ')',
+                '*',
+                '+',
+                ',',
+                ';',
+                '%',
+                '=',
+            ];
+
+            c.is_alphanumeric() || special_link_chars.contains(&c)
+        });
+
+        choice((
+            attempt(string("http://")).and(many1(link_char())),
+            attempt(string("https://")).and(many1(link_char())),
+        )).map(|(schema, rest): (&str, String)| {
+            LineItem::Link(format!("{}{}", schema, rest))
+        })
+    }
+}
+
+parser! {
     /// Parse `\`code\`` within a line.
     fn line_code_parser[Input]()(Input) -> LineItem
     where [Input: Stream<Token = char>]
@@ -107,6 +151,8 @@ parser! {
             char('~'),
             char('>'),
             char('`'),
+            attempt(string("http://")).map(|_| '\0'),
+            attempt(string("https://")).map(|_| '\0'),
             newline(),
         ));
 
@@ -125,6 +171,7 @@ parser! {
             attempt(emphasis_parser()),
             attempt(spoiler_parser()),
             attempt(post_ref_parser(db)),
+            attempt(link_parser()),
             attempt(line_code_parser()),
             line_text_parser(),
         )))
@@ -354,6 +401,7 @@ enum LineItem {
     Emphasis(String),
     Spoiler(String),
     PostRef { id: PostId, uri: Option<String> },
+    Link(String),
     Code(String),
     Text(String),
 }
@@ -379,6 +427,13 @@ impl Render for LineItem {
                     }
                 } else {
                     tmpl << html! { a(class = "post-ref") { : id } }
+                }
+            }
+            LineItem::Link(s) => {
+                tmpl << html! {
+                    a(href = s, rel = "nofollow noopener", target = "_blank") {
+                        : s
+                    }
                 }
             }
             LineItem::Code(s) => tmpl << html! { code { : s } },
@@ -434,6 +489,11 @@ mod tests {
     #[test]
     fn post_ref() -> Result<()> {
         test_parse(">>1729", "<p><a class=\"post-ref\">1729</a></p>")
+    }
+
+    #[test]
+    fn link() -> Result<()> {
+        test_parse("https://lainchan.org", "<p><a href=\"https://lainchan.org\" rel=\"nofollow noopener\" target=\"_blank\">https://lainchan.org</a></p>")
     }
 
     #[test]
