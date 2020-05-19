@@ -327,7 +327,7 @@ impl GlobalConfig {
 impl Default for GlobalConfig {
     fn default() -> GlobalConfig {
         let datadir = option_env!("datadir").unwrap_or("/usr/local/share/");
-        let persistdir = option_env!("resdir").unwrap_or("/var/lib/");
+        let persistdir = option_env!("persistdir").unwrap_or("/var/lib/");
         let logdir = option_env!("logdir").unwrap_or("/var/log/");
 
         if cfg!(debug_assertions) {
