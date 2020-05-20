@@ -35,7 +35,7 @@ INSTALL_DATA	= $(INSTALL) -m 644
 
 CARGOFLAGS	= --locked
 CARGOFEATURES	= --all-features
-CARGO		= cargo $(CARGOFLAGS)
+CARGO		= cargo +nightly $(CARGOFLAGS)
 
 M4FLAGS		=
 M4DEFINES	= -D BINDIR=$(bindir) \
