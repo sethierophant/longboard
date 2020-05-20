@@ -13,7 +13,7 @@
 
 **Configurable, well-documented, and easy to install**. The default install
 comes with manual pages, a well-commented config file, and a .service file for
-starting with SystemD.
+starting with systemd.
 
 **Spam-resistant**. Longboard comes with a web interface for moderating posts
 and support for using DNSBLs.
@@ -41,7 +41,13 @@ or donation-run servers, performance is a major goal.
 
 ## Installation
 
-Dependencies:
+Build Dependencies:
+
+- Nightly Rust (rustc and cargo)
+- GNU Make
+- GNU M4
+
+Run Dependencies:
 
 - PostgreSQL
 - FFmpeg (for video thumbnails)
@@ -57,6 +63,18 @@ And run make:
 
     make
     sudo make install
+
+Some of the Makefile options:
+
+- **DESTDIR** Location to install to, set to `/` by default.
+- **prefix** Prefix to install to, set to `/usr/local` by default.
+- **servicedir** If this option is set, the directory to install systemd
+  service files to. Set to `/usr/local/lib/systemd/system` by default.
+- **mandir** If this option is set, the directory to install man pages to. Set
+  to `/usr/local/share/man/` by default.
+
+*Note that you should set the same make options while running `make` and `make
+install`.*
 
 For more installation options, see the [Makefile](/Makefile).
 
@@ -82,9 +100,9 @@ Add an administrator, so you can use the web moderator interface:
 
     longctl add-staff -r administrator -u NAME -p PASSWORD
 
-Start and enable the system service:
+Start the system service:
 
-    systemctl start longboard && systemctl enable longboard
+    systemctl start longboard
 
 And you should have a longboard instance running on localhost:80!
 
