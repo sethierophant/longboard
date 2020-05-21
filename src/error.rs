@@ -192,7 +192,8 @@ impl<'r> Responder<'r> for Error {
             | Error::StaffInvalidPassword { .. }
             | Error::ReportTooLong
             | Error::ThreadLocked
-            | Error::FileUploadNotAllowed => {
+            | Error::FileUploadNotAllowed
+            | Error::CannotDeleteThreadFilesOnly => {
                 warn!("{}", &self);
 
                 let context = req.guard::<Context>().unwrap();

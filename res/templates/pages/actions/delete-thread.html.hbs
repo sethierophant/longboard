@@ -1,0 +1,12 @@
+{{#*inline "content"}}
+    <h1>Delete Thread {{post.thread_id}}</h1>
+    {{#with post}}
+        {{> models/post hide_actions=true}}
+    {{/with}}
+    <form class="action-form" method="POST">
+        <label for="password">Password</label>
+        <input type="text" name="password">
+        <input type="submit" value="Delete Thread">
+    </form>
+{{/inline}}
+{{> pages/actions/action}}

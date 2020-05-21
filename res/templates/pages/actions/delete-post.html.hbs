@@ -1,0 +1,14 @@
+{{#*inline "content"}}
+    <h1>Delete Post {{post.id}}</h1>
+    {{#with post}}
+        {{> models/post hide_actions=true}}
+    {{/with}}
+    <form class="action-form" method="POST">
+        <label for="password">Password</label>
+        <input type="text" name="password">
+        <label for="file-only">File Only</label>
+        <input type="checkbox" name="file_only">
+        <input type="submit" value="Delete Post">
+    </form>
+{{/inline}}
+{{> pages/actions/action}}

@@ -454,7 +454,13 @@ pub fn delete(
         return Err(Error::PostNotFound { post_id });
     }
 
-    DeletePage::new(post_id, &context)
+    if db.is_first_post(post_id)? {
+        Ok(DeletePage::Thread(DeleteThreadPage::new(
+            post_id, &context,
+        )?))
+    } else {
+        Ok(DeletePage::Post(DeletePostPage::new(post_id, &context)?))
+    }
 }
 
 /// Form data for deleting a post.

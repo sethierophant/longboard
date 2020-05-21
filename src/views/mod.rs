@@ -9,6 +9,7 @@ use serde::{Serialize, Serializer};
 use serde_json::value::{to_value, Value as JsonValue};
 
 use rocket::request::{FromRequest, Outcome};
+use rocket::response::Responder;
 use rocket::{uri, Request, State};
 
 use crate::config::{Banner, Conf, Page as ConfigPage};
@@ -489,10 +490,12 @@ impl RecentPost {
     fn load(db: &Database, limit: u32) -> Result<Vec<RecentPost>> {
         db.recent_posts(limit)?
             .into_iter()
-            .map(|post| Ok(RecentPost {
-                thread_subject: db.thread(post.thread_id)?.subject,
-                post: PostView(post),
-            }))
+            .map(|post| {
+                Ok(RecentPost {
+                    thread_subject: db.thread(post.thread_id)?.subject,
+                    post: PostView(post),
+                })
+            })
             .collect()
     }
 }
@@ -826,7 +829,7 @@ impl ReportPage {
     /// Create a new report page.
     pub fn new(post_id: PostId, context: &Context) -> Result<ReportPage> {
         Ok(ReportPage {
-            page_info: PageInfo::new("Report post", context),
+            page_info: PageInfo::new("Report Post", context),
             page_footer: PageFooter::new(context)?,
             post: context.database.post(post_id)?,
         })
@@ -835,26 +838,54 @@ impl ReportPage {
 
 impl_template_responder!(ReportPage, "pages/actions/report");
 
+/// A page for deleting either a post or a thread.
+#[derive(Responder)]
+pub enum DeletePage {
+    Thread(DeleteThreadPage),
+    Post(DeletePostPage),
+}
+
 /// A page for deleting a post.
 #[derive(Debug, Serialize)]
-pub struct DeletePage {
+pub struct DeletePostPage {
     pub page_info: PageInfo,
     pub page_footer: PageFooter,
     pub post: Post,
 }
 
-impl DeletePage {
+impl DeletePostPage {
     /// Create a new delete page.
-    pub fn new(post_id: PostId, context: &Context) -> Result<DeletePage> {
-        Ok(DeletePage {
-            page_info: PageInfo::new("Delete post", context),
+    pub fn new(post_id: PostId, context: &Context) -> Result<DeletePostPage> {
+        Ok(DeletePostPage {
+            page_info: PageInfo::new("Delete Post", context),
             page_footer: PageFooter::new(context)?,
             post: context.database.post(post_id)?,
         })
     }
 }
 
-impl_template_responder!(DeletePage, "pages/actions/delete");
+impl_template_responder!(DeletePostPage, "pages/actions/delete-post");
+
+/// A page for deleting a thread.
+#[derive(Debug, Serialize)]
+pub struct DeleteThreadPage {
+    pub page_info: PageInfo,
+    pub page_footer: PageFooter,
+    pub post: Post,
+}
+
+impl DeleteThreadPage {
+    /// Create a new delete page.
+    pub fn new(post_id: PostId, context: &Context) -> Result<DeleteThreadPage> {
+        Ok(DeleteThreadPage {
+            page_info: PageInfo::new("Delete Thread", context),
+            page_footer: PageFooter::new(context)?,
+            post: context.database.post(post_id)?,
+        })
+    }
+}
+
+impl_template_responder!(DeleteThreadPage, "pages/actions/delete-thread");
 
 /// A page to display a success message about a message.
 #[derive(Debug, Serialize)]
