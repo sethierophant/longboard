@@ -68,8 +68,10 @@
 ## Stylesheets to use. Any style you add here will be selectable by your users
 ## to use, provided it exists in $RESOURCE_DIR/styles/.
 #styles:
-#   - light
-#   - dark
+#   - blood
+#   - peace
+#   - nautical
+#   - yotsuba
 
 ## The list of IP addresses to allow for posting. This list will override both
 ## block_list and dns_block_list.

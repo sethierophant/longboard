@@ -7,6 +7,7 @@
     --background-gradient-start: #024249;
     --background-gradient-end: #024249;
     --footer-background-color: var(--backgroudn-gradient-end);
+    --form-item-text-color: black;
     --form-item-background-color: hsl(0, 0%, 90%);
     --form-submit-text-color: black;
     --form-submit-background-color: hsl(0, 0%, 90%);

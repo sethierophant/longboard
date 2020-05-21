@@ -2,6 +2,7 @@
     --bright-color: hsl(0, 100%, 65%);
     --less-bright-color: hsl(0, 100%, 45%);
     --dull-color: hsl(0, 0%, 40%);
+    --form-item-text-color: var(--text-color);
     --form-item-background-color: hsl(0, 0%, 22%);
     --form-submit-text-color: hsl(0, 0%, 98%);
     --form-submit-background-color: hsl(0, 100%, 50%);
