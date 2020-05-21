@@ -46,6 +46,10 @@ Build Dependencies:
 - Nightly Rust (rustc and cargo)
 - GNU Make
 - GNU M4
+- PostgresQL (libpq)
+
+You should also install whatever you're distribution's `build-essential` or
+`base-devel` package is if you're building from source.
 
 Run Dependencies:
 
