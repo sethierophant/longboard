@@ -91,7 +91,9 @@ body {
     color: var(--quote-color);
 }
 
-.body-contents pre.blockcode code {
+.body-contents pre.blockcode {
+    color: var(--form-item-text-color);
+    background-color: var(--form-item-background-color);
     border: thin solid var(--border-color);
 }
 

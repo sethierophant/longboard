@@ -358,8 +358,14 @@ nav a {
 }
 
 .body-contents pre.blockcode {
-    padding: 0.5em;
     overflow-x: auto;
+    line-height: 1.3;
+}
+
+.body-contents pre.blockcode code {
+    display: block;
+    padding: 0.4em 0.6em;
+    margin: 0;
 }
 
 .body-contents h3 {
