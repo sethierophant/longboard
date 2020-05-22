@@ -125,7 +125,7 @@ pub struct OverviewPage {
 impl OverviewPage {
     /// Create a new overview page.
     pub fn new(context: &Context) -> Result<OverviewPage> {
-        let users = context
+        let mut users: Vec<_> = context
             .database
             .all_users()?
             .into_iter()
@@ -136,6 +136,10 @@ impl OverviewPage {
                 })
             })
             .collect::<Result<_>>()?;
+
+        // TODO: We could also do this in the database with a join.
+        // With enough users, this might be a performance issue.
+        users.sort_by(|user1, user2| user2.post_count.cmp(&user1.post_count));
 
         Ok(OverviewPage {
             page_info: PageInfo::new("Overview", context),
