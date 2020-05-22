@@ -382,11 +382,13 @@ nav a {
     float: left;
 }
 
+.post-image .file-thumb {
+    margin-bottom: 0.8em;
+}
+
 .post-image img, .post-image video {
     max-width: 100%;
     max-height: 100vh;
-
-    margin-bottom: 1.3em;
 }
 
 .post-image img[data-expanding] {

@@ -1,12 +1,14 @@
 <section class="post-image">
     <a class="file-name" href="{{uri}}" title="{{orig_name}}" download="{{orig_name}}">{{orig_name}}</a>
-    <img src="{{thumb_uri}}"
-         data-uri="{{uri}}"
-         data-thumb-uri="{{thumb_uri}}"
-         {{#if is_image}}
-             data-is-image="is-image"
-         {{/if}}
-         {{#if is_video}}
-             data-is-video="is-video"
-         {{/if}}>
+    <a class="file-thumb" href="{{uri}}" target="_blank">
+        <img src="{{thumb_uri}}"
+             data-uri="{{uri}}"
+             data-thumb-uri="{{thumb_uri}}"
+             {{#if is_image}}
+                 data-is-image="is-image"
+             {{/if}}
+             {{#if is_video}}
+                 data-is-video="is-video"
+             {{/if}}>
+    </a>
 </section>

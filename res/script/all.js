@@ -1,5 +1,7 @@
 /* Expand a post's file when it is clicked. */
 function onClickPostImage(ev) {
+    ev.preventDefault();
+
     if (ev.target.dataset.isImage) {
         expandImage(ev.target);
     } else if (ev.target.dataset.isVideo) {
