@@ -2,6 +2,8 @@
 //!
 //! Most of these types are meant to be returned from a route.
 
+use std::sync::Arc;
+
 use maplit::hashmap;
 
 use serde::{Serialize, Serializer};
@@ -10,7 +12,7 @@ use serde_json::value::{to_value, Value as JsonValue};
 
 use rocket::request::{FromRequest, Outcome};
 use rocket::response::Responder;
-use rocket::{uri, Request, State};
+use rocket::{uri, Request};
 
 use crate::config::{Banner, Conf, Page as ConfigPage};
 use crate::models::staff::Staff;
@@ -25,7 +27,7 @@ use staff::StaffView;
 /// Context that's needed to render a page.
 #[derive(Debug, Clone)]
 pub struct Context<'r> {
-    pub database: &'r Database,
+    pub database: Arc<PooledConnection>,
     pub conf: Conf<'r>,
     pub options: UserOptions,
     pub staff: Option<Staff>,
@@ -36,9 +38,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
 
     fn from_request(req: &'a Request<'r>) -> Outcome<Self, Self::Error> {
         let database = req
-            .guard::<State<Database>>()
-            .expect("expected database to be initialized")
-            .inner();
+            .guard::<PooledConnection>()
+            .expect("expected database to be initialized");
 
         let session = req
             .guard::<Option<Session>>()
@@ -48,7 +49,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
             session.and_then(|session| database.staff(session.staff.name).ok());
 
         Outcome::Success(Context {
-            database,
+            database: Arc::new(database),
             staff,
             conf: req.guard::<Conf>().expect("couldn't load configuration"),
             options: req
@@ -349,7 +350,10 @@ pub struct ThreadView {
 
 impl ThreadView {
     /// Create a new `ThreadView`.
-    pub fn new(thread_id: ThreadId, db: &Database) -> Result<ThreadView> {
+    pub fn new(
+        thread_id: ThreadId,
+        db: &PooledConnection,
+    ) -> Result<ThreadView> {
         Ok(ThreadView {
             thread: db.thread(thread_id)?,
             post_count: db.thread_post_count(thread_id)?,
@@ -386,7 +390,7 @@ pub struct DeepPost(PostView, Option<FileView>);
 
 impl DeepPost {
     /// Create a new `DeepPost`.
-    fn new(post_id: PostId, db: &Database) -> Result<DeepPost> {
+    fn new(post_id: PostId, db: &PooledConnection) -> Result<DeepPost> {
         let post = PostView(db.post(post_id)?);
         let file = db.files_in_post(post_id)?.pop().map(FileView);
         Ok(DeepPost(post, file))
@@ -424,7 +428,7 @@ pub struct DeepThread(ThreadView, Vec<DeepPost>);
 
 impl DeepThread {
     /// Load a thread and its posts from the database.
-    fn new(thread_id: ThreadId, db: &Database) -> Result<DeepThread> {
+    fn new(thread_id: ThreadId, db: &PooledConnection) -> Result<DeepThread> {
         let thread = ThreadView::new(thread_id, db)?;
         let posts = db.posts_in_thread(thread_id)?;
 
@@ -440,7 +444,10 @@ impl DeepThread {
     }
 
     /// Load a thread and a preview of its posts from the database.
-    fn new_preview(thread_id: ThreadId, db: &Database) -> Result<DeepThread> {
+    fn new_preview(
+        thread_id: ThreadId,
+        db: &PooledConnection,
+    ) -> Result<DeepThread> {
         let thread = ThreadView::new(thread_id, db)?;
         let posts =
             db.preview_thread(thread_id, crate::DEFAULT_PREVIEW_LIMIT)?;
@@ -487,7 +494,7 @@ pub struct RecentPost {
 }
 
 impl RecentPost {
-    fn load(db: &Database, limit: u32) -> Result<Vec<RecentPost>> {
+    fn load(db: &PooledConnection, limit: u32) -> Result<Vec<RecentPost>> {
         db.recent_posts(limit)?
             .into_iter()
             .map(|post| {
@@ -527,7 +534,7 @@ pub struct RecentFile {
 }
 
 impl RecentFile {
-    fn load(db: &Database, limit: u32) -> Result<Vec<RecentFile>> {
+    fn load(db: &PooledConnection, limit: u32) -> Result<Vec<RecentFile>> {
         Ok(db
             .recent_files(limit)?
             .into_iter()
@@ -566,11 +573,11 @@ impl HomePage {
             site_name: context.conf.site_name.to_string(),
             site_description,
             recent_posts: RecentPost::load(
-                context.database,
+                &context.database,
                 crate::DEFAULT_RECENT_POSTS,
             )?,
             recent_files: RecentFile::load(
-                context.database,
+                &context.database,
                 crate::DEFAULT_RECENT_FILES,
             )?,
         })
@@ -735,8 +742,8 @@ impl BoardCatalogPage {
                 let thread = context.database.thread(post.thread_id)?;
 
                 Ok(CatalogItem {
-                    thread: ThreadView::new(thread.id, context.database)?,
-                    first_post: DeepPost::new(post.id, context.database)?,
+                    thread: ThreadView::new(thread.id, &context.database)?,
+                    first_post: DeepPost::new(post.id, &context.database)?,
                     num_posts: context
                         .database
                         .thread_post_count(post.thread_id)?,
@@ -780,7 +787,7 @@ impl ThreadPage {
     where
         S: AsRef<str>,
     {
-        let thread = DeepThread::new(thread_id, context.database)?;
+        let thread = DeepThread::new(thread_id, &context.database)?;
         let subject = thread.0.thread.subject.clone();
 
         Ok(ThreadPage {
@@ -808,7 +815,7 @@ pub struct PostPreview {
 
 impl PostPreview {
     /// Load a post preview from the database.
-    pub fn new(post_id: PostId, db: &Database) -> Result<PostPreview> {
+    pub fn new(post_id: PostId, db: &PooledConnection) -> Result<PostPreview> {
         Ok(PostPreview {
             post: DeepPost::new(post_id, db)?,
         })

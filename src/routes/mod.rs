@@ -13,7 +13,7 @@ use pulldown_cmark::{html, Parser};
 use rocket::http::Status;
 use rocket::request::{Form, FromForm, FromRequest, Outcome, Request};
 use rocket::response::NamedFile;
-use rocket::{get, post, routes, uri, Route, State};
+use rocket::{get, post, routes, uri, Route};
 
 use rocket_contrib::templates::Template;
 
@@ -88,7 +88,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
         let db = request
-            .guard::<State<Database>>()
+            .guard::<PooledConnection>()
             .expect("expected database to be initialized");
 
         // If we are using a local request (i.e., if we're running a test) then
@@ -305,7 +305,7 @@ pub fn form_help(context: Context, conf: Conf) -> Result<Template> {
 pub fn board(
     board_name: String,
     page: Option<u32>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _user: User,
 ) -> Result<BoardPage> {
@@ -320,7 +320,7 @@ pub fn board(
 #[get("/<board_name>/catalog", rank = 2)]
 pub fn board_catalog(
     board_name: String,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _user: User,
 ) -> Result<BoardCatalogPage> {
@@ -338,7 +338,7 @@ pub fn board_catalog(
 pub fn thread(
     board_name: String,
     thread_id: ThreadId,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _user: User,
 ) -> Result<ThreadPage> {
@@ -358,7 +358,7 @@ pub fn post_preview(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
-    db: State<Database>,
+    db: PooledConnection,
     _user: User,
 ) -> Result<PostPreview> {
     if db.board(board_name).is_err()
@@ -377,7 +377,7 @@ pub fn report(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _not_blocked: NotBlocked,
     _user: User,
@@ -405,7 +405,7 @@ pub fn new_report(
     thread_id: ThreadId,
     post_id: PostId,
     report_data: Form<ReportData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     user: User,
     _not_blocked: NotBlocked,
@@ -442,7 +442,7 @@ pub fn delete(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _not_blocked: NotBlocked,
     _user: User,
@@ -477,7 +477,7 @@ pub fn handle_delete(
     thread_id: ThreadId,
     post_id: PostId,
     delete_data: Form<DeleteData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _not_blocked: NotBlocked,
     _user: User,

@@ -11,7 +11,7 @@ use horrorshow::prelude::*;
 use regex::Regex;
 
 use crate::config::FilterRule;
-use crate::models::{Database, PostId};
+use crate::models::*;
 use crate::{Error, Result};
 
 // The reason that the parser is split into many small top-level parser is that
@@ -21,248 +21,233 @@ use crate::{Error, Result};
 // compile times to 30 minutes+ on my machine, while these top-level functions
 // can be compiled in about 1 minute.
 
-parser! {
-    /// Parse whitespace that isn't a newline.
-    fn line_spaces[Input]()(Input) -> String
-    where [Input: Stream<Token = char>]
-    {
-        many(satisfy(|c: char| c.is_whitespace() && c != '\n'))
-    }
+/// Parse whitespace that isn't a newline.
+fn line_spaces<Input>() -> impl Parser<Input, Output = String>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    many(satisfy(|c: char| c.is_whitespace() && c != '\n'))
 }
 
-parser! {
-    /// Parse `**strong**` text.
-    fn strong_parser[Input]()(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        let p = not_followed_by(attempt(string("**"))).with(any());
+/// Parse `**strong**` text.
+fn strong_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let p = not_followed_by(attempt(string("**"))).with(any());
 
-        string("**")
-            .with(many1(p))
-            .skip(string("**"))
-            .map(LineItem::Strong)
-    }
+    string("**")
+        .with(many1(p))
+        .skip(string("**"))
+        .map(LineItem::Strong)
 }
 
-parser! {
-    /// Parse `*emphasized*` text.
-    fn emphasis_parser[Input]()(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        let p = not_followed_by(char('*')).with(any());
+/// Parse `*emphasized*` text.
+fn emphasis_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let p = not_followed_by(char('*')).with(any());
 
-        char('*').with(many1(p)).skip(char('*')).map(LineItem::Emphasis)
-    }
+    char('*')
+        .with(many1(p))
+        .skip(char('*'))
+        .map(LineItem::Emphasis)
 }
 
-parser! {
-    /// Parse `~spoiler~` text.
-    fn spoiler_parser[Input]()(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        let p = not_followed_by(char('~')).with(any());
+/// Parse `~spoiler~` text.
+fn spoiler_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let p = not_followed_by(char('~')).with(any());
 
-        char('~').with(many1(p)).skip(char('~')).map(LineItem::Spoiler)
-    }
+    char('~')
+        .with(many1(p))
+        .skip(char('~'))
+        .map(LineItem::Spoiler)
 }
 
-parser! {
-    /// Parse a post ref like `>>123`.
-    fn post_ref_parser['a, Input](db: &'a Database)(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        string(">>").with(many1(digit())).map(|s: String| {
-            let id: PostId = s.parse().unwrap();
-
-            LineItem::PostRef {
-                id,
-                uri: db.post_uri(id).ok(),
-            }
+/// Parse a post ref like `>>123`.
+fn post_ref_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    string(">>")
+        .with(many1(digit()))
+        .map(move |s: String| LineItem::PostRef {
+            id: s.parse().unwrap(),
+            uri: None,
         })
-    }
 }
 
-parser! {
-    /// Parse a http link.
-    fn link_parser[Input]()(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        let link_char = || satisfy(|c: char| {
+/// Parse a http link.
+fn link_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let link_char = || {
+        satisfy(|c: char| {
             let special_link_chars = [
-                '-',
-                '.',
-                '_',
-                '~',
-                ':',
-                '/',
-                '?',
-                '#',
-                '[',
-                ']',
-                '@',
-                '!',
-                '$',
-                '&',
-                '\'',
-                '(',
-                ')',
-                '*',
-                '+',
-                ',',
-                ';',
-                '%',
-                '=',
+                '-', '.', '_', '~', ':', '/', '?', '#', '[', ']', '@', '!',
+                '$', '&', '\'', '(', ')', '*', '+', ',', ';', '%', '=',
             ];
 
             c.is_alphanumeric() || special_link_chars.contains(&c)
-        });
-
-        choice((
-            attempt(string("http://")).and(many1(link_char())),
-            attempt(string("https://")).and(many1(link_char())),
-        )).map(|(schema, rest): (&str, String)| {
-            LineItem::Link(format!("{}{}", schema, rest))
         })
-    }
+    };
+
+    choice((
+        attempt(string("http://")).and(many1(link_char())),
+        attempt(string("https://")).and(many1(link_char())),
+    ))
+    .map(|(schema, rest): (&str, String)| {
+        LineItem::Link(format!("{}{}", schema, rest))
+    })
 }
 
-parser! {
-    /// Parse `\`code\`` within a line.
-    fn line_code_parser[Input]()(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        let p = not_followed_by(char('`')).with(any());
+/// Parse `\`code\`` within a line.
+fn line_code_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let p = not_followed_by(char('`')).with(any());
 
-        char('`')
-            .with(many1(p))
-            .skip(char('`'))
-            .map(LineItem::Code)
-    }
+    char('`').with(many1(p)).skip(char('`')).map(LineItem::Code)
 }
 
-parser! {
-    /// Parse any plain text within a line; anything not covered by the above
-    /// line-item parsers.
-    fn line_text_parser[Input]()(Input) -> LineItem
-    where [Input: Stream<Token = char>]
-    {
-        let end = choice((
-            char('*'),
-            char('~'),
-            char('>'),
-            char('`'),
-            attempt(string("http://")).map(|_| '\0'),
-            attempt(string("https://")).map(|_| '\0'),
-            newline(),
-        ));
+/// Parse any plain text within a line; anything not covered by the above
+/// line-item parsers.
+fn line_text_parser<Input>() -> impl Parser<Input, Output = LineItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let end = choice((
+        char('*'),
+        char('~'),
+        char('>'),
+        char('`'),
+        attempt(string("http://")).map(|_| '\0'),
+        attempt(string("https://")).map(|_| '\0'),
+        newline(),
+    ));
 
-        many1(not_followed_by(end).with(any())).map(LineItem::Text)
-    }
+    many1(not_followed_by(end).with(any())).map(LineItem::Text)
 }
 
-parser! {
-    /// Parse all line items.
-    fn line_items_parser['a, Input](db: &'a Database)(Input)
-        -> Vec<LineItem>
-    where [Input: Stream<Token = char>]
-    {
-        many1(choice((
-            attempt(strong_parser()),
-            attempt(emphasis_parser()),
-            attempt(spoiler_parser()),
-            attempt(post_ref_parser(db)),
-            attempt(link_parser()),
-            attempt(line_code_parser()),
-            line_text_parser(),
-        )))
-    }
+/// Parse all line items.
+fn line_items_parser<Input>() -> impl Parser<Input, Output = Vec<LineItem>>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    many1(choice((
+        attempt(strong_parser()),
+        attempt(emphasis_parser()),
+        attempt(spoiler_parser()),
+        attempt(post_ref_parser()),
+        attempt(link_parser()),
+        attempt(line_code_parser()),
+        line_text_parser(),
+    )))
 }
 
-parser! {
-    /// Parse a block of code.
-    fn code_parser[Input]()(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        let delim = string("```").skip(newline());
-        let p = not_followed_by(attempt(delim)).with(any());
+/// Parse a block of code.
+fn code_parser<Input>() -> impl Parser<Input, Output = BlockItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    let delim = string("```").skip(newline());
+    let p = not_followed_by(attempt(delim)).with(any());
 
-        string("```")
-            .skip(line_spaces())
-            .with(many(alpha_num()))
-            .skip(newline())
-            .and(many1(p))
-            .skip(string("```"))
-            .skip(newline())
-            .map(|(lang, contents): (String, String)| {
-                if lang.is_empty() {
-                    BlockItem::Code { language: None, contents }
-                } else {
-                    BlockItem::Code { language: Some(lang), contents }
+    string("```")
+        .skip(line_spaces())
+        .with(many(alpha_num()))
+        .skip(newline())
+        .and(many1(p))
+        .skip(string("```"))
+        .skip(newline())
+        .map(|(lang, contents): (String, String)| {
+            if lang.is_empty() {
+                BlockItem::Code {
+                    language: None,
+                    contents,
                 }
-            })
-    }
+            } else {
+                BlockItem::Code {
+                    language: Some(lang),
+                    contents,
+                }
+            }
+        })
 }
 
-parser! {
-    /// Parse a `#Header`.
-    fn header_parser['a, Input](db: &'a Database)(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        char('#')
-            .skip(line_spaces())
-            .with(line_items_parser(db))
-            .skip(newline())
-            .map(BlockItem::Header)
-    }
+/// Parse a `#Header`.
+fn header_parser<Input>() -> impl Parser<Input, Output = BlockItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    char('#')
+        .skip(line_spaces())
+        .with(line_items_parser())
+        .skip(newline())
+        .map(BlockItem::Header)
 }
 
-parser! {
-    /// Parse a `>greentext` blockquote.
-    fn quote_parser['a, Input](db: &'a Database)(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        char('>')
-            .skip(line_spaces())
-            .with(line_items_parser(db))
-            .skip(newline())
-            .map(BlockItem::Quote)
-    }
+/// Parse a `>greentext` blockquote.
+fn quote_parser<Input>() -> impl Parser<Input, Output = BlockItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    char('>')
+        .skip(line_spaces())
+        .with(line_items_parser())
+        .skip(newline())
+        .map(BlockItem::Quote)
 }
 
-parser! {
-    /// Parse any kind of block text not covered by the above block item
-    /// parsers.
-    fn text_parser['a, Input](db: &'a Database)(Input) -> BlockItem
-    where [Input: Stream<Token = char>]
-    {
-        line_items_parser(db).skip(newline()).map(BlockItem::Text)
-    }
+/// Parse any kind of block text not covered by the above block item
+/// parsers.
+fn text_parser<Input>() -> impl Parser<Input, Output = BlockItem>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    line_items_parser().skip(newline()).map(BlockItem::Text)
 }
 
-parser! {
-    fn post_body_parser['a, Input](db: &'a Database)(Input) -> PostBody
-    where [Input: Stream<Token = char>]
-    {
-        many1(choice((
-            attempt(code_parser()),
-            attempt(header_parser(db)),
-            attempt(quote_parser(db)),
-            text_parser(db),
-        )))
-        .skip(eof())
-        .map(PostBody)
-    }
+fn post_body_parser<Input>() -> impl Parser<Input, Output = PostBody>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+{
+    many1(choice((
+        attempt(code_parser()),
+        attempt(header_parser()),
+        attempt(quote_parser()),
+        text_parser(),
+    )))
+    .skip(eof())
+    .map(PostBody)
 }
 
 /// A parsed post body which can be rendered into HTML.
 pub struct PostBody(Vec<BlockItem>);
 
 impl PostBody {
-    pub fn parse<S>(
-        content: S,
-        rules: &[FilterRule],
-        db: &Database,
-    ) -> Result<PostBody>
+    /// Parse the post body.
+    pub fn parse<S>(content: S, rules: &[FilterRule]) -> Result<PostBody>
     where
         S: Into<String>,
     {
@@ -284,11 +269,34 @@ impl PostBody {
             content.push('\n');
         }
 
-        let (output, _input) = post_body_parser(db)
+        let (output, _input) = post_body_parser()
             .easy_parse(position::Stream::new(content.as_str()))
             .map_err(|err| Error::ParseError(err.to_string()))?;
 
         Ok(output)
+    }
+
+    /// Resolve post references. This adds an URI to the post reference if the
+    /// post in question exists.
+    pub fn resolve_refs<C>(&mut self, db: &Connection<C>)
+    where
+        C: InnerConnection,
+    {
+        for block_item in self.0.iter_mut() {
+            match block_item {
+                BlockItem::Header(items)
+                | BlockItem::Quote(items)
+                | BlockItem::Text(items) => {
+                    for line_item in items.iter_mut() {
+                        if let LineItem::PostRef { id, uri } = line_item {
+                            *uri = db.post_uri(*id).ok();
+                        }
+                    }
+                }
+
+                _ => (),
+            }
+        }
     }
 
     pub fn into_html(self) -> String {
@@ -457,14 +465,14 @@ impl RenderOnce for LineItem {
 #[cfg(test)]
 mod tests {
     use super::PostBody;
-    use crate::{models::Database, Result};
+    use crate::Result;
 
     fn test_parse<S1, S2>(input: S1, expected_output: S2) -> Result<()>
     where
         S1: Into<String> + std::fmt::Debug,
         S2: AsRef<str> + std::fmt::Debug,
     {
-        let body = PostBody::parse(input.into(), &[], &Database::mock())?;
+        let body = PostBody::parse(input.into(), &[])?;
 
         assert_eq!(body.into_html(), expected_output.as_ref());
 

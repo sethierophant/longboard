@@ -6,9 +6,9 @@ use serde_json::value::{to_value, Value as JsonValue};
 
 use crate::impl_template_responder;
 use crate::models::staff::{Role, Staff, StaffAction, User};
-use crate::models::{Board, Report};
+use crate::models::{Board, PooledConnection, Report};
 use crate::views::{Context, PageFooter, PageInfo};
-use crate::{Database, Result};
+use crate::Result;
 
 /// A wrapper type for using a `Staff` in a template.
 #[derive(Debug)]
@@ -46,7 +46,7 @@ pub struct ReportView {
 
 impl ReportView {
     /// Create a new `ReportView`.
-    fn new(report_id: i32, db: &Database) -> Result<ReportView> {
+    fn new(report_id: i32, db: &PooledConnection) -> Result<ReportView> {
         let report = db.report(report_id)?;
         let post_uri = db.post(report.post_id)?.uri();
         Ok(ReportView { report, post_uri })
@@ -149,7 +149,7 @@ impl OverviewPage {
                 .database
                 .all_reports()?
                 .into_iter()
-                .map(|report| ReportView::new(report.id, context.database))
+                .map(|report| ReportView::new(report.id, &context.database))
                 .collect::<Result<_>>()?,
             boards: context.database.all_boards()?,
             users,

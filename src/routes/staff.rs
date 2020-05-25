@@ -11,7 +11,7 @@ use rocket::request::{
     Form, FromForm, FromFormValue, FromRequest, Outcome, Request,
 };
 use rocket::response::Response;
-use rocket::{get, post, uri, State};
+use rocket::{get, post, uri};
 
 use crate::models::*;
 use crate::views::staff::*;
@@ -23,7 +23,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Session {
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
         let db = request
-            .guard::<State<Database>>()
+            .guard::<PooledConnection>()
             .expect("expected database to be initialized");
         let cookies = request.cookies();
 
@@ -54,7 +54,7 @@ pub struct LoginData {
 #[post("/staff/login", data = "<login_data>")]
 pub fn handle_login<'r>(
     login_data: Form<LoginData>,
-    db: State<Database>,
+    db: PooledConnection,
 ) -> Result<Response<'r>> {
     let staff = db.staff(&login_data.user)?;
 
@@ -90,7 +90,7 @@ pub fn handle_login<'r>(
 pub fn logout<'r>(
     session: Session,
     mut cookies: Cookies,
-    db: State<Database>,
+    db: PooledConnection,
 ) -> Result<Response<'r>> {
     if let Some(cookie) = cookies.get("session").cloned() {
         cookies.remove(cookie)
@@ -141,7 +141,7 @@ pub struct CloseReportData {
 #[post("/staff/close-report", data = "<close_data>")]
 pub fn close_report(
     close_data: Form<CloseReportData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -174,7 +174,7 @@ pub struct CreateBoardData {
 #[post("/staff/create-board", data = "<create_data>")]
 pub fn create_board(
     create_data: Form<CreateBoardData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -202,7 +202,7 @@ pub struct EditBoardData {
 #[post("/staff/edit-board", data = "<edit_data>")]
 pub fn edit_board(
     edit_data: Form<EditBoardData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -229,7 +229,7 @@ pub struct DeleteBoardData {
 #[post("/staff/delete-board", data = "<delete_data>")]
 pub fn delete_board(
     delete_data: Form<DeleteBoardData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -273,7 +273,7 @@ pub struct BanUserData {
 #[post("/staff/ban-user", data = "<ban_data>")]
 pub fn ban_user(
     ban_data: Form<BanUserData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -311,7 +311,7 @@ pub struct UnbanUserData {
 #[post("/staff/unban-user", data = "<unban_data>")]
 pub fn unban_user(
     unban_data: Form<UnbanUserData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -345,7 +345,7 @@ pub struct AddNoteData {
 #[post("/staff/add-note", data = "<note_data>")]
 pub fn add_note(
     note_data: Form<AddNoteData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -371,7 +371,7 @@ pub struct RemoveNoteData {
 #[post("/staff/remove-note", data = "<note_data>")]
 pub fn remove_note(
     note_data: Form<RemoveNoteData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -398,7 +398,7 @@ pub struct DeletePostsForUserData {
 #[post("/staff/delete-posts-for-user", data = "<delete_data>")]
 pub fn delete_posts_for_user(
     delete_data: Form<DeletePostsForUserData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -432,7 +432,7 @@ pub fn pin(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -465,7 +465,7 @@ pub fn unpin(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -498,7 +498,7 @@ pub fn lock(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -531,7 +531,7 @@ pub fn unlock(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
@@ -568,7 +568,7 @@ pub fn staff_delete(
     thread_id: ThreadId,
     post_id: PostId,
     reason_data: Form<ReasonData>,
-    db: State<Database>,
+    db: PooledConnection,
     context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {

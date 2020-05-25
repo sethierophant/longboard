@@ -11,8 +11,6 @@ use argon2::hash_encoded;
 
 use chrono::offset::Utc;
 
-use diesel::Connection;
-
 use image::ImageFormat;
 
 use mime::Mime;
@@ -28,7 +26,7 @@ use rocket::http::hyper::header::Location;
 use rocket::http::{ContentType, Status};
 use rocket::response::Redirect;
 use rocket::{data, Outcome};
-use rocket::{post, uri, Data, Request, Responder, State};
+use rocket::{post, uri, Data, Request, Responder};
 
 use crate::models::*;
 use crate::parse::PostBody;
@@ -152,7 +150,7 @@ fn create_thread(
     board_name: String,
     entries: MultipartEntries,
     conf: Conf,
-    db: &Database,
+    db: &PooledConnection,
     user: User,
     session: Option<Session>,
 ) -> Result<ThreadId> {
@@ -199,7 +197,7 @@ fn create_post(
     thread_id: ThreadId,
     entries: MultipartEntries,
     conf: Conf,
-    db: &Database,
+    db: &PooledConnection,
     user: User,
     session: Option<Session>,
 ) -> Result<PostId> {
@@ -218,10 +216,13 @@ fn create_post(
             param: "body".into(),
         })?;
 
-    let body = PostBody::parse(body_param, conf.filter_rules, db)?.into_html();
+    let mut body = PostBody::parse(body_param, conf.filter_rules)?;
+    body.resolve_refs(&db);
+
+    let body_html = body.into_html();
 
     let limit = *conf.rate_limit_same_content;
-    if db.content_rate_limit_exceeded(&body, limit)? {
+    if db.content_rate_limit_exceeded(&body_html, limit)? {
         return Err(Error::ContentRateLimitExceeded);
     }
 
@@ -291,7 +292,7 @@ fn create_post(
     let no_bump = entries.param("no-bump").is_some();
 
     let new_post_id = db.insert_post(NewPost {
-        body,
+        body: body_html,
         author_name,
         author_contact,
         author_ident,
@@ -318,7 +319,7 @@ fn create_file(
     post_id: PostId,
     entries: MultipartEntries,
     conf: Conf,
-    db: &Database,
+    db: &PooledConnection,
 ) -> Result<()> {
     let field = entries.field("file").unwrap();
 
@@ -529,7 +530,7 @@ pub fn new_thread(
     board_name: String,
     entries: MultipartEntries,
     conf: Conf,
-    db: State<Database>,
+    db: PooledConnection,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
@@ -538,7 +539,7 @@ pub fn new_thread(
         return Err(Error::BoardNotFound { board_name });
     }
 
-    let new_thread_id = db.pool()?.get()?.transaction::<_, Error, _>(|| {
+    let new_thread_id = db.inner.transaction::<_, Error, _>(|| {
         create_thread(board_name.clone(), entries, conf, &db, user, session)
     })?;
 
@@ -555,7 +556,7 @@ pub fn new_post(
     thread_id: ThreadId,
     entries: MultipartEntries,
     conf: Conf,
-    db: State<Database>,
+    db: PooledConnection,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
@@ -567,7 +568,7 @@ pub fn new_post(
         });
     }
 
-    let new_post_id = db.pool()?.get()?.transaction::<_, Error, _>(|| {
+    let new_post_id = db.inner.transaction::<_, Error, _>(|| {
         create_post(
             board_name.clone(),
             thread_id,

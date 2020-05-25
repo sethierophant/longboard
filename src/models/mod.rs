@@ -8,7 +8,7 @@ use chrono::offset::Utc;
 use chrono::{DateTime, Duration};
 
 use diesel::dsl::{count, exists};
-use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::r2d2;
 use diesel::sql_types::{Integer, Text};
 use diesel::{delete, insert_into, prelude::*, select, sql_query, update};
 
@@ -16,7 +16,9 @@ use diesel_migrations::embed_migrations;
 
 use mime::Mime;
 
-use rocket::uri;
+use rocket::http::Status;
+use rocket::request::{FromRequest, Outcome, Request};
+use rocket::{uri, State};
 
 use serde::{Serialize, Serializer};
 
@@ -276,66 +278,92 @@ impl Page {
 }
 
 /// A PostgreSQL connection pool.
-type ConnectionPool = Pool<ConnectionManager<PgConnection>>;
+pub struct ConnectionPool(r2d2::Pool<r2d2::ConnectionManager<PgConnection>>);
 
-/// A connection to the database. Used for creating and retrieving data.
-///
-/// If being run in a unit test, the database might not have a connection pool.
-/// In that case, any database operation will fail with Error::DatabaseIsMock.
-pub struct Database {
-    pool: Option<ConnectionPool>,
-}
-
-impl Debug for Database {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.pool {
-            Some(ref pool) => {
-                let state = pool.state();
-
-                write!(
-                    fmt,
-                    "<#Database connections={} idle_connections={}>",
-                    state.connections, state.idle_connections,
-                )?;
-            }
-            None => write!(fmt, "<#Database (mock)>")?,
-        }
-
-        Ok(())
-    }
-}
-
-impl Database {
-    /// Get the connection pool.
-    ///
-    /// If this database is a mock database, fails with Error::DatabaseIsMock.
-    pub fn pool(&self) -> Result<&ConnectionPool> {
-        self.pool.as_ref().ok_or(Error::DatabaseIsMock)
-    }
-
-    /// Connect to the database with a new connection pool.
-    pub fn new<S>(url: S) -> Result<Database>
+impl ConnectionPool {
+    /// Create a new connection pool.
+    pub fn new<S>(uri: S) -> Result<ConnectionPool>
     where
         S: AsRef<str>,
     {
-        let pool = Pool::new(ConnectionManager::new(url.as_ref()))?;
+        let manager = r2d2::ConnectionManager::new(uri.as_ref());
+        let pool = r2d2::Pool::new(manager)?;
+
         embedded_migrations::run(&pool.get()?)?;
 
-        Ok(Database { pool: Some(pool) })
+        Ok(ConnectionPool(pool))
     }
+}
 
-    /// Create a new Database for unit tests.
-    ///
-    /// Any database operation will fail with Error::DatabaseIsMock.
-    pub fn mock() -> Database {
-        Database { pool: None }
+/// A connection to the database.
+///
+/// This type is generic, so it could be either either a single connection, or a
+/// pooled connection.
+pub struct Connection<C: InnerConnection> {
+    pub(crate) inner: C,
+}
+
+/// The raw diesel connection.
+pub trait InnerConnection = diesel::connection::Connection<
+    Backend = diesel::pg::Pg,
+    TransactionManager = diesel::connection::AnsiTransactionManager,
+>;
+
+/// A database connection recieved from a pool.
+pub type PooledConnection = Connection<
+    diesel::r2d2::PooledConnection<
+        diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>,
+    >,
+>;
+
+/// A single, non-pooled connection to the database.
+pub type SingleConnection = Connection<diesel::pg::PgConnection>;
+
+impl<C: InnerConnection> Debug for Connection<C> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // It would be nice if we could get more information here but
+        // unfortunately this is a pretty opaque type.
+        write!(fmt, "<database connection>")
     }
+}
 
+impl<'a, 'r> FromRequest<'a, 'r> for PooledConnection {
+    type Error = Error;
+
+    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+        let ConnectionPool(pool) = request
+            .guard::<State<ConnectionPool>>()
+            .expect("expected database connection pool to be initialized")
+            .inner();
+
+        match pool.get() {
+            Ok(conn) => Outcome::Success(PooledConnection { inner: conn }),
+            Err(err) => Outcome::Failure((
+                Status::InternalServerError,
+                Error::from(err),
+            )),
+        }
+    }
+}
+
+impl SingleConnection {
+    /// Establish a new non-pooled connection to the database.
+    pub fn establish<S>(database_uri: S) -> Result<SingleConnection>
+    where
+        S: AsRef<str>,
+    {
+        Ok(SingleConnection {
+            inner: PgConnection::establish(database_uri.as_ref())?,
+        })
+    }
+}
+
+impl<C: InnerConnection> Connection<C> {
     /// Get all boards.
     pub fn all_boards(&self) -> Result<Vec<Board>> {
         use crate::schema::board::dsl::board;
 
-        Ok(board.load(&self.pool()?.get()?)?)
+        Ok(board.load(&self.inner)?)
     }
 
     /// Get a board.
@@ -348,16 +376,14 @@ impl Database {
 
         Ok(board
             .filter(name.eq(board_name.as_ref()))
-            .first(&self.pool()?.get()?)?)
+            .first(&self.inner)?)
     }
 
     /// Insert a new board.
     pub fn insert_board(&self, new_board: Board) -> Result<()> {
         use crate::schema::board::dsl::board;
 
-        insert_into(board)
-            .values(&new_board)
-            .execute(&self.pool()?.get()?)?;
+        insert_into(board).values(&new_board).execute(&self.inner)?;
 
         Ok(())
     }
@@ -376,7 +402,7 @@ impl Database {
 
         update(board.filter(name.eq(board_name.as_ref())))
             .set(description.eq(new_description.as_ref()))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -392,7 +418,7 @@ impl Database {
         use crate::schema::board::dsl::board;
 
         delete(board.filter(name.eq(board_name.as_ref())))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -406,7 +432,7 @@ impl Database {
     where
         S: AsRef<str>,
     {
-        self.pool()?.get()?.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|| {
             let query = "DELETE FROM report R \
                                USING post P, thread T \
                                WHERE R.post = P.id \
@@ -418,7 +444,7 @@ impl Database {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             let query = "DELETE FROM file F \
                                USING post P, thread T \
@@ -431,7 +457,7 @@ impl Database {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             let query = "DELETE FROM post \
                                WHERE thread = ANY( \
@@ -442,7 +468,7 @@ impl Database {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             let query = "DELETE FROM thread \
                                WHERE id = ANY( \
@@ -453,7 +479,7 @@ impl Database {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             Ok(())
         })?;
@@ -469,7 +495,7 @@ impl Database {
         Ok(thread
             .filter(id.eq(thread_id))
             .limit(1)
-            .first(&self.pool()?.get()?)?)
+            .first(&self.inner)?)
     }
 
     /// Get a single page of threads on a board.
@@ -496,7 +522,7 @@ impl Database {
             .then_order_by(bump_date.desc())
             .limit(page.width as i64)
             .offset(page.offset() as i64)
-            .load(&self.pool()?.get()?)?)
+            .load(&self.inner)?)
     }
 
     /// How many pages of threads there are total.
@@ -514,7 +540,7 @@ impl Database {
         let thread_count: i64 = thread
             .filter(board.eq(board_name.as_ref()))
             .select(count(id))
-            .first(&self.pool()?.get()?)?;
+            .first(&self.inner)?;
 
         Ok((thread_count as f64 / page_width as f64).ceil() as u32)
     }
@@ -557,7 +583,7 @@ impl Database {
                                   LIMIT 1)"))
             .order_by(thread_columns::pinned.desc())
             .then_order_by(thread_columns::bump_date.desc())
-            .load(&self.pool()?.get()?)?)
+            .load(&self.inner)?)
     }
 
     /// Insert a new thread into the database.
@@ -568,7 +594,7 @@ impl Database {
         Ok(insert_into(thread)
             .values(&new_thread)
             .returning(id)
-            .get_result(&self.pool()?.get()?)?)
+            .get_result(&self.inner)?)
     }
 
     /// Update a thread's bump_date.
@@ -580,7 +606,7 @@ impl Database {
 
         update(thread.filter(id.eq(thread_id)))
             .set(bump_date.eq(now))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -595,26 +621,26 @@ impl Database {
         use crate::schema::thread::columns::id as thread_id;
         use crate::schema::thread::dsl::thread as table_thread;
 
-        self.pool()?.get()?.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|| {
             let query = "DELETE FROM report R \
                                USING post P \
                                WHERE R.post = P.id AND P.thread = $1";
             sql_query(query)
                 .bind::<Integer, _>(tid)
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             let query = "DELETE FROM file F \
                                USING post P \
                                WHERE F.post = P.id AND P.thread = $1";
             sql_query(query)
                 .bind::<Integer, _>(tid)
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             delete(table_post.filter(post_thread.eq(tid)))
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             delete(table_thread.filter(thread_id.eq(tid)))
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             Ok(())
         })?;
@@ -630,7 +656,7 @@ impl Database {
         Ok(post
             .filter(thread.eq(thread_id))
             .order(id.asc())
-            .load(&self.pool()?.get()?)?)
+            .load(&self.inner)?)
     }
 
     /// Get the number of posts in a thread.
@@ -641,7 +667,7 @@ impl Database {
         let count: i64 = post
             .filter(thread.eq(thread_id))
             .count()
-            .first(&self.pool()?.get()?)?;
+            .first(&self.inner)?;
 
         Ok(count.try_into().unwrap())
     }
@@ -657,7 +683,7 @@ impl Database {
             .inner_join(post.inner_join(file))
             .filter(id.eq(thread_id))
             .count()
-            .first(&self.pool()?.get()?)?;
+            .first(&self.inner)?;
 
         Ok(count.try_into().unwrap())
     }
@@ -673,19 +699,19 @@ impl Database {
 
         let mut posts: Vec<Post> = Vec::new();
 
-        self.pool()?.get()?.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|| {
             let first_post: Post = post
                 .filter(thread.eq(thread_id))
                 .order(id.asc())
                 .limit(1)
-                .first(&self.pool()?.get()?)?;
+                .first(&self.inner)?;
 
             posts = post
                 .filter(id.ne(first_post.id))
                 .filter(thread.eq(thread_id))
                 .order(id.desc())
                 .limit(limit.into())
-                .load(&self.pool()?.get()?)?;
+                .load(&self.inner)?;
 
             posts.reverse();
             posts.insert(0, first_post);
@@ -703,7 +729,7 @@ impl Database {
 
         update(thread.filter(id.eq(thread_id)))
             .set(locked.eq(true))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -715,7 +741,7 @@ impl Database {
 
         update(thread.filter(id.eq(thread_id)))
             .set(locked.eq(false))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -727,7 +753,7 @@ impl Database {
 
         update(thread.filter(id.eq(thread_id)))
             .set(pinned.eq(true))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -739,7 +765,7 @@ impl Database {
 
         update(thread.filter(id.eq(thread_id)))
             .set(pinned.eq(false))
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -753,7 +779,7 @@ impl Database {
             .filter(id.eq(thread_id))
             .select(locked)
             .limit(1)
-            .first(&self.pool()?.get()?)?)
+            .first(&self.inner)?)
     }
 
     /// Get a post.
@@ -761,10 +787,7 @@ impl Database {
         use crate::schema::post::columns::id;
         use crate::schema::post::dsl::post;
 
-        Ok(post
-            .filter(id.eq(post_id))
-            .limit(1)
-            .first(&self.pool()?.get()?)?)
+        Ok(post.filter(id.eq(post_id)).limit(1).first(&self.inner)?)
     }
 
     /// Insert a new post into the database.
@@ -779,12 +802,12 @@ impl Database {
         Ok(insert_into(post)
             .values(&new_post)
             .returning(id)
-            .get_result(&self.pool()?.get()?)?)
+            .get_result(&self.inner)?)
     }
 
     /// Delete a post.
     pub fn delete_post(&self, pid: PostId) -> Result<()> {
-        self.pool()?.get()?.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|| {
             use crate::schema::file::columns::post as file_post;
             use crate::schema::file::dsl::file as table_file;
             use crate::schema::post::columns::id as post_id;
@@ -793,13 +816,12 @@ impl Database {
             use crate::schema::report::dsl::report as table_report;
 
             delete(table_report.filter(report_post.eq(pid)))
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
             delete(table_file.filter(file_post.eq(pid)))
-                .execute(&self.pool()?.get()?)?;
+                .execute(&self.inner)?;
 
-            delete(table_post.filter(post_id.eq(pid)))
-                .execute(&self.pool()?.get()?)?;
+            delete(table_post.filter(post_id.eq(pid))).execute(&self.inner)?;
 
             Ok(())
         })?;
@@ -809,38 +831,37 @@ impl Database {
 
     /// Get the URI for a post.
     pub fn post_uri(&self, post_id: PostId) -> Result<String> {
-        let thread_uri =
-            self.pool()?.get()?.transaction::<_, Error, _>(|| {
-                let thread_id: ThreadId = {
-                    use crate::schema::post::columns::{id, thread};
-                    use crate::schema::post::dsl::post;
+        let thread_uri = self.inner.transaction::<_, Error, _>(|| {
+            let thread_id: ThreadId = {
+                use crate::schema::post::columns::{id, thread};
+                use crate::schema::post::dsl::post;
 
-                    post.filter(id.eq(post_id))
-                        .select(thread)
-                        .limit(1)
-                        .first(&self.pool()?.get()?)?
-                };
+                post.filter(id.eq(post_id))
+                    .select(thread)
+                    .limit(1)
+                    .first(&self.inner)?
+            };
 
-                let board_name: String = {
-                    use crate::schema::thread::columns::{board, id};
-                    use crate::schema::thread::dsl::thread;
+            let board_name: String = {
+                use crate::schema::thread::columns::{board, id};
+                use crate::schema::thread::dsl::thread;
 
-                    thread
-                        .filter(id.eq(thread_id))
-                        .select(board)
-                        .limit(1)
-                        .first(&self.pool()?.get()?)?
-                };
+                thread
+                    .filter(id.eq(thread_id))
+                    .select(board)
+                    .limit(1)
+                    .first(&self.inner)?
+            };
 
-                Ok(uri!(crate::routes::thread: board_name, thread_id))
-            })?;
+            Ok(uri!(crate::routes::thread: board_name, thread_id))
+        })?;
 
         Ok(format!("{}#{}", thread_uri.to_string(), post_id))
     }
 
     /// Get the thread that a post belongs to.
     pub fn parent_thread(&self, post_id: PostId) -> Result<Thread> {
-        let parent = self.pool()?.get()?.transaction::<_, Error, _>(|| {
+        let parent = self.inner.transaction::<_, Error, _>(|| {
             use crate::schema::thread::columns::id;
             use crate::schema::thread::dsl::thread;
 
@@ -851,13 +872,13 @@ impl Database {
                 post.filter(id.eq(post_id))
                     .select(thread)
                     .limit(1)
-                    .first(&self.pool()?.get()?)?
+                    .first(&self.inner)?
             };
 
             Ok(thread
                 .filter(id.eq(thread_id))
                 .limit(1)
-                .first(&self.pool()?.get()?)?)
+                .first(&self.inner)?)
         })?;
 
         Ok(parent)
@@ -865,26 +886,22 @@ impl Database {
 
     /// Check whether a post is the first post in a thread (the original post).
     pub fn is_first_post(&self, post_id: PostId) -> Result<bool> {
-        let first_post_id =
-            self.pool()?.get()?.transaction::<_, Error, _>(|| {
-                use crate::schema::post::columns::{id, thread};
-                use crate::schema::post::dsl::post;
+        let first_post_id = self.inner.transaction::<_, Error, _>(|| {
+            use crate::schema::post::columns::{id, thread};
+            use crate::schema::post::dsl::post;
 
-                let Post { thread_id, .. } = {
-                    post.filter(id.eq(post_id))
-                        .limit(1)
-                        .first(&self.pool()?.get()?)?
-                };
+            let Post { thread_id, .. } =
+                { post.filter(id.eq(post_id)).limit(1).first(&self.inner)? };
 
-                let first_post_id: i32 = post
-                    .filter(thread.eq(thread_id))
-                    .select(id)
-                    .order(id.asc())
-                    .limit(1)
-                    .first(&self.pool()?.get()?)?;
+            let first_post_id: i32 = post
+                .filter(thread.eq(thread_id))
+                .select(id)
+                .order(id.asc())
+                .limit(1)
+                .first(&self.inner)?;
 
-                Ok(first_post_id)
-            })?;
+            Ok(first_post_id)
+        })?;
 
         Ok(post_id == first_post_id)
     }
@@ -895,7 +912,7 @@ impl Database {
         use crate::schema::file::dsl::file;
 
         let files: Vec<DbFile> =
-            file.filter(post.eq(post_id)).load(&self.pool()?.get()?)?;
+            file.filter(post.eq(post_id)).load(&self.inner)?;
 
         Ok(files.into_iter().map(File::from).collect())
     }
@@ -904,9 +921,7 @@ impl Database {
     pub fn insert_file(&self, new_file: NewFile) -> Result<()> {
         use crate::schema::file::dsl::file;
 
-        insert_into(file)
-            .values(&new_file)
-            .execute(&self.pool()?.get()?)?;
+        insert_into(file).values(&new_file).execute(&self.inner)?;
 
         Ok(())
     }
@@ -915,7 +930,7 @@ impl Database {
     pub fn delete_files_of_post(&self, post_id: PostId) -> Result<()> {
         use crate::schema::file::columns::post;
         use crate::schema::file::dsl::file;
-        delete(file.filter(post.eq(post_id))).execute(&self.pool()?.get()?)?;
+        delete(file.filter(post.eq(post_id))).execute(&self.inner)?;
 
         Ok(())
     }
@@ -924,14 +939,14 @@ impl Database {
     pub fn num_threads(&self) -> Result<i64> {
         use crate::schema::thread::dsl::thread;
 
-        Ok(thread.count().first(&self.pool()?.get()?)?)
+        Ok(thread.count().first(&self.inner)?)
     }
 
     /// Get the number of posts in the database.
     pub fn num_posts(&self) -> Result<i64> {
         use crate::schema::post::dsl::post;
 
-        Ok(post.count().first(&self.pool()?.get()?)?)
+        Ok(post.count().first(&self.inner)?)
     }
 
     /// Get a report.
@@ -942,14 +957,14 @@ impl Database {
         Ok(report
             .filter(id.eq(report_id))
             .limit(1)
-            .first(&self.pool()?.get()?)?)
+            .first(&self.inner)?)
     }
 
     /// Get all post reports.
     pub fn all_reports(&self) -> Result<Vec<Report>> {
         use crate::schema::report::dsl::report;
 
-        Ok(report.load(&self.pool()?.get()?)?)
+        Ok(report.load(&self.inner)?)
     }
 
     /// Insert a new post report.
@@ -958,7 +973,7 @@ impl Database {
 
         insert_into(report)
             .values(&new_report)
-            .execute(&self.pool()?.get()?)?;
+            .execute(&self.inner)?;
 
         Ok(())
     }
@@ -968,8 +983,7 @@ impl Database {
         use crate::schema::report::columns::id;
         use crate::schema::report::dsl::report;
 
-        delete(report.filter(id.eq(report_id)))
-            .execute(&self.pool()?.get()?)?;
+        delete(report.filter(id.eq(report_id))).execute(&self.inner)?;
 
         Ok(())
     }
@@ -982,7 +996,7 @@ impl Database {
         Ok(post
             .order(time_stamp.desc())
             .limit(limit.into())
-            .load(&self.pool()?.get()?)?)
+            .load(&self.inner)?)
     }
 
     /// Get up to `limit` recently uploaded files.
@@ -1004,7 +1018,7 @@ impl Database {
                 post,
                 is_spoiler,
             ))
-            .load(&self.pool()?.get()?)?;
+            .load(&self.inner)?;
 
         Ok(files.into_iter().map(File::from).collect())
     }
@@ -1022,7 +1036,7 @@ impl Database {
             .filter(post_columns::user_id.eq(user_id))
             .filter(post_columns::time_stamp.gt(Utc::now() - limit));
 
-        Ok(select(exists(query)).get_result(&self.pool()?.get()?)?)
+        Ok(select(exists(query)).get_result(&self.inner)?)
     }
 
     /// Check if a post has been made with the given content within recently.
@@ -1041,6 +1055,6 @@ impl Database {
             .filter(post_columns::body.eq(post_body.as_ref()))
             .filter(post_columns::time_stamp.gt(Utc::now() - limit));
 
-        Ok(select(exists(query)).get_result(&self.pool()?.get()?)?)
+        Ok(select(exists(query)).get_result(&self.inner)?)
     }
 }

@@ -5,8 +5,8 @@ use clap::{App, Arg, SubCommand};
 use rand::{thread_rng, Rng};
 
 use longboard::config::{Config, ExtensionConfig, GlobalConfig};
-use longboard::models::staff::Staff;
-use longboard::{Database, Result};
+use longboard::models::{staff::Staff, SingleConnection};
+use longboard::Result;
 
 fn main_res() -> Result<()> {
     let matches = App::new("longctl")
@@ -106,7 +106,7 @@ fn main_res() -> Result<()> {
         config.global_config.database_uri = uri.to_string();
     }
 
-    let db = Database::new(config.global().database_uri)?;
+    let db = SingleConnection::establish(&config.global_config.database_uri)?;
 
     if let Some(matches) = matches.subcommand_matches("add-staff") {
         let pass = matches.value_of("pass").unwrap().as_bytes();
