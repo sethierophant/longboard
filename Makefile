@@ -73,7 +73,7 @@ install: target/release/longboard
 	$(INSTALL_DATA) -D res/style/* -t $(DESTDIR)$(datadir)/longboard/style
 	cp -r res/templates $(DESTDIR)$(datadir)/longboard/templates
 	$(INSTALL_DIR) -d $(DESTDIR)$(sysconfdir)/longboard
-	$(INSTALL_PRIVDIR) -d $(DESTDIR)$(persistdir)/longboard
+	$(INSTALL_DIR) -d $(DESTDIR)$(persistdir)/longboard
 	$(INSTALL_PRIVDIR) -d $(DESTDIR)$(logdir)/longboard
 	$(M4) contrib/config/release.yaml.m4 \
 		>$(DESTDIR)$(sysconfdir)/longboard/config.yaml
