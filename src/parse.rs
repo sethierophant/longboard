@@ -1,6 +1,7 @@
 //! Parsing for uploaded posts.
 
 use combine::parser::char::*;
+use combine::parser::combinator::*;
 use combine::parser::repeat::*;
 use combine::stream::position;
 use combine::*;
@@ -22,12 +23,42 @@ use crate::{Error, Result};
 // can be compiled in about 1 minute.
 
 /// Parse whitespace that isn't a newline.
-fn line_spaces<Input>() -> impl Parser<Input, Output = String>
+fn inline_spaces<Input>() -> impl Parser<Input, Output = String>
 where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     many(satisfy(|c: char| c.is_whitespace() && c != '\n'))
+}
+
+/// Parses in-line text started and ended by `delim`. Characters escaped with a
+/// backslash are not counted as the delimiter.
+fn inline_delimited<Input, F, P>(
+    delim: F,
+) -> impl Parser<Input, Output = String>
+where
+    Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
+    F: Fn() -> P,
+    P: Parser<Input>,
+    P::Output: Into<
+        combine::error::Info<
+            <Input as StreamOnce>::Token,
+            <Input as StreamOnce>::Range,
+            &'static str,
+        >,
+    >,
+{
+    let line_char = || satisfy(|c: char| c != '\n' && c != '\\');
+
+    let escaped_line_char = || satisfy(|c: char| c != '\n');
+
+    let inner = many1(choice((
+        not_followed_by(attempt(delim())).with(line_char()),
+        char('\\').with(escaped_line_char()),
+    )));
+
+    delim().with(inner).skip(delim())
 }
 
 /// Parse `**strong**` text.
@@ -36,12 +67,7 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    let p = not_followed_by(attempt(string("**"))).with(any());
-
-    string("**")
-        .with(many1(p))
-        .skip(string("**"))
-        .map(LineItem::Strong)
+    inline_delimited(|| string("**")).map(LineItem::Strong)
 }
 
 /// Parse `*emphasized*` text.
@@ -50,12 +76,7 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    let p = not_followed_by(char('*')).with(any());
-
-    char('*')
-        .with(many1(p))
-        .skip(char('*'))
-        .map(LineItem::Emphasis)
+    inline_delimited(|| char('*')).map(LineItem::Emphasis)
 }
 
 /// Parse `~spoiler~` text.
@@ -64,12 +85,7 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    let p = not_followed_by(char('~')).with(any());
-
-    char('~')
-        .with(many1(p))
-        .skip(char('~'))
-        .map(LineItem::Spoiler)
+    inline_delimited(|| char('~')).map(LineItem::Spoiler)
 }
 
 /// Parse a post ref like `>>123`.
@@ -80,18 +96,20 @@ where
 {
     string(">>")
         .with(many1(digit()))
-        .map(move |s: String| LineItem::PostRef {
+        .map(|s: String| LineItem::PostRef {
             id: s.parse().unwrap(),
             uri: None,
         })
 }
 
-/// Parse a http link.
+/// Parse an HTTP link.
 fn link_parser<Input>() -> impl Parser<Input, Output = LineItem>
 where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
+    dbg!("link_parser");
+
     let link_char = || {
         satisfy(|c: char| {
             let special_link_chars = [
@@ -103,13 +121,28 @@ where
         })
     };
 
-    choice((
-        attempt(string("http://")).and(many1(link_char())),
-        attempt(string("https://")).and(many1(link_char())),
-    ))
-    .map(|(schema, rest): (&str, String)| {
-        LineItem::Link(format!("{}{}", schema, rest))
-    })
+    // Most links don't end with special characters, so we omit them from the
+    // link, even though technically they're valid URI characters.
+    //
+    // For example, if a link was at the end of a sentence, this prevents the
+    // period for becoming a part of the link.
+    let final_link_char = || {
+        satisfy(|c: char| {
+            let special_link_chars = ['#', '$', '-', '_', '+', '*', '\''];
+
+            c.is_alphanumeric() || special_link_chars.contains(&c)
+        })
+    };
+
+    attempt(recognize((
+        look_ahead(any()).map(|c| dbg!(c)),
+        choice((attempt(string("http://")), attempt(string("https://")))),
+        many::<String, _, _>(attempt(
+            link_char().skip(look_ahead(link_char())),
+        )),
+        optional(final_link_char()),
+    )))
+    .map(LineItem::Link)
 }
 
 /// Parse `\`code\`` within a line.
@@ -118,9 +151,7 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    let p = not_followed_by(char('`')).with(any());
-
-    char('`').with(many1(p)).skip(char('`')).map(LineItem::Code)
+    inline_delimited(|| char('`')).map(LineItem::Code)
 }
 
 /// Parse any plain text within a line; anything not covered by the above
@@ -130,17 +161,43 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    let end = choice((
-        char('*'),
-        char('~'),
-        char('>'),
-        char('`'),
-        attempt(string("http://")).map(|_| '\0'),
-        attempt(string("https://")).map(|_| '\0'),
-        newline(),
-    ));
+    dbg!("line_text_parser");
 
-    many1(not_followed_by(end).with(any())).map(LineItem::Text)
+    let line_char = || {
+        choice((
+            // Parse any character other than a backslash literally.
+            satisfy(|c: char| c != '\n' && c != '\\'),
+            // If a backslash is followed by a character, parse that character
+            // literally.
+            attempt(char('\\').with(satisfy(|c: char| c != '\n'))),
+            // If a backslash is followed by a newline, parse it literally.
+            char('\\'),
+        ))
+    };
+
+    let end = || {
+        choice((
+            char('*'),
+            char('~'),
+            char('>'),
+            char('`'),
+            attempt(string("http://")).map(|_| '\0'),
+            attempt(string("https://")).map(|_| '\0'),
+            newline(),
+        ))
+    };
+
+    let not_end = || attempt(not_followed_by(end()).with(line_char()));
+
+    // We parse one character before not_end, because if there is an
+    // unmatched end character such as '*' or '~', it is parsed literally.
+    //
+    // We know that the first character this parser encounters wasn't handled by
+    // any other parser because this is the last parser tried.
+    line_char()
+        .and(many(not_end()))
+        .map(|(first, rest): (char, String)| format!("{}{}", first, rest))
+        .map(LineItem::Text)
 }
 
 /// Parse all line items.
@@ -170,7 +227,7 @@ where
     let p = not_followed_by(attempt(delim)).with(any());
 
     string("```")
-        .skip(line_spaces())
+        .skip(inline_spaces())
         .with(many(alpha_num()))
         .skip(newline())
         .and(many1(p))
@@ -198,7 +255,7 @@ where
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     char('#')
-        .skip(line_spaces())
+        .skip(inline_spaces())
         .with(line_items_parser())
         .skip(newline())
         .map(BlockItem::Header)
@@ -211,7 +268,9 @@ where
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     char('>')
-        .skip(line_spaces())
+        // Needed to differentiate between quotes and post refs.
+        .skip(not_followed_by(char('>')))
+        .skip(inline_spaces())
         .with(line_items_parser())
         .skip(newline())
         .map(BlockItem::Quote)
@@ -260,14 +319,32 @@ impl PostBody {
                 .into_owned();
         }
 
-        content = Regex::new(r"(\r\n)+")
+        // Here we do some preprocessing, so the parser can assume that no lines
+        // are empty and all lines end with a newline.
+
+        // Replace web newlines \r\n with normal newlines \n.
+        content = Regex::new(r"\r\n")
             .unwrap()
             .replace_all(&content, "\n")
             .into_owned();
 
+        // Remove empty lines.
+        content = Regex::new(r"\n+")
+            .unwrap()
+            .replace_all(&content, "\n")
+            .into_owned();
+
+        // Remove an initial newline, if present.
+        if content.starts_with('\n') {
+            content = String::from(&content[1..]);
+        }
+
+        // Add a trailing newline, if not present.
         if !content.ends_with('\n') {
             content.push('\n');
         }
+
+        println!();
 
         let (output, _input) = post_body_parser()
             .easy_parse(position::Stream::new(content.as_str()))
@@ -505,6 +582,16 @@ mod tests {
     }
 
     #[test]
+    fn link_period() -> Result<()> {
+        test_parse("Here's a cool site: https://lainchan.org.", "<p>Here's a cool site: <a href=\"https://lainchan.org\" rel=\"nofollow noopener\" target=\"_blank\">https://lainchan.org</a>.</p>")
+    }
+
+    #[test]
+    fn link_sentence() -> Result<()> {
+        test_parse("What do you think of https://lainchan.org? I think it's pretty cool.", "<p>What do you think of <a href=\"https://lainchan.org\" rel=\"nofollow noopener\" target=\"_blank\">https://lainchan.org</a>? I think it's pretty cool.</p>")
+    }
+
+    #[test]
     fn header() -> Result<()> {
         test_parse(
             "# The hardships of artistry",
@@ -529,7 +616,7 @@ if(f(a)||f(b)||f(c)
       ||f(y)||f(z)
                      ){
       dostuff();
-} 
+}
 ```";
 
         let expected_output =
@@ -538,7 +625,7 @@ if(f(a)||f(b)||f(c)
       ||f(y)||f(z)
                      ){
       dostuff();
-} 
+}
 </code></pre>";
 
         test_parse(input, expected_output)
@@ -553,7 +640,7 @@ if (very_long_function_name(city_1)
   ...
   || very_long_function_name(city_n)) {
     do_stuff();
-} 
+}
 ```";
 
         let expected_output = "<pre class=\"blockcode\"><code class=\"language-C\">if (very_long_function_name(city_1)
@@ -562,7 +649,7 @@ if (very_long_function_name(city_1)
   ...
   || very_long_function_name(city_n)) {
     do_stuff();
-} 
+}
 </code></pre>";
 
         test_parse(input, expected_output)
@@ -585,5 +672,128 @@ I'll take a look at OP's project and give it a whirl when I get home from work. 
         let expected_output = "<p>Anyone know any good guides to writing text-based adventure games or even MUDs?</p><p>I'll take a look at OP's project and give it a whirl when I get home from work. Looks pretty cool!</p>";
 
         test_parse(input, expected_output)
+    }
+
+    #[test]
+    fn unmatched_emph() -> Result<()> {
+        test_parse("*", "<p>*</p>")
+    }
+
+    #[test]
+    fn unmatched_code() -> Result<()> {
+        test_parse("`", "<p>`</p>")
+    }
+
+    #[test]
+    fn unmatched_spoiler() -> Result<()> {
+        test_parse("~", "<p>~</p>")
+    }
+
+    #[test]
+    fn escaped_emph() -> Result<()> {
+        test_parse(r"*ab\*cd*", "<p><em>ab*cd</em></p>")
+    }
+
+    #[test]
+    fn escaped_strong() -> Result<()> {
+        test_parse(r"**ab\*cd\**ef**", "<p><strong>ab*cd**ef</strong></p>")
+    }
+
+    #[test]
+    fn escaped_spoiler() -> Result<()> {
+        test_parse("~hi\\~~", "<p><span class=\"spoiler\">hi~</span></p>")
+    }
+
+    #[test]
+    fn escaped_code() -> Result<()> {
+        test_parse("`a\\`b`", "<p><code>a`b</code></p>")
+    }
+
+    #[test]
+    fn fuzz() -> Result<()> {
+        use rand::{distributions::Uniform, thread_rng, Rng};
+
+        for _ in 1..50 {
+            // Iterate over ASCII values.
+            let post_content = thread_rng()
+                .sample_iter(Uniform::new_inclusive(0, 127))
+                .map(|byte: u8| char::from(byte))
+                .filter(|c| c.is_ascii_graphic() || *c == ' ' || *c == '\n')
+                .take(100)
+                .collect::<String>();
+
+            if let Err(e) = PostBody::parse(&post_content, &[]) {
+                println!("Post content: {:?}", post_content);
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn fuzz_more() -> Result<()> {
+        use rand::{distributions::Uniform, thread_rng, Rng};
+
+        for _ in 1..1000 {
+            // Iterate over visible ASCII values.
+            let post_content = thread_rng()
+                .sample_iter(Uniform::new_inclusive(0, 127))
+                .map(|byte: u8| char::from(byte))
+                .filter(|c| c.is_ascii_graphic() || *c == ' ' || *c == '\n')
+                .take(100)
+                .collect::<String>();
+
+            if let Err(e) = PostBody::parse(&post_content, &[]) {
+                println!("Post content: {:?}", post_content);
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn fuzz_ascii() -> Result<()> {
+        use rand::{distributions::Uniform, thread_rng, Rng};
+
+        for _ in 1..1000 {
+            // Iterate over all ASCII values.
+            let post_content = thread_rng()
+                .sample_iter(Uniform::new_inclusive(0, 127))
+                .map(|byte: u8| char::from(byte))
+                .take(100)
+                .collect::<String>();
+
+            if let Err(e) = PostBody::parse(&post_content, &[]) {
+                println!("Post content: {:?}", post_content);
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn fuzz_utf8() -> Result<()> {
+        use rand::{distributions::Standard, thread_rng, Rng};
+
+        for _ in 1..1000 {
+            // Iterate over random UTF8.
+            let post_content = thread_rng()
+                .sample_iter::<char, _>(Standard)
+                .take(100)
+                .collect::<String>();
+
+            if let Err(e) = PostBody::parse(&post_content, &[]) {
+                println!("Post content: {:?}", post_content);
+                return Err(e);
+            }
+        }
+
+        Ok(())
     }
 }
