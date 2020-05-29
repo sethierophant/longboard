@@ -16,8 +16,8 @@ md5sums=('SKIP')
 makecmd="make prefix=/usr sysconfdir=/etc localstatedir=/var DESTDIR=\"$pkgdir/\""
 
 pkgver() {
-	cd "$srcdir/${pkgname%-git}"
-	printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+    cd "$srcdir/${pkgname%-git}"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 check() {
@@ -26,11 +26,11 @@ check() {
 }
 
 build() {
-	cd "$srcdir/${pkgname%-git}"
-	${makecmd}
+    cd "$srcdir/${pkgname%-git}"
+    ${makecmd}
 }
 
 package() {
-	cd "$srcdir/${pkgname%-git}"
-	${makecmd} install
+    cd "$srcdir/${pkgname%-git}"
+    ${makecmd} install
 }
