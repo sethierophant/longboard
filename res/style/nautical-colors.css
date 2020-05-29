@@ -1,6 +1,6 @@
 :root {
     --text-color: white;
-    --quote-color: darkgreen;
+    --quote-color: lightgreen;
     --bright-color: hsl(60, 80%, 70%);
     --less-bright-color: hsl(60, 40%, 70%);
     --dull-color: hsl(0, 0%, 75%);
