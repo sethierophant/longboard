@@ -402,6 +402,7 @@ nav a {
 }
 
 .post-image .video-close {
+    display: block;
     margin: 0.2em 0;
     z-index: 1;
 }
