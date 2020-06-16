@@ -128,6 +128,11 @@ appreciated.
 
 [GNU Affero General Public License v3.0][2]
 
+The fonts in [res/fonts](/res/fonts) are distributed under their own licenses,
+the Apache License Version 2.0 for the Roboto fonts and the Open Font License
+for Oswald. These fonts were obtained from [Google Fonts][4].
+
 [1]: https://en.wikipedia.org/wiki/Imageboard
 [2]: https://www.gnu.org/licenses/agpl-3.0.en.html
 [3]: https://www.joedog.org/siege-home/
+[4]: https://fonts.google.com

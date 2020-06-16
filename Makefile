@@ -71,6 +71,7 @@ install: target/release/longboard
 		$(DESTDIR)$(datadir)/longboard/banners
 	$(INSTALL_DATA) -D res/script/* -t $(DESTDIR)$(datadir)/longboard/script
 	$(INSTALL_DATA) -D res/style/* -t $(DESTDIR)$(datadir)/longboard/style
+	$(INSTALL_DATA) -D res/fonts/* -t $(DESTDIR)$(datadir)/longboard/fonts
 	cp -r res/templates $(DESTDIR)$(datadir)/longboard/templates
 	$(INSTALL_DIR) -d $(DESTDIR)$(sysconfdir)/longboard
 	$(INSTALL_DIR) -d $(DESTDIR)$(persistdir)/longboard
