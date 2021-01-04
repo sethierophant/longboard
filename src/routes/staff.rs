@@ -67,7 +67,11 @@ pub fn handle_login<'r>(
         });
     }
 
-    let id: String = thread_rng().sample_iter(Alphanumeric).take(42).collect();
+    let id: String = thread_rng()
+        .sample_iter(Alphanumeric)
+        .map(char::from)
+        .take(42)
+        .collect();
 
     let expires = Utc::now() + Duration::weeks(1);
 

@@ -795,7 +795,7 @@ impl<'a> Conf<'a> {
         let mut banners = self.banners()?;
 
         if !banners.is_empty() {
-            Ok(banners.remove(rng.gen_range(0, banners.len())))
+            Ok(banners.remove(rng.gen_range(0..banners.len())))
         } else {
             Err(Error::BannerDirEmpty)
         }
@@ -860,7 +860,7 @@ impl<'a> Conf<'a> {
         let mut names = self.names()?;
 
         if !names.is_empty() {
-            Ok(names.remove(rng.gen_range(0, names.len())))
+            Ok(names.remove(rng.gen_range(0..names.len())))
         } else {
             Err(Error::NamesFileEmpty)
         }
