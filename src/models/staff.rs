@@ -29,7 +29,7 @@ pub struct Session {
 
 /// The database model for a session.
 #[derive(Debug, Queryable, Insertable)]
-#[table_name = "session"]
+#[diesel(table_name = session)]
 struct DbSession {
     id: String,
     expires: DateTime<Utc>,
@@ -38,7 +38,7 @@ struct DbSession {
 
 /// A staff member.
 #[derive(Clone, Debug, Queryable, Insertable, Serialize)]
-#[table_name = "staff"]
+#[diesel(table_name = staff)]
 pub struct Staff {
     pub name: String,
     pub password_hash: String,
@@ -66,7 +66,7 @@ impl Staff {
     FromSqlRow,
     Serialize,
 )]
-#[sql_type = "sql_types::Role"]
+#[diesel(sql_type = sql_types::Role)]
 pub enum Role {
     Janitor,
     Moderator,
@@ -78,9 +78,9 @@ impl FromStr for Role {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_ref() {
-            "janitor" => Ok(Role::Janitor),
-            "moderator" => Ok(Role::Moderator),
-            "administrator" => Ok(Role::Administrator),
+            "j" | "janitor" => Ok(Role::Janitor),
+            "m" | "moderator" => Ok(Role::Moderator),
+            "a" | "administrator" => Ok(Role::Administrator),
             _ => Err(Error::UnknownRole {
                 role: s.to_string(),
             }),
@@ -98,19 +98,26 @@ pub mod sql_types {
     use diesel::serialize::{Result as SerializeResult, *};
 
     #[derive(SqlType)]
-    #[postgres(type_name = "role")]
+    #[diesel(postgres_type(name = "role"))]
     pub struct Role;
 
     impl ToSql<Role, Pg> for super::Role {
-        fn to_sql<W: Write>(&self, out: &mut Output<W, Pg>) -> SerializeResult {
+        fn to_sql<'b>(
+            &'b self,
+            out: &mut Output<'b, '_, Pg>,
+        ) -> SerializeResult {
             out.write_all(self.to_string().to_lowercase().as_bytes())?;
             Ok(IsNull::No)
         }
     }
 
     impl FromSql<Role, Pg> for super::Role {
-        fn from_sql(bytes: Option<&[u8]>) -> DeserializeResult<Self> {
-            std::str::from_utf8(not_none!(bytes))?
+        fn from_sql(
+            value: diesel::backend::RawValue<'_, Pg>,
+        ) -> DeserializeResult<Self> {
+            let bytes = value.as_bytes();
+
+            std::str::from_utf8(bytes)?
                 .parse::<super::Role>()
                 .map_err(|err| err.to_string().into())
         }
@@ -146,7 +153,7 @@ impl User {
 
 /// A new anonymous site user to insert into the database.
 #[derive(Debug, Insertable)]
-#[table_name = "anon_user"]
+#[diesel(table_name = anon_user)]
 pub struct NewUser {
     pub hash: String,
     pub ban_expires: Option<DateTime<Utc>>,
@@ -200,16 +207,20 @@ pub struct StaffAction {
 
 /// Insertable database type for staff member actions.
 #[derive(Insertable)]
-#[table_name = "staff_action"]
+#[diesel(table_name = staff_action)]
 pub struct NewStaffAction {
     pub done_by: String,
     pub action: String,
     pub reason: String,
 }
 
-impl<C: InnerConnection> Connection<C> {
+impl<C, M> Connection<C, M>
+where
+    C: InnerConnection<M> + diesel::connection::LoadConnection,
+    M: diesel::connection::TransactionManager<C>,
+{
     /// Get a staff member.
-    pub fn staff<S>(&self, name: S) -> Result<Staff>
+    pub fn staff<S>(&mut self, name: S) -> Result<Staff>
     where
         S: AsRef<str>,
     {
@@ -219,20 +230,22 @@ impl<C: InnerConnection> Connection<C> {
         Ok(staff
             .filter(column_name.eq(name.as_ref()))
             .limit(1)
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Insert a new staff member.
-    pub fn insert_staff(&self, new_staff: &Staff) -> Result<()> {
+    pub fn insert_staff(&mut self, new_staff: &Staff) -> Result<()> {
         use crate::schema::staff::dsl::staff;
 
-        insert_into(staff).values(new_staff).execute(&self.inner)?;
+        insert_into(staff)
+            .values(new_staff)
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Delete a staff member.
-    pub fn delete_staff<S>(&self, name: S) -> Result<()>
+    pub fn delete_staff<S>(&mut self, name: S) -> Result<()>
     where
         S: AsRef<str>,
     {
@@ -247,17 +260,18 @@ impl<C: InnerConnection> Connection<C> {
 
         let name = name.as_ref();
 
-        delete(session.filter(staff_name.eq(name))).execute(&self.inner)?;
+        delete(session.filter(staff_name.eq(name))).execute(&mut self.inner)?;
 
-        delete(staff_action.filter(done_by.eq(name))).execute(&self.inner)?;
+        delete(staff_action.filter(done_by.eq(name)))
+            .execute(&mut self.inner)?;
 
-        delete(staff.filter(column_name.eq(name))).execute(&self.inner)?;
+        delete(staff.filter(column_name.eq(name))).execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Get a session.
-    pub fn session<S>(&self, session_id: S) -> Result<Session>
+    pub fn session<S>(&mut self, session_id: S) -> Result<Session>
     where
         S: AsRef<str>,
     {
@@ -267,7 +281,7 @@ impl<C: InnerConnection> Connection<C> {
         let session: DbSession = session_table
             .filter(id.eq(session_id.as_ref()))
             .limit(1)
-            .first(&self.inner)?;
+            .first(&mut self.inner)?;
 
         if session.expires < Utc::now() {
             self.delete_session(session.staff_name)?;
@@ -280,7 +294,7 @@ impl<C: InnerConnection> Connection<C> {
         let staff: Staff = staff_table
             .filter(name.eq(session.staff_name))
             .limit(1)
-            .first(&self.inner)?;
+            .first(&mut self.inner)?;
 
         Ok(Session {
             id: session.id,
@@ -290,7 +304,7 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Insert a session.
-    pub fn insert_session(&self, new_session: Session) -> Result<()> {
+    pub fn insert_session(&mut self, new_session: Session) -> Result<()> {
         use crate::schema::session::dsl::session;
 
         let new_session = DbSession {
@@ -301,13 +315,13 @@ impl<C: InnerConnection> Connection<C> {
 
         insert_into(session)
             .values(new_session)
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Delete a session.
-    pub fn delete_session<S>(&self, session_id: S) -> Result<()>
+    pub fn delete_session<S>(&mut self, session_id: S) -> Result<()>
     where
         S: AsRef<str>,
     {
@@ -315,56 +329,56 @@ impl<C: InnerConnection> Connection<C> {
         use crate::schema::session::dsl::session;
 
         delete(session.filter(id.eq(session_id.as_ref())))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Get a user by their IP.
-    pub fn user(&self, user_ip: IpAddr) -> Result<User> {
+    pub fn user(&mut self, user_ip: IpAddr) -> Result<User> {
         use crate::schema::anon_user::columns::ip;
         use crate::schema::anon_user::dsl::anon_user;
 
         Ok(anon_user
             .filter(ip.eq(user_ip.to_string()))
             .limit(1)
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Get all users.
-    pub fn all_users(&self) -> Result<Vec<User>> {
+    pub fn all_users(&mut self) -> Result<Vec<User>> {
         use crate::schema::anon_user::dsl::anon_user;
 
-        Ok(anon_user.load(&self.inner)?)
+        Ok(anon_user.load(&mut self.inner)?)
     }
 
     /// Get the total number of posts a user has made.
-    pub fn user_post_count(&self, user_id: UserId) -> Result<u32> {
+    pub fn user_post_count(&mut self, user_id: UserId) -> Result<u32> {
         use crate::schema::post::columns::user_id as column_user_id;
         use crate::schema::post::dsl::post;
 
         let count: i64 = post
             .filter(column_user_id.eq(user_id))
             .count()
-            .first(&self.inner)?;
+            .first(&mut self.inner)?;
 
         Ok(count.try_into().unwrap())
     }
 
     /// Insert a user.
-    pub fn insert_user(&self, new_user: &NewUser) -> Result<User> {
+    pub fn insert_user(&mut self, new_user: &NewUser) -> Result<User> {
         use crate::schema::anon_user::dsl::anon_user;
 
         let user = insert_into(anon_user)
             .values(new_user)
-            .get_result(&self.inner)?;
+            .get_result(&mut self.inner)?;
 
         Ok(user)
     }
 
     /// Ban a user.
     pub fn ban_user(
-        &self,
+        &mut self,
         user_id: UserId,
         ban_duration: Duration,
     ) -> Result<()> {
@@ -373,25 +387,29 @@ impl<C: InnerConnection> Connection<C> {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(ban_expires.eq(Some(Utc::now() + ban_duration)))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Unban a user.
-    pub fn unban_user(&self, user_id: UserId) -> Result<()> {
+    pub fn unban_user(&mut self, user_id: UserId) -> Result<()> {
         use crate::schema::anon_user::columns::{ban_expires, id};
         use crate::schema::anon_user::dsl::anon_user;
 
         update(anon_user.filter(id.eq(user_id)))
             .set(ban_expires.eq::<Option<DateTime<Utc>>>(None))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Update the moderation notes for a user.
-    pub fn set_user_note<S>(&self, user_id: UserId, new_note: S) -> Result<()>
+    pub fn set_user_note<S>(
+        &mut self,
+        user_id: UserId,
+        new_note: S,
+    ) -> Result<()>
     where
         S: Into<String>,
     {
@@ -400,45 +418,45 @@ impl<C: InnerConnection> Connection<C> {
 
         update(anon_user.filter(id.eq(user_id)))
             .set(note.eq(Some(new_note.into())))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Remove the moderation notes for a user.
-    pub fn remove_user_note(&self, user_id: UserId) -> Result<()> {
+    pub fn remove_user_note(&mut self, user_id: UserId) -> Result<()> {
         use crate::schema::anon_user::columns::{id, note};
         use crate::schema::anon_user::dsl::anon_user;
 
         update(anon_user.filter(id.eq(user_id)))
             .set(note.eq::<Option<String>>(None))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Delete all of the posts a user has made. Returns the amount of rows
     /// deleted.
-    pub fn delete_posts_for_user(&self, id: UserId) -> Result<u32> {
+    pub fn delete_posts_for_user(&mut self, id: UserId) -> Result<u32> {
         use crate::schema::post::columns::user_id;
         use crate::schema::post::dsl::post;
 
         let count: usize =
-            delete(post.filter(user_id.eq(id))).execute(&self.inner)?;
+            delete(post.filter(user_id.eq(id))).execute(&mut self.inner)?;
 
         Ok(count.try_into().unwrap())
     }
 
     /// Get all staff actions.
-    pub fn all_staff_actions(&self) -> Result<Vec<StaffAction>> {
+    pub fn all_staff_actions(&mut self) -> Result<Vec<StaffAction>> {
         use crate::schema::staff_action::dsl::staff_action;
 
-        Ok(staff_action.load(&self.inner)?)
+        Ok(staff_action.load(&mut self.inner)?)
     }
 
     /// Get a staff action.
     pub fn staff_action(
-        &self,
+        &mut self,
         action_id: StaffActionId,
     ) -> Result<StaffAction> {
         use crate::schema::staff_action::columns::id;
@@ -447,19 +465,19 @@ impl<C: InnerConnection> Connection<C> {
         Ok(staff_action
             .filter(id.eq(action_id))
             .limit(1)
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Record an action that a staff member did.
     pub fn insert_staff_action(
-        &self,
+        &mut self,
         new_action: NewStaffAction,
     ) -> Result<()> {
         use crate::schema::staff_action::dsl::staff_action;
 
         insert_into(staff_action)
             .values(new_action)
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }

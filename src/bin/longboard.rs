@@ -3,7 +3,7 @@
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 
 use fern::colors::{Color, ColoredLevelConfig};
 
@@ -13,51 +13,51 @@ use longboard::config::{Config, ExtensionConfig, GlobalConfig};
 use longboard::{new_instance, Error, Result};
 
 fn main_res() -> Result<()> {
-    let matches = App::new(env!("CARGO_PKG_NAME"))
+    let matches = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(
-            Arg::with_name("config")
-                .short("c")
+            Arg::new("config")
+                .short('c')
                 .long("config")
                 .value_name("FILE")
-                .takes_value(true)
+                .num_args(1)
                 .help("Config file to use"),
         )
         .arg(
-            Arg::with_name("extension-dir")
-                .short("x")
+            Arg::new("extension-dir")
+                .short('x')
                 .long("extension-dir")
                 .value_name("DIR")
-                .takes_value(true)
+                .num_args(1)
                 .help("Directory of extension configs to use"),
         )
         .arg(
-            Arg::with_name("log-file")
-                .short("l")
+            Arg::new("log-file")
+                .short('l')
                 .long("log-file")
                 .value_name("FILE")
-                .takes_value(true)
+                .num_args(1)
                 .help("Log file to use (- for stdout)"),
         )
         .arg(
-            Arg::with_name("database-uri")
-                .short("u")
+            Arg::new("database-uri")
+                .short('u')
                 .long("database-uri")
                 .value_name("URI")
-                .takes_value(true)
+                .num_args(1)
                 .help("URI to use to connect to the database"),
         )
         .arg(
-            Arg::with_name("log-all")
-                .short("a")
+            Arg::new("log-all")
+                .short('a')
                 .long("log-all")
                 .help("Show all log messages, this makes the log very messy"),
         )
         .arg(
-            Arg::with_name("debug-config")
-                .short("d")
+            Arg::new("debug-config")
+                .short('d')
                 .long("debug-config")
                 .help("Dump the configuration to the log on startup"),
         )
@@ -66,31 +66,31 @@ fn main_res() -> Result<()> {
     let mut conf_path = GlobalConfig::default_path();
     let mut extension_dir = ExtensionConfig::default_dir();
 
-    if let Some(path) = matches.value_of("config") {
+    if let Some(path) = matches.get_one::<String>("config") {
         conf_path = PathBuf::from(path);
         extension_dir = conf_path.parent().expect("bad config path").to_owned();
     }
 
-    if let Some(dir) = matches.value_of("extension-dir") {
+    if let Some(dir) = matches.get_one::<String>("extension-dir") {
         extension_dir = PathBuf::from(dir);
     }
 
     let mut config = Config::load(&conf_path, extension_dir)?;
 
-    if let Some(path) = matches.value_of("log-file") {
-        config.global_config.log_file = match path {
+    if let Some(path) = matches.get_one::<String>("log-file") {
+        config.global_config.log_file = match path.as_ref() {
             "-" => None,
             _ => Some(PathBuf::from(path)),
         };
     }
 
-    if let Some(uri) = matches.value_of("database-uri") {
+    if let Some(uri) = matches.get_one::<String>("database-uri") {
         config.global_config.database_uri = uri.to_string();
     }
 
     let log_to_file = config.global().log_file.is_some();
 
-    let log_all = matches.is_present("log-all");
+    let log_all = matches.contains_id("log-all");
 
     let dispatch = fern::Dispatch::new()
         .format(move |out, message, record| {
@@ -141,7 +141,7 @@ fn main_res() -> Result<()> {
 
     info!("Using config file {}", conf_path.display());
 
-    if matches.is_present("debug-config") {
+    if matches.contains_id("debug-config") {
         for line in format!("{:#?}", config).lines() {
             debug!("{}", line);
         }

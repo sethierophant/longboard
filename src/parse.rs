@@ -355,9 +355,10 @@ impl PostBody {
 
     /// Resolve post references. This adds an URI to the post reference if the
     /// post in question exists.
-    pub fn resolve_refs<C>(&mut self, db: &Connection<C>)
+    pub fn resolve_refs<C, M>(&mut self, db: &mut Connection<C, M>)
     where
-        C: InnerConnection,
+        C: InnerConnection<M> + diesel::connection::LoadConnection,
+        M: diesel::connection::TransactionManager<C>,
     {
         for block_item in self.0.iter_mut() {
             match block_item {

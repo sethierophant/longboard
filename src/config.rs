@@ -267,14 +267,14 @@ impl GlobalConfig {
 
         if !conf.resource_dir.exists() {
             return Err(Error::ConfigPathNotFound {
-                name: "resource dir".to_string(),
+                description: "resource directory".to_string(),
                 path: conf.resource_dir.display().to_string(),
             });
         }
 
         if !conf.upload_dir.exists() {
             return Err(Error::ConfigPathNotFound {
-                name: "uploads dir".to_string(),
+                description: "uploads directory".to_string(),
                 path: conf.upload_dir.display().to_string(),
             });
         }
@@ -282,7 +282,7 @@ impl GlobalConfig {
         if let Some(path) = &conf.pages_dir {
             if !path.exists() {
                 return Err(Error::ConfigPathNotFound {
-                    name: "pages dir".to_string(),
+                    description: "pages directory".to_string(),
                     path: path.display().to_string(),
                 });
             }
@@ -291,7 +291,7 @@ impl GlobalConfig {
         if let Some(path) = &conf.names_path {
             if !path.exists() {
                 return Err(Error::ConfigPathNotFound {
-                    name: "names file".to_string(),
+                    description: "names file".to_string(),
                     path: path.display().to_string(),
                 });
             }
@@ -300,7 +300,7 @@ impl GlobalConfig {
         if let Some(path) = &conf.notice_path {
             if !path.exists() {
                 return Err(Error::ConfigPathNotFound {
-                    name: "notice file".to_string(),
+                    description: "notice file".to_string(),
                     path: path.display().to_string(),
                 });
             }
@@ -497,7 +497,7 @@ impl ExtensionConfig {
         if let Some(path) = &extension.pages_dir {
             if !path.exists() {
                 return Err(Error::ConfigPathNotFound {
-                    name: "pages dir".to_string(),
+                    description: "pages dir".to_string(),
                     path: path.display().to_string(),
                 });
             }
@@ -506,7 +506,7 @@ impl ExtensionConfig {
         if let Some(path) = &extension.names_path {
             if !path.exists() {
                 return Err(Error::ConfigPathNotFound {
-                    name: "names file".to_string(),
+                    description: "names file".to_string(),
                     path: path.display().to_string(),
                 });
             }
@@ -515,7 +515,7 @@ impl ExtensionConfig {
         if let Some(path) = &extension.notice_path {
             if !path.exists() {
                 return Err(Error::ConfigPathNotFound {
-                    name: "notice file".to_string(),
+                    description: "notice file".to_string(),
                     path: path.display().to_string(),
                 });
             }

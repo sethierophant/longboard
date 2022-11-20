@@ -41,6 +41,10 @@ use crate::{config::Conf, Error, Result};
 ///
 /// [1]: https://github.com/SergioBenitez/Rocket/issues/842
 /// [2]: https://github.com/SergioBenitez/Rocket/issues/998
+///
+/// TODO: [Seems like this is now solved?][3] We should be able to remove this.
+///
+/// [3]: https://github.com/SergioBenitez/Rocket/commit/fa3e0334c1dcbbc91f63375906aaab72e5bafe59
 #[derive(Responder)]
 #[response(status = 303)]
 pub struct FragmentRedirect((), Location);
@@ -143,227 +147,6 @@ impl MultipartEntries {
 
         None
     }
-}
-
-/// Create a new thread.
-fn create_thread(
-    board_name: String,
-    entries: MultipartEntries,
-    conf: Conf,
-    db: &PooledConnection,
-    user: User,
-    session: Option<Session>,
-) -> Result<ThreadId> {
-    if entries.field("file").is_none() {
-        return Err(Error::MissingThreadParam {
-            param: "file".into(),
-        });
-    }
-
-    let subject = entries
-        .param("subject")
-        .ok_or(Error::MissingThreadParam {
-            param: "subject".into(),
-        })?
-        .to_string();
-
-    let new_thread_id = db.insert_thread(NewThread {
-        subject,
-        board: board_name.clone(),
-        locked: false,
-        pinned: false,
-    })?;
-
-    create_post(
-        board_name.clone(),
-        new_thread_id,
-        entries,
-        conf,
-        db,
-        user,
-        session,
-    )?;
-
-    db.trim_board(&board_name, crate::DEFAULT_THREAD_LIMIT)?;
-
-    Ok(new_thread_id)
-}
-
-/// Crate a new post.
-///
-/// If the post has an attatched file, the file is also created.
-fn create_post(
-    board_name: String,
-    thread_id: ThreadId,
-    entries: MultipartEntries,
-    conf: Conf,
-    db: &PooledConnection,
-    user: User,
-    session: Option<Session>,
-) -> Result<PostId> {
-    if db.user_rate_limit_exceeded(user.id, *conf.rate_limit_same_user)? {
-        return Err(Error::UserRateLimitExceeded);
-    }
-
-    if entries.field("file").is_some() && !conf.allow_uploads {
-        return Err(Error::FileUploadNotAllowed);
-    }
-
-    let body_param = entries
-        .param("body")
-        .filter(|body| !body.trim().is_empty())
-        .ok_or(Error::MissingPostParam {
-            param: "body".into(),
-        })?;
-
-    let mut body = PostBody::parse(body_param, conf.filter_rules)?;
-    body.resolve_refs(&db);
-
-    let body_html = body.into_html();
-
-    let limit = *conf.rate_limit_same_content;
-    if db.content_rate_limit_exceeded(&body_html, limit)? {
-        return Err(Error::ContentRateLimitExceeded);
-    }
-
-    let author_name = if let Some(param) = entries.param("author") {
-        param.to_string()
-    } else {
-        conf.choose_name()?
-    };
-
-    // TODO: actually parse if this is an email, domain, ...
-    let author_contact = entries.param("contact").map(ToString::to_string);
-
-    let author_ident = match entries.param("ident") {
-        Some(ident) => {
-            let salt: [u8; 20] = thread_rng().gen();
-            let hash = hash_encoded(
-                ident.as_bytes(),
-                &salt,
-                &argon2::Config::default(),
-            )
-            .expect("could not hash ident with Argon2");
-
-            Some(hash)
-        }
-        None => {
-            if let Some(session) = session {
-                if let Some(ident) = entries.param("staff-ident") {
-                    if ident == "Anonymous" {
-                        None
-                    } else {
-                        let named_role = format!(
-                            "{} ({})",
-                            session.staff.name, session.staff.role,
-                        );
-
-                        if ident == named_role {
-                            Some(ident.to_string())
-                        } else {
-                            let role: Role = ident.parse()?;
-
-                            if session.staff.is_authorized(role) {
-                                Some(ident.to_string())
-                            } else {
-                                return Err(Error::UnauthorizedRole {
-                                    staff_name: session.staff.name,
-                                    role,
-                                });
-                            }
-                        }
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-    };
-
-    let delete_hash = entries.param("delete-pass").map(|pass| {
-        let salt = b"longboard-delete";
-
-        hash_encoded(pass.as_bytes(), salt, &argon2::Config::default())
-            .expect("could not hash delete password with Argon2")
-    });
-
-    let no_bump = entries.param("no-bump").is_some();
-
-    let new_post_id = db.insert_post(NewPost {
-        body: body_html,
-        author_name,
-        author_contact,
-        author_ident,
-        delete_hash,
-        thread: thread_id,
-        board: board_name,
-        user_id: user.id,
-        no_bump,
-    })?;
-
-    if !no_bump {
-        db.bump_thread(thread_id)?;
-    }
-
-    if entries.field("file").is_some() {
-        create_file(new_post_id, entries, conf, db)?;
-    };
-
-    Ok(new_post_id)
-}
-
-/// Create a new file for a post.
-fn create_file(
-    post_id: PostId,
-    entries: MultipartEntries,
-    conf: Conf,
-    db: &PooledConnection,
-) -> Result<()> {
-    let field = entries.field("file").unwrap();
-
-    let content_type = match field.headers.content_type.as_ref() {
-        Some(content_type) => content_type,
-        None => return Err(Error::UploadMissingContentType),
-    };
-
-    // This converts from rocket::http::hyper::mime::Mime (re-export of mime
-    // v0.2.6) to mime::Mime (mime v0.3.16).
-    let content_type: Mime = content_type.to_string().parse().unwrap();
-
-    if !conf.allow_file_types.contains(&content_type) {
-        return Err(Error::UploadBadContentType { content_type });
-    }
-
-    let save_path = save_file(field, &content_type, conf.upload_dir)?;
-    let save_name = save_path
-        .file_name()
-        .expect("bad filename for save path")
-        .to_string_lossy()
-        .into_owned();
-
-    let orig_name = field.headers.filename.clone();
-
-    let thumb_path = create_thumbnail(&save_path, &content_type)?;
-    let thumb_name = thumb_path
-        .file_name()
-        .expect("bad thumb path")
-        .to_string_lossy()
-        .into_owned();
-
-    let is_spoiler = entries.param("spoiler").is_some();
-
-    db.insert_file(NewFile {
-        save_name,
-        orig_name,
-        thumb_name,
-        content_type: content_type.to_string(),
-        is_spoiler,
-        post: post_id,
-    })?;
-
-    Ok(())
 }
 
 /// Copy a file from the user's request into the uploads dir. Returns the path
@@ -495,6 +278,7 @@ where
     let source_path = source_path.as_ref();
     let thumb_path = thumb_path.as_ref();
 
+    // First, use ffmpeg to grab a still image from the start of the video.
     let output = Command::new("ffmpeg")
         .arg("-i")
         .arg(source_path)
@@ -519,6 +303,7 @@ where
         });
     }
 
+    // Then, re-size that image into a thumbnail.
     create_image_thumbnail(thumb_path, thumb_path)?;
 
     Ok(())
@@ -530,7 +315,7 @@ pub fn new_thread(
     board_name: String,
     entries: MultipartEntries,
     conf: Conf,
-    db: PooledConnection,
+    mut db: PooledConnection,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
@@ -539,9 +324,8 @@ pub fn new_thread(
         return Err(Error::BoardNotFound { board_name });
     }
 
-    let new_thread_id = db.inner.transaction::<_, Error, _>(|| {
-        create_thread(board_name.clone(), entries, conf, &db, user, session)
-    })?;
+    let new_thread_id =
+        db.create_thread(board_name.clone(), entries, conf, user, session)?;
 
     Ok(Redirect::to(uri!(
         crate::routes::thread: board_name,
@@ -556,7 +340,7 @@ pub fn new_post(
     thread_id: ThreadId,
     entries: MultipartEntries,
     conf: Conf,
-    db: PooledConnection,
+    mut db: PooledConnection,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
@@ -568,18 +352,251 @@ pub fn new_post(
         });
     }
 
-    let new_post_id = db.inner.transaction::<_, Error, _>(|| {
-        create_post(
-            board_name.clone(),
-            thread_id,
-            entries,
-            conf,
-            &db,
-            user,
-            session,
-        )
-    })?;
+    let new_post_id = db.create_post(
+        board_name.clone(),
+        thread_id,
+        entries,
+        conf,
+        user,
+        session,
+    )?;
 
     let uri = uri!(crate::routes::thread: board_name, thread_id);
     Ok(FragmentRedirect::to(uri, new_post_id))
+}
+
+impl<C, M> Connection<C, M>
+where
+    C: InnerConnection<M> + diesel::connection::LoadConnection,
+    M: diesel::connection::TransactionManager<C>,
+{
+    /// Create a new thread.
+    ///
+    /// This function also creates a post, which will be the original post of
+    /// the new thread.
+    fn create_thread(
+        &mut self,
+        board_name: String,
+        entries: MultipartEntries,
+        conf: Conf,
+        user: User,
+        session: Option<Session>,
+    ) -> Result<ThreadId> {
+        if entries.field("file").is_none() {
+            return Err(Error::MissingThreadParam {
+                param: "file".into(),
+            });
+        }
+
+        let subject = entries
+            .param("subject")
+            .ok_or(Error::MissingThreadParam {
+                param: "subject".into(),
+            })?
+            .to_string();
+
+        let new_thread_id = self.insert_thread(NewThread {
+            subject,
+            board: board_name.clone(),
+            locked: false,
+            pinned: false,
+        })?;
+
+        self.create_post(
+            board_name.clone(),
+            new_thread_id,
+            entries,
+            conf,
+            user,
+            session,
+        )?;
+
+        self.trim_board(&board_name, crate::DEFAULT_THREAD_LIMIT)?;
+
+        Ok(new_thread_id)
+    }
+
+    /// Crate a new post.
+    ///
+    /// If the post has an attatched file, the file is also created.
+    fn create_post(
+        &mut self,
+        board_name: String,
+        thread_id: ThreadId,
+        entries: MultipartEntries,
+        conf: Conf,
+        user: User,
+        session: Option<Session>,
+    ) -> Result<PostId>
+    where
+        C: InnerConnection<M> + diesel::connection::LoadConnection,
+        M: diesel::connection::TransactionManager<C>,
+    {
+        if self.user_rate_limit_exceeded(user.id, *conf.rate_limit_same_user)? {
+            return Err(Error::UserRateLimitExceeded);
+        }
+
+        if entries.field("file").is_some() && !conf.allow_uploads {
+            return Err(Error::FileUploadNotAllowed);
+        }
+
+        let body_param = entries
+            .param("body")
+            .filter(|body| !body.trim().is_empty())
+            .ok_or(Error::MissingPostParam {
+                param: "body".into(),
+            })?;
+
+        let mut body = PostBody::parse(body_param, conf.filter_rules)?;
+        body.resolve_refs(self);
+
+        let body_html = body.into_html();
+
+        // TODO is * needed ??
+        let limit = *conf.rate_limit_same_content;
+        if self.content_rate_limit_exceeded(&body_html, limit)? {
+            return Err(Error::ContentRateLimitExceeded);
+        }
+
+        let author_name = if let Some(param) = entries.param("author") {
+            param.to_string()
+        } else {
+            conf.choose_name()?
+        };
+
+        // TODO: actually parse if this is an email, domain, ...
+        let author_contact = entries.param("contact").map(ToString::to_string);
+
+        let author_ident = match entries.param("ident") {
+            Some(ident) => {
+                let salt: [u8; 20] = thread_rng().gen();
+                let hash = hash_encoded(
+                    ident.as_bytes(),
+                    &salt,
+                    &argon2::Config::default(),
+                )
+                .expect("could not hash ident with Argon2");
+
+                Some(hash)
+            }
+            None => {
+                if let Some(session) = session {
+                    if let Some(ident) = entries.param("staff-ident") {
+                        if ident == "Anonymous" {
+                            None
+                        } else {
+                            let named_role = format!(
+                                "{} ({})",
+                                session.staff.name, session.staff.role,
+                            );
+
+                            if ident == named_role {
+                                Some(ident.to_string())
+                            } else {
+                                let role: Role = ident.parse()?;
+
+                                if session.staff.is_authorized(role) {
+                                    Some(ident.to_string())
+                                } else {
+                                    return Err(Error::UnauthorizedRole {
+                                        staff_name: session.staff.name,
+                                        role,
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        };
+
+        let delete_hash = entries.param("delete-pass").map(|pass| {
+            let salt = b"longboard-delete";
+
+            hash_encoded(pass.as_bytes(), salt, &argon2::Config::default())
+                .expect("could not hash delete password with Argon2")
+        });
+
+        let no_bump = entries.param("no-bump").is_some();
+
+        let new_post_id = self.insert_post(NewPost {
+            body: body_html,
+            author_name,
+            author_contact,
+            author_ident,
+            delete_hash,
+            thread: thread_id,
+            board: board_name,
+            user_id: user.id,
+            no_bump,
+        })?;
+
+        if !no_bump {
+            self.bump_thread(thread_id)?;
+        }
+
+        if entries.field("file").is_some() {
+            self.create_file(new_post_id, entries, conf)?;
+        };
+
+        Ok(new_post_id)
+    }
+
+    /// Create a new file for a post.
+    fn create_file(
+        &mut self,
+        post_id: PostId,
+        entries: MultipartEntries,
+        conf: Conf,
+    ) -> Result<()> {
+        let field = entries.field("file").unwrap();
+
+        let content_type = match field.headers.content_type.as_ref() {
+            Some(content_type) => content_type,
+            None => return Err(Error::UploadMissingContentType),
+        };
+
+        // This converts from rocket::http::hyper::mime::Mime (re-export of mime
+        // v0.2.6) to mime::Mime (mime v0.3.16).
+        //
+        // TODO: Verify that this comment is still correct.
+        let content_type: Mime = content_type.to_string().parse().unwrap();
+
+        if !conf.allow_file_types.contains(&content_type) {
+            return Err(Error::UploadBadContentType { content_type });
+        }
+
+        let save_path = save_file(field, &content_type, conf.upload_dir)?;
+        let save_name = save_path
+            .file_name()
+            .expect("bad filename for save path")
+            .to_string_lossy()
+            .into_owned();
+
+        let orig_name = field.headers.filename.clone();
+
+        let thumb_path = create_thumbnail(&save_path, &content_type)?;
+        let thumb_name = thumb_path
+            .file_name()
+            .expect("bad thumb path")
+            .to_string_lossy()
+            .into_owned();
+
+        let is_spoiler = entries.param("spoiler").is_some();
+
+        self.insert_file(NewFile {
+            save_name,
+            orig_name,
+            thumb_name,
+            content_type: content_type.to_string(),
+            is_spoiler,
+            post: post_id,
+        })?;
+
+        Ok(())
+    }
 }

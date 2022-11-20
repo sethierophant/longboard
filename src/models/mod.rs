@@ -2,6 +2,7 @@
 
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use chrono::offset::Utc;
@@ -12,7 +13,9 @@ use diesel::r2d2;
 use diesel::sql_types::{Integer, Text};
 use diesel::{delete, insert_into, prelude::*, select, sql_query, update};
 
-use diesel_migrations::embed_migrations;
+use diesel_migrations::{
+    embed_migrations, EmbeddedMigrations, MigrationHarness,
+};
 
 use mime::Mime;
 
@@ -28,7 +31,17 @@ use crate::{Error, Result};
 pub mod staff;
 pub use staff::*;
 
-embed_migrations!();
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+fn run_migrations(
+    connection: &mut impl MigrationHarness<diesel::pg::Pg>,
+) -> Result<()> {
+    connection
+        .run_pending_migrations(MIGRATIONS)
+        .map_err(Error::from_migration_error)?;
+
+    Ok(())
+}
 
 /// A thread ID.
 pub type ThreadId = i32;
@@ -39,7 +52,7 @@ pub type ReportId = i32;
 
 /// A collection of post threads about a similar topic.
 #[derive(Debug, Queryable, Serialize, Insertable)]
-#[table_name = "board"]
+#[diesel(table_name = board)]
 pub struct Board {
     /// The unique name of the board.
     pub name: String,
@@ -216,7 +229,7 @@ pub struct Report {
 
 /// A new thread to be inserted in the database.
 #[derive(Debug, Insertable)]
-#[table_name = "thread"]
+#[diesel(table_name = thread)]
 pub struct NewThread {
     pub subject: String,
     pub board: String,
@@ -226,7 +239,7 @@ pub struct NewThread {
 
 /// A new post to be inserted in the database.
 #[derive(Debug, Insertable)]
-#[table_name = "post"]
+#[diesel(table_name = post)]
 pub struct NewPost {
     pub body: String,
     pub author_name: String,
@@ -241,7 +254,7 @@ pub struct NewPost {
 
 /// A new file to be inserted in the database.
 #[derive(Debug, Insertable)]
-#[table_name = "file"]
+#[diesel(table_name = file)]
 pub struct NewFile {
     pub save_name: String,
     pub thumb_name: String,
@@ -253,7 +266,7 @@ pub struct NewFile {
 
 /// A new report to be inserted in the database.
 #[derive(Debug, Insertable)]
-#[table_name = "report"]
+#[diesel(table_name = report)]
 pub struct NewReport {
     pub reason: String,
     pub post: PostId,
@@ -289,43 +302,21 @@ impl ConnectionPool {
         let manager = r2d2::ConnectionManager::new(uri.as_ref());
         let pool = r2d2::Pool::new(manager)?;
 
-        embedded_migrations::run(&pool.get()?)?;
+        run_migrations(&mut pool.get()?)?;
 
         Ok(ConnectionPool(pool))
     }
 }
-
-/// A connection to the database.
-///
-/// This type is generic, so it could be either either a single connection, or a
-/// pooled connection.
-pub struct Connection<C: InnerConnection> {
-    pub(crate) inner: C,
-}
-
-/// The raw diesel connection.
-pub trait InnerConnection = diesel::connection::Connection<
-    Backend = diesel::pg::Pg,
-    TransactionManager = diesel::connection::AnsiTransactionManager,
->;
 
 /// A database connection recieved from a pool.
 pub type PooledConnection = Connection<
     diesel::r2d2::PooledConnection<
         diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>,
     >,
+    diesel::r2d2::PoolTransactionManager<
+        diesel::connection::AnsiTransactionManager,
+    >,
 >;
-
-/// A single, non-pooled connection to the database.
-pub type SingleConnection = Connection<diesel::pg::PgConnection>;
-
-impl<C: InnerConnection> Debug for Connection<C> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // It would be nice if we could get more information here but
-        // unfortunately this is a pretty opaque type.
-        write!(fmt, "<database connection>")
-    }
-}
 
 impl<'a, 'r> FromRequest<'a, 'r> for PooledConnection {
     type Error = Error;
@@ -337,7 +328,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for PooledConnection {
             .inner();
 
         match pool.get() {
-            Ok(conn) => Outcome::Success(PooledConnection { inner: conn }),
+            Ok(conn) => Outcome::Success(PooledConnection {
+                inner: conn,
+                manager: PhantomData,
+            }),
             Err(err) => Outcome::Failure((
                 Status::InternalServerError,
                 Error::from(err),
@@ -345,6 +339,12 @@ impl<'a, 'r> FromRequest<'a, 'r> for PooledConnection {
         }
     }
 }
+
+/// A single, non-pooled connection to the database.
+pub type SingleConnection = Connection<
+    diesel::pg::PgConnection,
+    diesel::connection::AnsiTransactionManager,
+>;
 
 impl SingleConnection {
     /// Establish a new non-pooled connection to the database.
@@ -354,20 +354,56 @@ impl SingleConnection {
     {
         Ok(SingleConnection {
             inner: PgConnection::establish(database_uri.as_ref())?,
+            manager: PhantomData,
         })
     }
 }
 
-impl<C: InnerConnection> Connection<C> {
+/// The raw diesel connection.
+pub trait InnerConnection<M> = diesel::connection::Connection<
+    Backend = diesel::pg::Pg,
+    TransactionManager = M,
+>;
+
+/// A connection to the database.
+///
+/// This type is generic, so it could be either either a standalone connection,
+/// or a connection obtained from a pool.
+pub struct Connection<C, M>
+where
+    C: InnerConnection<M> + diesel::connection::LoadConnection,
+    M: diesel::connection::TransactionManager<C>,
+{
+    pub(crate) inner: C,
+    manager: std::marker::PhantomData<M>,
+}
+
+impl<C, M> Debug for Connection<C, M>
+where
+    C: InnerConnection<M> + diesel::connection::LoadConnection,
+    M: diesel::connection::TransactionManager<C>,
+{
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // It would be nice if we could get more information here but
+        // unfortunately this is a pretty opaque type.
+        write!(fmt, "<database connection>")
+    }
+}
+
+impl<C, M> Connection<C, M>
+where
+    C: InnerConnection<M> + diesel::connection::LoadConnection,
+    M: diesel::connection::TransactionManager<C>,
+{
     /// Get all boards.
-    pub fn all_boards(&self) -> Result<Vec<Board>> {
+    pub fn all_boards(&mut self) -> Result<Vec<Board>> {
         use crate::schema::board::dsl::board;
 
-        Ok(board.load(&self.inner)?)
+        Ok(board.load(&mut self.inner)?)
     }
 
     /// Get a board.
-    pub fn board<S>(&self, board_name: S) -> Result<Board>
+    pub fn board<S>(&mut self, board_name: S) -> Result<Board>
     where
         S: AsRef<str>,
     {
@@ -376,21 +412,23 @@ impl<C: InnerConnection> Connection<C> {
 
         Ok(board
             .filter(name.eq(board_name.as_ref()))
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Insert a new board.
-    pub fn insert_board(&self, new_board: Board) -> Result<()> {
+    pub fn insert_board(&mut self, new_board: Board) -> Result<()> {
         use crate::schema::board::dsl::board;
 
-        insert_into(board).values(&new_board).execute(&self.inner)?;
+        insert_into(board)
+            .values(&new_board)
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Update a board.
     pub fn update_board<S>(
-        &self,
+        &mut self,
         board_name: S,
         new_description: S,
     ) -> Result<()>
@@ -402,7 +440,7 @@ impl<C: InnerConnection> Connection<C> {
 
         update(board.filter(name.eq(board_name.as_ref())))
             .set(description.eq(new_description.as_ref()))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
@@ -410,7 +448,7 @@ impl<C: InnerConnection> Connection<C> {
     /// Delete a board.
     ///
     /// FIXME: This function should delete recursively, like e.g. `trim_board`.
-    pub fn delete_board<S>(&self, board_name: S) -> Result<()>
+    pub fn delete_board<S>(&mut self, board_name: S) -> Result<()>
     where
         S: AsRef<str>,
     {
@@ -418,7 +456,7 @@ impl<C: InnerConnection> Connection<C> {
         use crate::schema::board::dsl::board;
 
         delete(board.filter(name.eq(board_name.as_ref())))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
@@ -428,11 +466,15 @@ impl<C: InnerConnection> Connection<C> {
     /// This function deletes recursively, it will also delete any posts, files,
     /// and reports associated with old threads. Returns the IDs of the threads
     /// that were deleted.
-    pub fn trim_board<S>(&self, board_name: S, max_threads: u32) -> Result<()>
+    pub fn trim_board<S>(
+        &mut self,
+        board_name: S,
+        max_threads: u32,
+    ) -> Result<()>
     where
         S: AsRef<str>,
     {
-        self.inner.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|conn| {
             let query = "DELETE FROM report R \
                                USING post P, thread T \
                                WHERE R.post = P.id \
@@ -444,7 +486,7 @@ impl<C: InnerConnection> Connection<C> {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.inner)?;
+                .execute(conn)?;
 
             let query = "DELETE FROM file F \
                                USING post P, thread T \
@@ -457,7 +499,7 @@ impl<C: InnerConnection> Connection<C> {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.inner)?;
+                .execute(conn)?;
 
             let query = "DELETE FROM post \
                                WHERE thread = ANY( \
@@ -468,7 +510,7 @@ impl<C: InnerConnection> Connection<C> {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.inner)?;
+                .execute(conn)?;
 
             let query = "DELETE FROM thread \
                                WHERE id = ANY( \
@@ -479,7 +521,7 @@ impl<C: InnerConnection> Connection<C> {
             sql_query(query)
                 .bind::<Text, _>(board_name.as_ref())
                 .bind::<Integer, i32>(max_threads.try_into().unwrap())
-                .execute(&self.inner)?;
+                .execute(conn)?;
 
             Ok(())
         })?;
@@ -488,14 +530,14 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Get a thread.
-    pub fn thread(&self, thread_id: ThreadId) -> Result<Thread> {
+    pub fn thread(&mut self, thread_id: ThreadId) -> Result<Thread> {
         use crate::schema::thread::columns::id;
         use crate::schema::thread::dsl::thread;
 
         Ok(thread
             .filter(id.eq(thread_id))
             .limit(1)
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Get a single page of threads on a board.
@@ -506,7 +548,7 @@ impl<C: InnerConnection> Connection<C> {
     /// Pinned threads are always displayed first and the order of pinned
     /// threads is their bump order as well.
     pub fn thread_page<S>(
-        &self,
+        &mut self,
         board_name: S,
         page: Page,
     ) -> Result<Vec<Thread>>
@@ -522,12 +564,12 @@ impl<C: InnerConnection> Connection<C> {
             .then_order_by(bump_date.desc())
             .limit(page.width as i64)
             .offset(page.offset() as i64)
-            .load(&self.inner)?)
+            .load(&mut self.inner)?)
     }
 
     /// How many pages of threads there are total.
     pub fn thread_page_count<S>(
-        &self,
+        &mut self,
         board_name: S,
         page_width: u32,
     ) -> Result<u32>
@@ -540,7 +582,7 @@ impl<C: InnerConnection> Connection<C> {
         let thread_count: i64 = thread
             .filter(board.eq(board_name.as_ref()))
             .select(count(id))
-            .first(&self.inner)?;
+            .first(&mut self.inner)?;
 
         Ok((thread_count as f64 / page_width as f64).ceil() as u32)
     }
@@ -548,10 +590,13 @@ impl<C: InnerConnection> Connection<C> {
     /// All of the first posts of threads on the given board.
     ///
     /// The order here is the same as `thread_page`.
-    pub fn first_posts<S>(&self, board_name: S) -> Result<Vec<Post>>
+    pub fn first_posts<S>(&mut self, board_name: S) -> Result<Vec<Post>>
     where
         S: AsRef<str>,
     {
+        /*
+        TODO: Convert this to be compatible with Diesel 2.x.x
+
         use crate::schema::post::columns as post_columns;
         use crate::schema::post::dsl::post;
 
@@ -576,29 +621,31 @@ impl<C: InnerConnection> Connection<C> {
                 post_columns::no_bump,
             ))
             .filter(post_columns::board.eq(board_name.as_ref()))
-            .filter(sql("post.id IN (\
+            .filter(sql::<()>("post.id IN (\
                                  SELECT id FROM post AS inner_post \
                                   WHERE inner_post.thread = thread.id \
                                   ORDER BY id ASC \
                                   LIMIT 1)"))
             .order_by(thread_columns::pinned.desc())
             .then_order_by(thread_columns::bump_date.desc())
-            .load(&self.inner)?)
+            .load(&mut self.inner)?)
+        */
+        unimplemented!()
     }
 
     /// Insert a new thread into the database.
-    pub fn insert_thread(&self, new_thread: NewThread) -> Result<ThreadId> {
+    pub fn insert_thread(&mut self, new_thread: NewThread) -> Result<ThreadId> {
         use crate::schema::thread::columns::id;
         use crate::schema::thread::dsl::thread;
 
         Ok(insert_into(thread)
             .values(&new_thread)
             .returning(id)
-            .get_result(&self.inner)?)
+            .get_result(&mut self.inner)?)
     }
 
     /// Update a thread's bump_date.
-    pub fn bump_thread(&self, thread_id: ThreadId) -> Result<()> {
+    pub fn bump_thread(&mut self, thread_id: ThreadId) -> Result<()> {
         use crate::schema::thread::columns::{bump_date, id};
         use crate::schema::thread::dsl::thread;
 
@@ -606,7 +653,7 @@ impl<C: InnerConnection> Connection<C> {
 
         update(thread.filter(id.eq(thread_id)))
             .set(bump_date.eq(now))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
@@ -615,32 +662,26 @@ impl<C: InnerConnection> Connection<C> {
     ///
     /// This function will recursively delete all reports, posts, and files
     /// associated with the thread as well.
-    pub fn delete_thread(&self, tid: ThreadId) -> Result<()> {
+    pub fn delete_thread(&mut self, tid: ThreadId) -> Result<()> {
         use crate::schema::post::columns::thread as post_thread;
         use crate::schema::post::dsl::post as table_post;
         use crate::schema::thread::columns::id as thread_id;
         use crate::schema::thread::dsl::thread as table_thread;
 
-        self.inner.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|conn| {
             let query = "DELETE FROM report R \
                                USING post P \
                                WHERE R.post = P.id AND P.thread = $1";
-            sql_query(query)
-                .bind::<Integer, _>(tid)
-                .execute(&self.inner)?;
+            sql_query(query).bind::<Integer, _>(tid).execute(conn)?;
 
             let query = "DELETE FROM file F \
                                USING post P \
                                WHERE F.post = P.id AND P.thread = $1";
-            sql_query(query)
-                .bind::<Integer, _>(tid)
-                .execute(&self.inner)?;
+            sql_query(query).bind::<Integer, _>(tid).execute(conn)?;
 
-            delete(table_post.filter(post_thread.eq(tid)))
-                .execute(&self.inner)?;
+            delete(table_post.filter(post_thread.eq(tid))).execute(conn)?;
 
-            delete(table_thread.filter(thread_id.eq(tid)))
-                .execute(&self.inner)?;
+            delete(table_thread.filter(thread_id.eq(tid))).execute(conn)?;
 
             Ok(())
         })?;
@@ -649,31 +690,34 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Get all of the posts in a thread.
-    pub fn posts_in_thread(&self, thread_id: ThreadId) -> Result<Vec<Post>> {
+    pub fn posts_in_thread(
+        &mut self,
+        thread_id: ThreadId,
+    ) -> Result<Vec<Post>> {
         use crate::schema::post::columns::{id, thread};
         use crate::schema::post::dsl::post;
 
         Ok(post
             .filter(thread.eq(thread_id))
             .order(id.asc())
-            .load(&self.inner)?)
+            .load(&mut self.inner)?)
     }
 
     /// Get the number of posts in a thread.
-    pub fn thread_post_count(&self, thread_id: ThreadId) -> Result<u32> {
+    pub fn thread_post_count(&mut self, thread_id: ThreadId) -> Result<u32> {
         use crate::schema::post::columns::thread;
         use crate::schema::post::dsl::post;
 
         let count: i64 = post
             .filter(thread.eq(thread_id))
             .count()
-            .first(&self.inner)?;
+            .first(&mut self.inner)?;
 
         Ok(count.try_into().unwrap())
     }
 
     /// Get the number of files in a thread.
-    pub fn thread_file_count(&self, thread_id: ThreadId) -> Result<u32> {
+    pub fn thread_file_count(&mut self, thread_id: ThreadId) -> Result<u32> {
         use crate::schema::file::dsl::file;
         use crate::schema::post::dsl::post;
         use crate::schema::thread::columns::id;
@@ -683,14 +727,14 @@ impl<C: InnerConnection> Connection<C> {
             .inner_join(post.inner_join(file))
             .filter(id.eq(thread_id))
             .count()
-            .first(&self.inner)?;
+            .first(&mut self.inner)?;
 
         Ok(count.try_into().unwrap())
     }
 
     /// Get the first post and up to `limit` recent posts from a thread.
     pub fn preview_thread(
-        &self,
+        &mut self,
         thread_id: ThreadId,
         limit: u32,
     ) -> Result<Vec<Post>> {
@@ -699,19 +743,19 @@ impl<C: InnerConnection> Connection<C> {
 
         let mut posts: Vec<Post> = Vec::new();
 
-        self.inner.transaction::<_, Error, _>(|| {
+        self.inner.transaction::<_, Error, _>(|conn| {
             let first_post: Post = post
                 .filter(thread.eq(thread_id))
                 .order(id.asc())
                 .limit(1)
-                .first(&self.inner)?;
+                .first(conn)?;
 
             posts = post
                 .filter(id.ne(first_post.id))
                 .filter(thread.eq(thread_id))
                 .order(id.desc())
                 .limit(limit.into())
-                .load(&self.inner)?;
+                .load(conn)?;
 
             posts.reverse();
             posts.insert(0, first_post);
@@ -723,55 +767,55 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Lock a thread.
-    pub fn lock_thread(&self, thread_id: ThreadId) -> Result<()> {
+    pub fn lock_thread(&mut self, thread_id: ThreadId) -> Result<()> {
         use crate::schema::thread::columns::{id, locked};
         use crate::schema::thread::dsl::thread;
 
         update(thread.filter(id.eq(thread_id)))
             .set(locked.eq(true))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Unlock a thread.
-    pub fn unlock_thread(&self, thread_id: ThreadId) -> Result<()> {
+    pub fn unlock_thread(&mut self, thread_id: ThreadId) -> Result<()> {
         use crate::schema::thread::columns::{id, locked};
         use crate::schema::thread::dsl::thread;
 
         update(thread.filter(id.eq(thread_id)))
             .set(locked.eq(false))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Pin a thread.
-    pub fn pin_thread(&self, thread_id: ThreadId) -> Result<()> {
+    pub fn pin_thread(&mut self, thread_id: ThreadId) -> Result<()> {
         use crate::schema::thread::columns::{id, pinned};
         use crate::schema::thread::dsl::thread;
 
         update(thread.filter(id.eq(thread_id)))
             .set(pinned.eq(true))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Unpin a thread.
-    pub fn unpin_thread(&self, thread_id: ThreadId) -> Result<()> {
+    pub fn unpin_thread(&mut self, thread_id: ThreadId) -> Result<()> {
         use crate::schema::thread::columns::{id, pinned};
         use crate::schema::thread::dsl::thread;
 
         update(thread.filter(id.eq(thread_id)))
             .set(pinned.eq(false))
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Check whether a thread is locked.
-    pub fn is_locked(&self, thread_id: ThreadId) -> Result<bool> {
+    pub fn is_locked(&mut self, thread_id: ThreadId) -> Result<bool> {
         use crate::schema::thread::columns::{id, locked};
         use crate::schema::thread::dsl::thread;
 
@@ -779,19 +823,22 @@ impl<C: InnerConnection> Connection<C> {
             .filter(id.eq(thread_id))
             .select(locked)
             .limit(1)
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Get a post.
-    pub fn post(&self, post_id: PostId) -> Result<Post> {
+    pub fn post(&mut self, post_id: PostId) -> Result<Post> {
         use crate::schema::post::columns::id;
         use crate::schema::post::dsl::post;
 
-        Ok(post.filter(id.eq(post_id)).limit(1).first(&self.inner)?)
+        Ok(post
+            .filter(id.eq(post_id))
+            .limit(1)
+            .first(&mut self.inner)?)
     }
 
     /// Insert a new post into the database.
-    pub fn insert_post(&self, new_post: NewPost) -> Result<PostId> {
+    pub fn insert_post(&mut self, new_post: NewPost) -> Result<PostId> {
         use crate::schema::post::columns::id;
         use crate::schema::post::dsl::post;
 
@@ -802,12 +849,12 @@ impl<C: InnerConnection> Connection<C> {
         Ok(insert_into(post)
             .values(&new_post)
             .returning(id)
-            .get_result(&self.inner)?)
+            .get_result(&mut self.inner)?)
     }
 
     /// Delete a post.
-    pub fn delete_post(&self, pid: PostId) -> Result<()> {
-        self.inner.transaction::<_, Error, _>(|| {
+    pub fn delete_post(&mut self, pid: PostId) -> Result<()> {
+        self.inner.transaction::<_, Error, _>(|conn| {
             use crate::schema::file::columns::post as file_post;
             use crate::schema::file::dsl::file as table_file;
             use crate::schema::post::columns::id as post_id;
@@ -815,13 +862,11 @@ impl<C: InnerConnection> Connection<C> {
             use crate::schema::report::columns::post as report_post;
             use crate::schema::report::dsl::report as table_report;
 
-            delete(table_report.filter(report_post.eq(pid)))
-                .execute(&self.inner)?;
+            delete(table_report.filter(report_post.eq(pid))).execute(conn)?;
 
-            delete(table_file.filter(file_post.eq(pid)))
-                .execute(&self.inner)?;
+            delete(table_file.filter(file_post.eq(pid))).execute(conn)?;
 
-            delete(table_post.filter(post_id.eq(pid))).execute(&self.inner)?;
+            delete(table_post.filter(post_id.eq(pid))).execute(conn)?;
 
             Ok(())
         })?;
@@ -830,8 +875,8 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Get the URI for a post.
-    pub fn post_uri(&self, post_id: PostId) -> Result<String> {
-        let thread_uri = self.inner.transaction::<_, Error, _>(|| {
+    pub fn post_uri(&mut self, post_id: PostId) -> Result<String> {
+        let thread_uri = self.inner.transaction::<_, Error, _>(|conn| {
             let thread_id: ThreadId = {
                 use crate::schema::post::columns::{id, thread};
                 use crate::schema::post::dsl::post;
@@ -839,7 +884,7 @@ impl<C: InnerConnection> Connection<C> {
                 post.filter(id.eq(post_id))
                     .select(thread)
                     .limit(1)
-                    .first(&self.inner)?
+                    .first(conn)?
             };
 
             let board_name: String = {
@@ -850,7 +895,7 @@ impl<C: InnerConnection> Connection<C> {
                     .filter(id.eq(thread_id))
                     .select(board)
                     .limit(1)
-                    .first(&self.inner)?
+                    .first(conn)?
             };
 
             Ok(uri!(crate::routes::thread: board_name, thread_id))
@@ -860,8 +905,8 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Get the thread that a post belongs to.
-    pub fn parent_thread(&self, post_id: PostId) -> Result<Thread> {
-        let parent = self.inner.transaction::<_, Error, _>(|| {
+    pub fn parent_thread(&mut self, post_id: PostId) -> Result<Thread> {
+        let parent = self.inner.transaction::<_, Error, _>(|conn| {
             use crate::schema::thread::columns::id;
             use crate::schema::thread::dsl::thread;
 
@@ -872,33 +917,30 @@ impl<C: InnerConnection> Connection<C> {
                 post.filter(id.eq(post_id))
                     .select(thread)
                     .limit(1)
-                    .first(&self.inner)?
+                    .first(conn)?
             };
 
-            Ok(thread
-                .filter(id.eq(thread_id))
-                .limit(1)
-                .first(&self.inner)?)
+            Ok(thread.filter(id.eq(thread_id)).limit(1).first(conn)?)
         })?;
 
         Ok(parent)
     }
 
     /// Check whether a post is the first post in a thread (the original post).
-    pub fn is_first_post(&self, post_id: PostId) -> Result<bool> {
-        let first_post_id = self.inner.transaction::<_, Error, _>(|| {
+    pub fn is_first_post(&mut self, post_id: PostId) -> Result<bool> {
+        let first_post_id = self.inner.transaction::<_, Error, _>(|conn| {
             use crate::schema::post::columns::{id, thread};
             use crate::schema::post::dsl::post;
 
             let Post { thread_id, .. } =
-                { post.filter(id.eq(post_id)).limit(1).first(&self.inner)? };
+                { post.filter(id.eq(post_id)).limit(1).first(conn)? };
 
             let first_post_id: i32 = post
                 .filter(thread.eq(thread_id))
                 .select(id)
                 .order(id.asc())
                 .limit(1)
-                .first(&self.inner)?;
+                .first(conn)?;
 
             Ok(first_post_id)
         })?;
@@ -907,100 +949,102 @@ impl<C: InnerConnection> Connection<C> {
     }
 
     /// Get all of the files in a post.
-    pub fn files_in_post(&self, post_id: PostId) -> Result<Vec<File>> {
+    pub fn files_in_post(&mut self, post_id: PostId) -> Result<Vec<File>> {
         use crate::schema::file::columns::post;
         use crate::schema::file::dsl::file;
 
         let files: Vec<DbFile> =
-            file.filter(post.eq(post_id)).load(&self.inner)?;
+            file.filter(post.eq(post_id)).load(&mut self.inner)?;
 
         Ok(files.into_iter().map(File::from).collect())
     }
 
     /// Insert a new file into the database.
-    pub fn insert_file(&self, new_file: NewFile) -> Result<()> {
+    pub fn insert_file(&mut self, new_file: NewFile) -> Result<()> {
         use crate::schema::file::dsl::file;
 
-        insert_into(file).values(&new_file).execute(&self.inner)?;
+        insert_into(file)
+            .values(&new_file)
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Delete all the files that belong to a post.
-    pub fn delete_files_of_post(&self, post_id: PostId) -> Result<()> {
+    pub fn delete_files_of_post(&mut self, post_id: PostId) -> Result<()> {
         use crate::schema::file::columns::post;
         use crate::schema::file::dsl::file;
-        delete(file.filter(post.eq(post_id))).execute(&self.inner)?;
+        delete(file.filter(post.eq(post_id))).execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Get the number of threads in the database.
-    pub fn num_threads(&self) -> Result<i64> {
+    pub fn num_threads(&mut self) -> Result<i64> {
         use crate::schema::thread::dsl::thread;
 
-        Ok(thread.count().first(&self.inner)?)
+        Ok(thread.count().first(&mut self.inner)?)
     }
 
     /// Get the number of posts in the database.
-    pub fn num_posts(&self) -> Result<i64> {
+    pub fn num_posts(&mut self) -> Result<i64> {
         use crate::schema::post::dsl::post;
 
-        Ok(post.count().first(&self.inner)?)
+        Ok(post.count().first(&mut self.inner)?)
     }
 
     /// Get a report.
-    pub fn report(&self, report_id: ReportId) -> Result<Report> {
+    pub fn report(&mut self, report_id: ReportId) -> Result<Report> {
         use crate::schema::report::columns::id;
         use crate::schema::report::dsl::report;
 
         Ok(report
             .filter(id.eq(report_id))
             .limit(1)
-            .first(&self.inner)?)
+            .first(&mut self.inner)?)
     }
 
     /// Get all post reports.
-    pub fn all_reports(&self) -> Result<Vec<Report>> {
+    pub fn all_reports(&mut self) -> Result<Vec<Report>> {
         use crate::schema::report::dsl::report;
 
-        Ok(report.load(&self.inner)?)
+        Ok(report.load(&mut self.inner)?)
     }
 
     /// Insert a new post report.
-    pub fn insert_report(&self, new_report: NewReport) -> Result<()> {
+    pub fn insert_report(&mut self, new_report: NewReport) -> Result<()> {
         use crate::schema::report::dsl::report;
 
         insert_into(report)
             .values(&new_report)
-            .execute(&self.inner)?;
+            .execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Delete a report.
-    pub fn delete_report(&self, report_id: ReportId) -> Result<()> {
+    pub fn delete_report(&mut self, report_id: ReportId) -> Result<()> {
         use crate::schema::report::columns::id;
         use crate::schema::report::dsl::report;
 
-        delete(report.filter(id.eq(report_id))).execute(&self.inner)?;
+        delete(report.filter(id.eq(report_id))).execute(&mut self.inner)?;
 
         Ok(())
     }
 
     /// Get up to `limit` recent posts.
-    pub fn recent_posts(&self, limit: u32) -> Result<Vec<Post>> {
+    pub fn recent_posts(&mut self, limit: u32) -> Result<Vec<Post>> {
         use crate::schema::post::columns::time_stamp;
         use crate::schema::post::dsl::post;
 
         Ok(post
             .order(time_stamp.desc())
             .limit(limit.into())
-            .load(&self.inner)?)
+            .load(&mut self.inner)?)
     }
 
     /// Get up to `limit` recently uploaded files.
-    pub fn recent_files(&self, limit: u32) -> Result<Vec<File>> {
+    pub fn recent_files(&mut self, limit: u32) -> Result<Vec<File>> {
         use crate::schema::file::columns::*;
         use crate::schema::file::dsl::file;
         use crate::schema::post::columns::time_stamp;
@@ -1018,14 +1062,14 @@ impl<C: InnerConnection> Connection<C> {
                 post,
                 is_spoiler,
             ))
-            .load(&self.inner)?;
+            .load(&mut self.inner)?;
 
         Ok(files.into_iter().map(File::from).collect())
     }
 
     /// Check if the user has made any posts recently.
     pub fn user_rate_limit_exceeded(
-        &self,
+        &mut self,
         user_id: UserId,
         limit: Duration,
     ) -> Result<bool> {
@@ -1036,12 +1080,12 @@ impl<C: InnerConnection> Connection<C> {
             .filter(post_columns::user_id.eq(user_id))
             .filter(post_columns::time_stamp.gt(Utc::now() - limit));
 
-        Ok(select(exists(query)).get_result(&self.inner)?)
+        Ok(select(exists(query)).get_result(&mut self.inner)?)
     }
 
     /// Check if a post has been made with the given content within recently.
     pub fn content_rate_limit_exceeded<S>(
-        &self,
+        &mut self,
         post_body: S,
         limit: Duration,
     ) -> Result<bool>
@@ -1055,6 +1099,6 @@ impl<C: InnerConnection> Connection<C> {
             .filter(post_columns::body.eq(post_body.as_ref()))
             .filter(post_columns::time_stamp.gt(Utc::now() - limit));
 
-        Ok(select(exists(query)).get_result(&self.inner)?)
+        Ok(select(exists(query)).get_result(&mut self.inner)?)
     }
 }

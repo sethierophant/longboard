@@ -62,8 +62,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for UserOptions {
 
 /// Serve the user options page.
 #[get("/options", rank = 0)]
-pub fn options(context: Context) -> Result<OptionsPage> {
-    OptionsPage::new(&context)
+pub fn options(mut context: Context) -> Result<OptionsPage> {
+    OptionsPage::new(&mut context)
 }
 
 /// Update user options.

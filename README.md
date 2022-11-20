@@ -46,12 +46,12 @@ Build Dependencies:
 - Nightly Rust (rustc and cargo)
 - GNU Make
 - GNU M4
-- PostgresQL (libpq)
+- PostgreSQL (libpq)
 
 You should also install whatever your distribution's `build-essential` or
 `base-devel` package is if you're building from source.
 
-Run Dependencies:
+Runtime Dependencies:
 
 - PostgreSQL
 - FFmpeg (for video thumbnails)
@@ -126,7 +126,8 @@ appreciated.
 
 ## License
 
-[GNU Affero General Public License v3.0][2]
+With the exception of the fonts, as listed below, the contents of this
+repository are licensed under the [GNU Affero General Public License v3.0][2].
 
 The fonts in [res/fonts](/res/fonts) are distributed under their own licenses,
 the Apache License Version 2.0 for the Roboto fonts and the Open Font License

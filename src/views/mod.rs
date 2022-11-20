@@ -2,8 +2,6 @@
 //!
 //! Most of these types are meant to be returned from a route.
 
-use std::sync::Arc;
-
 use maplit::hashmap;
 
 use serde::{Serialize, Serializer};
@@ -25,9 +23,9 @@ pub mod staff;
 use staff::StaffView;
 
 /// Context that's needed to render a page.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Context<'r> {
-    pub database: Arc<PooledConnection>,
+    pub database: PooledConnection,
     pub conf: Conf<'r>,
     pub options: UserOptions,
     pub staff: Option<Staff>,
@@ -37,7 +35,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
     type Error = Error;
 
     fn from_request(req: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let database = req
+        let mut database = req
             .guard::<PooledConnection>()
             .expect("expected database to be initialized");
 
@@ -49,12 +47,12 @@ impl<'a, 'r> FromRequest<'a, 'r> for Context<'r> {
             session.and_then(|session| database.staff(session.staff.name).ok());
 
         Outcome::Success(Context {
-            database: Arc::new(database),
-            staff,
+            database,
             conf: req.guard::<Conf>().expect("couldn't load configuration"),
             options: req
                 .guard::<UserOptions>()
                 .expect("couldn't load user options from cookies"),
+            staff,
         })
     }
 }
@@ -101,7 +99,7 @@ pub struct PageInfo {
 
 impl PageInfo {
     /// Create a new `PageInfo`.
-    pub fn new<S>(title: S, context: &Context) -> PageInfo
+    pub fn new<S>(title: S, context: &mut Context) -> PageInfo
     where
         S: Into<String>,
     {
@@ -123,7 +121,7 @@ pub struct PageFooter {
 
 impl PageFooter {
     /// Create a new `PageFooter`.
-    pub fn new(context: &Context) -> Result<PageFooter> {
+    pub fn new(context: &mut Context) -> Result<PageFooter> {
         Ok(PageFooter {
             pages: context.conf.pages()?,
         })
@@ -139,7 +137,7 @@ pub struct PageNav {
 
 impl PageNav {
     /// Create a new `PageNav`.
-    pub fn new(context: &Context) -> Result<PageNav> {
+    pub fn new(context: &mut Context) -> Result<PageNav> {
         Ok(PageNav {
             boards: context.database.all_boards()?,
         })
@@ -160,7 +158,7 @@ pub struct PageHeader {
 
 impl PageHeader {
     /// Create a new `PageHeader`.
-    fn new<S>(board_name: S, context: &Context) -> Result<PageHeader>
+    fn new<S>(board_name: S, context: &mut Context) -> Result<PageHeader>
     where
         S: AsRef<str>,
     {
@@ -352,7 +350,7 @@ impl ThreadView {
     /// Create a new `ThreadView`.
     pub fn new(
         thread_id: ThreadId,
-        db: &PooledConnection,
+        db: &mut PooledConnection,
     ) -> Result<ThreadView> {
         Ok(ThreadView {
             thread: db.thread(thread_id)?,
@@ -390,7 +388,7 @@ pub struct DeepPost(PostView, Option<FileView>);
 
 impl DeepPost {
     /// Create a new `DeepPost`.
-    fn new(post_id: PostId, db: &PooledConnection) -> Result<DeepPost> {
+    fn new(post_id: PostId, db: &mut PooledConnection) -> Result<DeepPost> {
         let post = PostView(db.post(post_id)?);
         let file = db.files_in_post(post_id)?.pop().map(FileView);
         Ok(DeepPost(post, file))
@@ -428,7 +426,10 @@ pub struct DeepThread(ThreadView, Vec<DeepPost>);
 
 impl DeepThread {
     /// Load a thread and its posts from the database.
-    fn new(thread_id: ThreadId, db: &PooledConnection) -> Result<DeepThread> {
+    fn new(
+        thread_id: ThreadId,
+        db: &mut PooledConnection,
+    ) -> Result<DeepThread> {
         let thread = ThreadView::new(thread_id, db)?;
         let posts = db.posts_in_thread(thread_id)?;
 
@@ -443,10 +444,10 @@ impl DeepThread {
         Ok(DeepThread(thread, deep_posts))
     }
 
-    /// Load a thread and a preview of its posts from the database.
+    /// Load a thread and a few of its posts from the database, as a preview.
     fn new_preview(
         thread_id: ThreadId,
-        db: &PooledConnection,
+        db: &mut PooledConnection,
     ) -> Result<DeepThread> {
         let thread = ThreadView::new(thread_id, db)?;
         let posts =
@@ -494,7 +495,7 @@ pub struct RecentPost {
 }
 
 impl RecentPost {
-    fn load(db: &PooledConnection, limit: u32) -> Result<Vec<RecentPost>> {
+    fn load(db: &mut PooledConnection, limit: u32) -> Result<Vec<RecentPost>> {
         db.recent_posts(limit)?
             .into_iter()
             .map(|post| {
@@ -534,7 +535,7 @@ pub struct RecentFile {
 }
 
 impl RecentFile {
-    fn load(db: &PooledConnection, limit: u32) -> Result<Vec<RecentFile>> {
+    fn load(db: &mut PooledConnection, limit: u32) -> Result<Vec<RecentFile>> {
         Ok(db
             .recent_files(limit)?
             .into_iter()
@@ -564,7 +565,7 @@ impl HomePage {
     /// Create a new home page.
     pub fn new(
         site_description: Option<String>,
-        context: &Context,
+        context: &mut Context,
     ) -> Result<HomePage> {
         Ok(HomePage {
             page_info: PageInfo::new(context.conf.site_name, context),
@@ -573,11 +574,11 @@ impl HomePage {
             site_name: context.conf.site_name.to_string(),
             site_description,
             recent_posts: RecentPost::load(
-                &context.database,
+                &mut context.database,
                 crate::DEFAULT_RECENT_POSTS,
             )?,
             recent_files: RecentFile::load(
-                &context.database,
+                &mut context.database,
                 crate::DEFAULT_RECENT_FILES,
             )?,
         })
@@ -605,7 +606,7 @@ pub struct OptionsPage {
 
 impl OptionsPage {
     /// Create a new options page.
-    pub fn new(context: &Context) -> Result<OptionsPage> {
+    pub fn new(context: &mut Context) -> Result<OptionsPage> {
         Ok(OptionsPage {
             page_info: PageInfo::new("Options", context),
             page_nav: PageNav::new(context)?,
@@ -665,7 +666,7 @@ impl BoardPage {
     pub fn new<S>(
         board_name: S,
         page_num: u32,
-        context: &Context,
+        context: &mut Context,
     ) -> Result<BoardPage>
     where
         S: AsRef<str>,
@@ -683,7 +684,9 @@ impl BoardPage {
                 },
             )?
             .into_iter()
-            .map(|thread| DeepThread::new_preview(thread.id, &context.database))
+            .map(|thread| {
+                DeepThread::new_preview(thread.id, &mut context.database)
+            })
             .collect::<Result<_>>()?;
 
         let page_count =
@@ -728,7 +731,10 @@ pub struct BoardCatalogPage {
 
 impl BoardCatalogPage {
     /// Create a new catalog page.
-    pub fn new<S>(board_name: S, context: &Context) -> Result<BoardCatalogPage>
+    pub fn new<S>(
+        board_name: S,
+        context: &mut Context,
+    ) -> Result<BoardCatalogPage>
     where
         S: AsRef<str>,
     {
@@ -742,8 +748,8 @@ impl BoardCatalogPage {
                 let thread = context.database.thread(post.thread_id)?;
 
                 Ok(CatalogItem {
-                    thread: ThreadView::new(thread.id, &context.database)?,
-                    first_post: DeepPost::new(post.id, &context.database)?,
+                    thread: ThreadView::new(thread.id, &mut context.database)?,
+                    first_post: DeepPost::new(post.id, &mut context.database)?,
                     num_posts: context
                         .database
                         .thread_post_count(post.thread_id)?,
@@ -782,12 +788,12 @@ impl ThreadPage {
     pub fn new<S>(
         board_name: S,
         thread_id: ThreadId,
-        context: &Context,
+        context: &mut Context,
     ) -> Result<ThreadPage>
     where
         S: AsRef<str>,
     {
-        let thread = DeepThread::new(thread_id, &context.database)?;
+        let thread = DeepThread::new(thread_id, &mut context.database)?;
         let subject = thread.0.thread.subject.clone();
 
         Ok(ThreadPage {
@@ -814,10 +820,10 @@ pub struct PostPreview {
 }
 
 impl PostPreview {
-    /// Load a post preview from the database.
-    pub fn new(post_id: PostId, db: &PooledConnection) -> Result<PostPreview> {
+    /// Create a new post preview.
+    pub fn new(post_id: PostId, context: &mut Context) -> Result<PostPreview> {
         Ok(PostPreview {
-            post: DeepPost::new(post_id, db)?,
+            post: DeepPost::new(post_id, &mut context.database)?,
         })
     }
 }
@@ -834,7 +840,7 @@ pub struct ReportPage {
 
 impl ReportPage {
     /// Create a new report page.
-    pub fn new(post_id: PostId, context: &Context) -> Result<ReportPage> {
+    pub fn new(post_id: PostId, context: &mut Context) -> Result<ReportPage> {
         Ok(ReportPage {
             page_info: PageInfo::new("Report Post", context),
             page_footer: PageFooter::new(context)?,
@@ -862,7 +868,10 @@ pub struct DeletePostPage {
 
 impl DeletePostPage {
     /// Create a new delete page.
-    pub fn new(post_id: PostId, context: &Context) -> Result<DeletePostPage> {
+    pub fn new(
+        post_id: PostId,
+        context: &mut Context,
+    ) -> Result<DeletePostPage> {
         Ok(DeletePostPage {
             page_info: PageInfo::new("Delete Post", context),
             page_footer: PageFooter::new(context)?,
@@ -883,7 +892,10 @@ pub struct DeleteThreadPage {
 
 impl DeleteThreadPage {
     /// Create a new delete page.
-    pub fn new(post_id: PostId, context: &Context) -> Result<DeleteThreadPage> {
+    pub fn new(
+        post_id: PostId,
+        context: &mut Context,
+    ) -> Result<DeleteThreadPage> {
         Ok(DeleteThreadPage {
             page_info: PageInfo::new("Delete Thread", context),
             page_footer: PageFooter::new(context)?,
@@ -908,7 +920,7 @@ impl ActionSuccessPage {
     pub fn new<S1, S2>(
         msg: S1,
         redirect_uri: S2,
-        context: &Context,
+        context: &mut Context,
     ) -> Result<ActionSuccessPage>
     where
         S1: Into<String>,

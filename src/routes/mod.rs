@@ -87,7 +87,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let db = request
+        let mut db = request
             .guard::<PooledConnection>()
             .expect("expected database to be initialized");
 
@@ -118,7 +118,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
                 let user = db
                     .insert_user(&new_user)
-                    .map_err(|err| Err((Status::InternalServerError, err)))?;
+                    .map_err(|err| (Status::InternalServerError, err))?;
 
                 Outcome::Success(user)
             }
@@ -241,9 +241,9 @@ where
 
 /// Serve the home page.
 #[get("/", rank = 0)]
-pub fn home(conf: Conf, context: Context) -> Result<HomePage> {
+pub fn home(conf: Conf, mut context: Context) -> Result<HomePage> {
     let contents = load_page("home", conf).ok();
-    HomePage::new(contents, &context)
+    HomePage::new(contents, &mut context)
 }
 
 /// Serve a admin-created page.
@@ -251,7 +251,7 @@ pub fn home(conf: Conf, context: Context) -> Result<HomePage> {
 pub fn custom_page(
     page_name: String,
     conf: Conf,
-    context: Context,
+    mut context: Context,
 ) -> Result<Template> {
     let mut data = HashMap::new();
 
@@ -260,11 +260,11 @@ pub fn custom_page(
 
     data.insert(
         "page_info".to_string(),
-        to_value(PageInfo::new(&page_name, &context))?,
+        to_value(PageInfo::new(&page_name, &mut context))?,
     );
     data.insert(
         "page_footer".to_string(),
-        to_value(PageFooter::new(&context)?)?,
+        to_value(PageFooter::new(&mut context)?)?,
     );
     data.insert("page_name".to_string(), JsonValue::String(page_name));
 
@@ -273,15 +273,16 @@ pub fn custom_page(
 
 /// Serve a page with help on creating a thread or post.
 #[get("/form-help", rank = 0)]
-pub fn form_help(context: Context, conf: Conf) -> Result<Template> {
+pub fn form_help(mut context: Context, conf: Conf) -> Result<Template> {
     let mut data = HashMap::new();
+
     data.insert(
         "page_info".to_string(),
-        to_value(PageInfo::new("Making a New Thread or Post", &context))?,
+        to_value(PageInfo::new("Making a New Thread or Post", &mut context))?,
     );
     data.insert(
         "page_footer".to_string(),
-        to_value(PageFooter::new(&context)?)?,
+        to_value(PageFooter::new(&mut context)?)?,
     );
     data.insert(
         "file_size_limit".to_string(),
@@ -300,37 +301,84 @@ pub fn form_help(context: Context, conf: Conf) -> Result<Template> {
     Ok(Template::render("pages/form-help", data))
 }
 
+// Helper functions to check if a board, post, or thread exists.
+//
+// TODO: These could probably be moved into a Connection impl, might not need to
+// get the whole object (board, thread, etc...) from the database.
+//
+// I bet there is a way to check if something exists in SQL, which may perform
+// slightly better.
+//
+// Also, we should be checking for
+// Error::DatabaseError(diesel::result::Error::NotFound) here and letting other
+// errors propagate.
+//
+// In fact, we could probably change the DB functions to do this check so we
+// don't have to do it here.
+fn board_exists(board_name: &str, db: &mut PooledConnection) -> Result<()> {
+    if db.board(board_name).is_err() {
+        return Err(Error::BoardNotFound {
+            board_name: board_name.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn thread_exists(
+    board_name: &str,
+    thread_id: ThreadId,
+    db: &mut PooledConnection,
+) -> Result<()> {
+    board_exists(board_name, db)?;
+
+    if db.thread(thread_id).is_err() {
+        return Err(Error::ThreadNotFound {
+            board_name: board_name.to_string(),
+            thread_id,
+        });
+    }
+
+    Ok(())
+}
+
+fn post_exists(
+    board_name: &str,
+    thread_id: ThreadId,
+    post_id: PostId,
+    db: &mut PooledConnection,
+) -> Result<()> {
+    board_exists(board_name, db)?;
+    thread_exists(board_name, thread_id, db)?;
+
+    if db.post(post_id).is_err() {
+        return Err(Error::PostNotFound { post_id });
+    }
+
+    Ok(())
+}
+
 /// Serve a board.
 #[get("/<board_name>?<page>", rank = 2)]
 pub fn board(
     board_name: String,
     page: Option<u32>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _user: User,
 ) -> Result<BoardPage> {
-    if db.board(&board_name).is_err() {
-        return Err(Error::BoardNotFound { board_name });
-    }
-
-    BoardPage::new(board_name, page.unwrap_or(1), &context)
+    board_exists(&board_name, &mut context.database)?;
+    BoardPage::new(board_name, page.unwrap_or(1), &mut context)
 }
 
 /// Serve a board catalog.
 #[get("/<board_name>/catalog", rank = 2)]
 pub fn board_catalog(
     board_name: String,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _user: User,
 ) -> Result<BoardCatalogPage> {
-    if let Err(Error::DatabaseError(diesel::result::Error::NotFound)) =
-        db.board(&board_name)
-    {
-        return Err(Error::BoardNotFound { board_name });
-    }
-
-    BoardCatalogPage::new(board_name, &context)
+    board_exists(&board_name, &mut context.database)?;
+    BoardCatalogPage::new(board_name, &mut context)
 }
 
 /// Serve a thread.
@@ -338,18 +386,11 @@ pub fn board_catalog(
 pub fn thread(
     board_name: String,
     thread_id: ThreadId,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _user: User,
 ) -> Result<ThreadPage> {
-    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name,
-            thread_id,
-        });
-    }
-
-    ThreadPage::new(board_name, thread_id, &context)
+    thread_exists(&board_name, thread_id, &mut context.database)?;
+    ThreadPage::new(board_name, thread_id, &mut context)
 }
 
 /// Serve a post preview.
@@ -358,17 +399,11 @@ pub fn post_preview(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
-    db: PooledConnection,
+    mut context: Context,
     _user: User,
 ) -> Result<PostPreview> {
-    if db.board(board_name).is_err()
-        || db.thread(thread_id).is_err()
-        || db.post(post_id).is_err()
-    {
-        return Err(Error::PostNotFound { post_id });
-    }
-
-    PostPreview::new(post_id, &db)
+    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
+    PostPreview::new(post_id, &mut context)
 }
 
 /// Report a post.
@@ -377,19 +412,12 @@ pub fn report(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<ReportPage> {
-    if db.board(board_name).is_err()
-        || db.thread(thread_id).is_err()
-        || db.post(post_id).is_err()
-    {
-        return Err(Error::PostNotFound { post_id });
-    }
-
-    ReportPage::new(post_id, &context)
+    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
+    ReportPage::new(post_id, &mut context)
 }
 
 /// Form data for reporting a post.
@@ -405,17 +433,11 @@ pub fn new_report(
     thread_id: ThreadId,
     post_id: PostId,
     report_data: Form<ReportData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     user: User,
     _not_blocked: NotBlocked,
 ) -> Result<ActionSuccessPage> {
-    if db.board(board_name).is_err()
-        || db.thread(thread_id).is_err()
-        || db.post(post_id).is_err()
-    {
-        return Err(Error::PostNotFound { post_id });
-    }
+    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
 
     let ReportData { reason } = report_data.into_inner();
 
@@ -423,9 +445,9 @@ pub fn new_report(
         return Err(Error::ReportTooLong);
     }
 
-    let thread = db.parent_thread(post_id)?;
+    let thread = context.database.parent_thread(post_id)?;
 
-    db.insert_report(NewReport {
+    context.database.insert_report(NewReport {
         reason,
         post: post_id,
         user_id: user.id,
@@ -433,7 +455,7 @@ pub fn new_report(
 
     let msg = format!("Reported post {} successfully.", post_id);
     let uri = uri!(thread: thread.board_name, thread.id).to_string();
-    Ok(ActionSuccessPage::new(msg, uri, &context)?)
+    Ok(ActionSuccessPage::new(msg, uri, &mut context)?)
 }
 
 /// Serve a form for deleting a post.
@@ -442,24 +464,22 @@ pub fn delete(
     board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<DeletePage> {
-    if db.board(board_name).is_err()
-        || db.thread(thread_id).is_err()
-        || db.post(post_id).is_err()
-    {
-        return Err(Error::PostNotFound { post_id });
-    }
+    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
 
-    if db.is_first_post(post_id)? {
+    if context.database.is_first_post(post_id)? {
         Ok(DeletePage::Thread(DeleteThreadPage::new(
-            post_id, &context,
+            post_id,
+            &mut context,
         )?))
     } else {
-        Ok(DeletePage::Post(DeletePostPage::new(post_id, &context)?))
+        Ok(DeletePage::Post(DeletePostPage::new(
+            post_id,
+            &mut context,
+        )?))
     }
 }
 
@@ -477,19 +497,13 @@ pub fn handle_delete(
     thread_id: ThreadId,
     post_id: PostId,
     delete_data: Form<DeleteData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<ActionSuccessPage> {
-    if db.board(board_name).is_err()
-        || db.thread(thread_id).is_err()
-        || db.post(post_id).is_err()
-    {
-        return Err(Error::PostNotFound { post_id });
-    }
+    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
 
-    let post = db.post(post_id)?;
+    let post = context.database.post(post_id)?;
 
     let hash = post.delete_hash.ok_or(Error::DeleteInvalidPassword)?;
 
@@ -497,33 +511,29 @@ pub fn handle_delete(
         return Err(Error::DeleteInvalidPassword);
     }
 
-    let delete_thread = db.is_first_post(post_id)?;
-    let delete_files_only = delete_data.file_only.is_some();
+    let msg: String;
+    let redirect_uri: String;
 
-    if delete_thread && delete_files_only {
-        return Err(Error::CannotDeleteThreadFilesOnly);
+    if context.database.is_first_post(post_id)? {
+        if delete_data.file_only.is_some() {
+            return Err(Error::CannotDeleteThreadFilesOnly);
+        }
+
+        context.database.delete_thread(post.thread_id)?;
+        msg = format!("Deleted thread {} successfully.", post.thread_id);
+
+        redirect_uri = uri!(board: post.board_name, 1).to_string();
+    } else {
+        if delete_data.file_only.is_some() {
+            context.database.delete_files_of_post(post_id)?;
+            msg = format!("Deleted files from post {} successfully.", post_id)
+        } else {
+            context.database.delete_post(post_id)?;
+            msg = format!("Deleted post {} successfully.", post_id)
+        }
+
+        redirect_uri = uri!(thread: post.board_name, post.id).to_string();
     }
 
-    let msg = if delete_thread {
-        db.delete_thread(post.thread_id)?;
-        format!("Deleted thread {} successfully.", post.thread_id)
-    } else if delete_files_only {
-        db.delete_files_of_post(post_id)?;
-        format!("Deleted files from post {} successfully.", post_id)
-    } else {
-        db.delete_post(post_id)?;
-        format!("Deleted post {} successfully.", post_id)
-    };
-
-    let redirect_uri = if delete_thread {
-        uri!(board: post.board_name, 1)
-    } else {
-        uri!(thread: post.board_name, post.id)
-    };
-
-    Ok(ActionSuccessPage::new(
-        msg,
-        redirect_uri.to_string(),
-        &context,
-    )?)
+    Ok(ActionSuccessPage::new(msg, redirect_uri, &mut context)?)
 }

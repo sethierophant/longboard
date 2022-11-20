@@ -84,22 +84,28 @@ pub enum Error {
     InvalidSessionCookie,
     #[display(fmt = "Session expired")]
     ExpiredSession,
-    #[display(fmt = "Report length was more than the max of 250 characters")]
+    #[display(
+        fmt = "Report length was more than the maximum of 250 characters"
+    )]
     ReportTooLong,
     #[display(fmt = "Cannot add a post to a locked thread")]
     ThreadLocked,
     #[display(fmt = "Tried to access a staff page without authentication")]
     NotAuthenticated,
-    #[display(fmt = "Banner dir is empty")]
+    #[display(fmt = "Banner directory is empty")]
     BannerDirEmpty,
-    #[display(fmt = "Names file is empty")]
+    #[display(fmt = "The names file is empty")]
     NamesFileEmpty,
-    #[display(fmt = "Path for {} at {} does not exist", name, path)]
-    ConfigPathNotFound { name: String, path: String },
+    #[display(
+        fmt = "The location for the {} at the path '{}' does not exist",
+        description,
+        path
+    )]
+    ConfigPathNotFound { description: String, path: String },
     #[display(fmt = "Unknown role: {}", role)]
     UnknownRole { role: String },
     #[display(
-        fmt = "Staff member {} does not have the authority of {}",
+        fmt = "Staff member '{}' does not have the authority of {}",
         staff_name,
         role
     )]
@@ -128,9 +134,9 @@ pub enum Error {
     #[display(fmt = "YAML error: {}", _0)]
     #[from]
     YamlError(serde_yaml::Error),
-    #[display(fmt = "HTML template file error: {}", _0)]
+    #[display(fmt = "HTML template error: {}", _0)]
     #[from]
-    TemplateError(handlebars::TemplateFileError),
+    TemplateError(handlebars::TemplateError),
     #[display(fmt = "Couldn't initialize logging: {}", _0)]
     #[from]
     LogError(log::SetLoggerError),
@@ -142,7 +148,7 @@ pub enum Error {
     DatabaseError(diesel::result::Error),
     #[display(fmt = "Database migration error: {}", _0)]
     #[from]
-    DatabaseMigrationError(diesel_migrations::RunMigrationsError),
+    DatabaseMigrationError(Box<dyn std::error::Error>),
     #[display(fmt = "Couldn't connect to the PostgreSQL database: {}", _0)]
     #[from]
     ConnectionError(diesel::ConnectionError),
@@ -170,7 +176,7 @@ impl Error {
     ///
     /// This is useful e.g. when opening a file; the error messages from the
     /// standard library are usually not helpful at all.
-    pub fn from_io_error<S>(cause: std::io::Error, msg: S) -> Error
+    pub fn from_io_error<S>(cause: std::io::Error, msg: S) -> Self
     where
         S: Into<String>,
     {
@@ -178,6 +184,18 @@ impl Error {
             cause,
             msg: msg.into(),
         }
+    }
+
+    /// Convert from a diesel migration error.
+    ///
+    /// For some reason, migration errors in diesel aren't their own type, but
+    /// the generic `Box<dyn std::error::Error>`. This method allows us to
+    /// explicitly label this generic error type as a migration error from
+    /// diesel.
+    pub fn from_migration_error(
+        cause: Box<dyn std::error::Error + Send + Sync>,
+    ) -> Self {
+        Error::DatabaseMigrationError(cause)
     }
 }
 
@@ -196,8 +214,8 @@ impl<'r> Responder<'r> for Error {
             | Error::CannotDeleteThreadFilesOnly => {
                 warn!("{}", &self);
 
-                let context = req.guard::<Context>().unwrap();
-                let page = BadRequestPage::new(self.to_string(), &context);
+                let mut context = req.guard::<Context>().unwrap();
+                let page = BadRequestPage::new(self.to_string(), &mut context);
 
                 let mut res = page.respond_to(req)?;
                 res.set_status(Status::BadRequest);
@@ -215,10 +233,10 @@ impl<'r> Responder<'r> for Error {
 
                 warn!("{}", &self);
 
-                let context = req.guard::<Context>().unwrap();
+                let mut context = req.guard::<Context>().unwrap();
                 let page = SpamDetectedPage::new(
                     "Your IP address was found in a block list.".to_string(),
-                    &context,
+                    &mut context,
                 );
 
                 let mut res = page.respond_to(req)?;
@@ -233,10 +251,10 @@ impl<'r> Responder<'r> for Error {
 
                 warn!("{}", &self);
 
-                let context = req.guard::<Context>().unwrap();
+                let mut context = req.guard::<Context>().unwrap();
                 let page = SpamDetectedPage::new(
                     "Rate limit exceeded.".to_string(),
-                    &context,
+                    &mut context,
                 );
 
                 let mut res = page.respond_to(req)?;
@@ -251,8 +269,8 @@ impl<'r> Responder<'r> for Error {
             | Error::CustomPageNotFound { .. } => {
                 warn!("{}", &self);
 
-                let context = req.guard::<Context>().unwrap();
-                let page = NotFoundPage::new(self.to_string(), &context);
+                let mut context = req.guard::<Context>().unwrap();
+                let page = NotFoundPage::new(self.to_string(), &mut context);
 
                 let mut res = page.respond_to(req)?;
                 res.set_status(Status::NotFound);
@@ -261,8 +279,8 @@ impl<'r> Responder<'r> for Error {
             }
 
             Error::NotAuthenticated => {
-                // If the client isn't authenticated, just redirect them to the
-                // staff login page.
+                // If the client isn't authenticated to access a staff page,
+                // just redirect them to the staff login page.
 
                 let login_uri = uri!(crate::routes::staff::login);
 
@@ -275,9 +293,11 @@ impl<'r> Responder<'r> for Error {
             _ => {
                 error!("{}", self);
 
-                let context = req.guard::<Context>().unwrap();
-                let page =
-                    InternalServerErrorPage::new(self.to_string(), &context);
+                let mut context = req.guard::<Context>().unwrap();
+                let page = InternalServerErrorPage::new(
+                    self.to_string(),
+                    &mut context,
+                );
 
                 let mut res = page.respond_to(req)?;
                 res.set_status(Status::InternalServerError);

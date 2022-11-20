@@ -22,15 +22,15 @@ impl<'a, 'r> FromRequest<'a, 'r> for Session {
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let db = request
+        let mut db = request
             .guard::<PooledConnection>()
             .expect("expected database to be initialized");
         let cookies = request.cookies();
 
-        let err = Err((Status::Forbidden, Error::MissingSessionCookie));
+        let err = (Status::Forbidden, Error::MissingSessionCookie);
         let session_id = cookies.get("session").ok_or(err)?.value();
 
-        let err = Err((Status::Forbidden, Error::InvalidSessionCookie));
+        let err = (Status::Forbidden, Error::InvalidSessionCookie);
         let session = db.session(session_id).map_err(|_| err)?;
 
         Outcome::Success(session)
@@ -39,8 +39,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for Session {
 
 /// Serve the login page for staff members.
 #[get("/staff/login")]
-pub fn login(context: Context, _user: User) -> Result<LoginPage> {
-    LoginPage::new(&context)
+pub fn login(mut context: Context, _user: User) -> Result<LoginPage> {
+    LoginPage::new(&mut context)
 }
 
 /// Login form data.
@@ -54,7 +54,7 @@ pub struct LoginData {
 #[post("/staff/login", data = "<login_data>")]
 pub fn handle_login<'r>(
     login_data: Form<LoginData>,
-    db: PooledConnection,
+    mut db: PooledConnection,
 ) -> Result<Response<'r>> {
     let staff = db.staff(&login_data.user)?;
 
@@ -94,7 +94,7 @@ pub fn handle_login<'r>(
 pub fn logout<'r>(
     session: Session,
     mut cookies: Cookies,
-    db: PooledConnection,
+    mut db: PooledConnection,
 ) -> Result<Response<'r>> {
     if let Some(cookie) = cookies.get("session").cloned() {
         cookies.remove(cookie)
@@ -111,27 +111,27 @@ pub fn logout<'r>(
 /// Serve the overview for staff actions.
 #[get("/staff")]
 pub fn overview(
-    context: Context,
+    mut context: Context,
     session: Option<Session>,
 ) -> Result<OverviewPage> {
     if session.is_none() {
         return Err(Error::NotAuthenticated);
     }
 
-    OverviewPage::new(&context)
+    OverviewPage::new(&mut context)
 }
 
 /// Serve the history for staff actions.
 #[get("/staff/history")]
 pub fn history(
-    context: Context,
+    mut context: Context,
     session: Option<Session>,
 ) -> Result<HistoryPage> {
     if session.is_none() {
         return Err(Error::NotAuthenticated);
     }
 
-    HistoryPage::new(&context)
+    HistoryPage::new(&mut context)
 }
 
 /// Form data for closing a report.
@@ -145,15 +145,14 @@ pub struct CloseReportData {
 #[post("/staff/close-report", data = "<close_data>")]
 pub fn close_report(
     close_data: Form<CloseReportData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
     let CloseReportData { id, reason } = close_data.into_inner();
 
-    db.delete_report(id)?;
+    context.database.delete_report(id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Closed report {}", id),
         reason,
@@ -163,7 +162,7 @@ pub fn close_report(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -178,20 +177,19 @@ pub struct CreateBoardData {
 #[post("/staff/create-board", data = "<create_data>")]
 pub fn create_board(
     create_data: Form<CreateBoardData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let CreateBoardData { name, description } = create_data.into_inner();
 
     let msg = format!("Created board \"{}\" successfully.", name);
 
-    db.insert_board(Board { name, description })?;
+    context.database.insert_board(Board { name, description })?;
 
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -206,20 +204,19 @@ pub struct EditBoardData {
 #[post("/staff/edit-board", data = "<edit_data>")]
 pub fn edit_board(
     edit_data: Form<EditBoardData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let EditBoardData { name, description } = edit_data.into_inner();
 
     let msg = format!("Edited board \"{}\" successfully.", name);
 
-    db.update_board(name, description)?;
+    context.database.update_board(name, description)?;
 
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -233,20 +230,19 @@ pub struct DeleteBoardData {
 #[post("/staff/delete-board", data = "<delete_data>")]
 pub fn delete_board(
     delete_data: Form<DeleteBoardData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeleteBoardData { name } = delete_data.into_inner();
 
     let msg = format!("Deleted board \"{}\" successfully.", name);
 
-    db.delete_board(name)?;
+    context.database.delete_board(name)?;
 
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -277,8 +273,7 @@ pub struct BanUserData {
 #[post("/staff/ban-user", data = "<ban_data>")]
 pub fn ban_user(
     ban_data: Form<BanUserData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
     let BanUserData {
@@ -289,9 +284,9 @@ pub fn ban_user(
 
     let msg = format!("Banned user {} successfully.", id);
 
-    db.ban_user(id, duration)?;
+    context.database.ban_user(id, duration)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Banned user {}", id),
         reason,
@@ -300,7 +295,7 @@ pub fn ban_user(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -315,17 +310,16 @@ pub struct UnbanUserData {
 #[post("/staff/unban-user", data = "<unban_data>")]
 pub fn unban_user(
     unban_data: Form<UnbanUserData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
     let UnbanUserData { id, reason } = unban_data.into_inner();
 
     let msg = format!("Unbanned user {} successfully.", id);
 
-    db.unban_user(id)?;
+    context.database.unban_user(id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Unbanned user {}", id),
         reason,
@@ -334,7 +328,7 @@ pub fn unban_user(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -349,19 +343,18 @@ pub struct AddNoteData {
 #[post("/staff/add-note", data = "<note_data>")]
 pub fn add_note(
     note_data: Form<AddNoteData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let AddNoteData { id, note } = note_data.into_inner();
 
-    db.set_user_note(id, note)?;
+    context.database.set_user_note(id, note)?;
 
     let msg = "Added note successfully.".to_string();
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -375,19 +368,18 @@ pub struct RemoveNoteData {
 #[post("/staff/remove-note", data = "<note_data>")]
 pub fn remove_note(
     note_data: Form<RemoveNoteData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     _session: Session,
 ) -> Result<ActionSuccessPage> {
     let RemoveNoteData { id } = note_data.into_inner();
 
-    db.remove_user_note(id)?;
+    context.database.remove_user_note(id)?;
 
     let msg = "Removed note successfully.".to_string();
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -402,15 +394,14 @@ pub struct DeletePostsForUserData {
 #[post("/staff/delete-posts-for-user", data = "<delete_data>")]
 pub fn delete_posts_for_user(
     delete_data: Form<DeletePostsForUserData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
     let DeletePostsForUserData { id, reason } = delete_data.into_inner();
 
-    let count = db.delete_posts_for_user(id)?;
+    let count = context.database.delete_posts_for_user(id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Deleted all posts for user {} ({} total)", id, count),
         reason,
@@ -420,7 +411,7 @@ pub fn delete_posts_for_user(
     Ok(ActionSuccessPage::new(
         msg,
         uri!(overview).to_string(),
-        &context,
+        &mut context,
     )?)
 }
 
@@ -436,31 +427,25 @@ pub fn pin(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    let ReasonData { reason } = reason_data.into_inner();
+    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
 
-    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name,
-            thread_id,
-        });
-    }
+    let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
 
-    db.pin_thread(thread_id)?;
+    context.database.pin_thread(thread_id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Pinned thread {}", thread_id),
         reason,
     })?;
 
     let msg: String = "Pinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context)?)
+    Ok(ActionSuccessPage::new(msg, uri, &mut context)?)
 }
 
 /// Unpin a thread.
@@ -469,31 +454,25 @@ pub fn unpin(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    let ReasonData { reason } = reason_data.into_inner();
+    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
 
-    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name,
-            thread_id,
-        });
-    }
+    let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
 
-    db.unpin_thread(thread_id)?;
+    context.database.unpin_thread(thread_id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Unpinned thread {}", thread_id),
         reason,
     })?;
 
     let msg: String = "Unpinned post successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context)?)
+    Ok(ActionSuccessPage::new(msg, uri, &mut context)?)
 }
 
 /// Lock a thread.
@@ -502,31 +481,25 @@ pub fn lock(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    let ReasonData { reason } = reason_data.into_inner();
+    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
 
-    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name,
-            thread_id,
-        });
-    }
+    let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
 
-    db.lock_thread(thread_id)?;
+    context.database.lock_thread(thread_id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Locked thread {}", thread_id),
         reason,
     })?;
 
     let msg: String = "Locked thread successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context)?)
+    Ok(ActionSuccessPage::new(msg, uri, &mut context)?)
 }
 
 /// Unlock a thread.
@@ -535,31 +508,25 @@ pub fn unlock(
     board_name: String,
     thread_id: ThreadId,
     reason_data: Form<ReasonData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    let ReasonData { reason } = reason_data.into_inner();
+    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
 
-    if db.board(&board_name).is_err() || db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name,
-            thread_id,
-        });
-    }
+    let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
 
-    db.unlock_thread(thread_id)?;
+    context.database.unlock_thread(thread_id)?;
 
-    db.insert_staff_action(NewStaffAction {
+    context.database.insert_staff_action(NewStaffAction {
         done_by: session.staff.name,
         action: format!("Unlocked thread {}", thread_id),
         reason,
     })?;
 
     let msg: String = "Unlocked thread successfully.".into();
-    Ok(ActionSuccessPage::new(msg, uri, &context)?)
+    Ok(ActionSuccessPage::new(msg, uri, &mut context)?)
 }
 
 /// Delete a post without needing a password.
@@ -572,54 +539,48 @@ pub fn staff_delete(
     thread_id: ThreadId,
     post_id: PostId,
     reason_data: Form<ReasonData>,
-    db: PooledConnection,
-    context: Context,
+    mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
+    // FIXME: Check if board and thread and post exist. See comment in routes/mod.rs
+
     let ReasonData { reason } = reason_data.into_inner();
 
-    if db.board(&board_name).is_err()
-        || db.thread(thread_id).is_err()
-        || db.post(post_id).is_err()
-    {
-        return Err(Error::PostNotFound { post_id });
-    }
+    let thread = context.database.parent_thread(post_id)?;
 
-    let thread = db.parent_thread(post_id)?;
+    let msg: String;
+    let redirect_uri: String;
 
-    let delete_thread = db.is_first_post(post_id)?;
+    if context.database.is_first_post(post_id)? {
+        context.database.delete_thread(thread.id)?;
 
-    let msg = if delete_thread {
-        db.delete_thread(thread.id)?;
-
-        db.insert_staff_action(NewStaffAction {
+        context.database.insert_staff_action(NewStaffAction {
             done_by: session.staff.name,
             action: format!("Deleted thread {}", thread_id),
             reason,
         })?;
 
-        format!("Deleted thread {} successfully.", thread_id)
+        msg = format!("Deleted thread {} successfully.", thread_id);
+        redirect_uri =
+            uri!(crate::routes::board: thread.board_name, 1).to_string();
     } else {
-        db.delete_post(post_id)?;
+        context.database.delete_post(post_id)?;
 
-        db.insert_staff_action(NewStaffAction {
+        context.database.insert_staff_action(NewStaffAction {
             done_by: session.staff.name,
             action: format!("Deleted post {}", post_id),
             reason,
         })?;
 
-        format!("Deleted post {} successfully.", post_id)
-    };
-
-    let redirect_uri = if delete_thread {
-        uri!(crate::routes::board: thread.board_name, 1)
-    } else {
-        uri!(crate::routes::thread: thread.board_name, thread.id)
+        msg = format!("Deleted post {} successfully.", post_id);
+        redirect_uri =
+            uri!(crate::routes::thread: thread.board_name, thread.id)
+                .to_string();
     };
 
     Ok(ActionSuccessPage::new(
         msg,
         redirect_uri.to_string(),
-        &context,
+        &mut context,
     )?)
 }

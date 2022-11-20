@@ -13,7 +13,7 @@ pub struct BadRequestPage {
 }
 
 impl BadRequestPage {
-    pub fn new<S>(message: S, context: &Context) -> Result<BadRequestPage>
+    pub fn new<S>(message: S, context: &mut Context) -> Result<BadRequestPage>
     where
         S: Into<String>,
     {
@@ -36,7 +36,7 @@ pub struct SpamDetectedPage {
 }
 
 impl SpamDetectedPage {
-    pub fn new<S>(message: S, context: &Context) -> Result<SpamDetectedPage>
+    pub fn new<S>(message: S, context: &mut Context) -> Result<SpamDetectedPage>
     where
         S: Into<String>,
     {
@@ -59,7 +59,7 @@ pub struct NotFoundPage {
 }
 
 impl NotFoundPage {
-    pub fn new<S>(message: S, context: &Context) -> Result<NotFoundPage>
+    pub fn new<S>(message: S, context: &mut Context) -> Result<NotFoundPage>
     where
         S: Into<String>,
     {
@@ -84,7 +84,7 @@ pub struct InternalServerErrorPage {
 impl InternalServerErrorPage {
     pub fn new<S>(
         message: S,
-        context: &Context,
+        context: &mut Context,
     ) -> Result<InternalServerErrorPage>
     where
         S: Into<String>,

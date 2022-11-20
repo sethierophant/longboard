@@ -5,7 +5,7 @@ name = "longboard"
 version = "1.1.0"
 authors = ["set <set@hierophant.club>"]
 description = "Imageboard engine."
-edition = "2018"
+edition = "2021"
 default-run = "longboard"
 
 [[bin]]
@@ -17,37 +17,37 @@ name = "longctl"
 path = "src/bin/longctl.rs"
 
 [dependencies]
-ammonia = "3.1"
+ammonia = "3.2"
 chrono = { version = "0.4", features = ["serde"] }
-clap = "2.33"
-combine = "4.5"
+clap = "4.0"
+combine = "4.6"
 derive_more = "0.99"
-diesel = { version = "1.4", features = ["chrono", "postgres", "r2d2"] }
-diesel_migrations = "1.4"
+diesel = { version = "2.0", features = ["chrono", "postgres", "r2d2"] }
+diesel_migrations = "2.0"
 fern = { version = "0.6", features = ["colored"] }
-handlebars = "3.0"
+handlebars = "4.3"
 horrorshow = "0.8"
-image = "0.23"
+image = "0.24"
 log = "0.4"
 maplit = "1.0"
 mime = "0.3"
 mime_guess = "2.0"
-multipart = { version = "0.17", default-features = false, features = ["server"] }
+multipart = { version = "0.18", default-features = false, features = ["server"] }
 parse_duration = "2.1"
-pulldown-cmark = "0.8"
+pulldown-cmark = "0.9"
 r2d2 = "0.8"
 rand = "0.8"
-regex = "1.3"
+regex = "1.6"
 rocket = "0.4"
 rocket_contrib = { version = "0.4", features = ["handlebars_templates"] }
-rust-argon2 = "0.8"
+rust-argon2 = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 time = "^0.1.43"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 
 [[bench]]
 name = "bench"

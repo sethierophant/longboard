@@ -46,7 +46,7 @@ pub struct ReportView {
 
 impl ReportView {
     /// Create a new `ReportView`.
-    fn new(report_id: i32, db: &PooledConnection) -> Result<ReportView> {
+    fn new(report_id: i32, db: &mut PooledConnection) -> Result<ReportView> {
         let report = db.report(report_id)?;
         let post_uri = db.post(report.post_id)?.uri();
         Ok(ReportView { report, post_uri })
@@ -124,7 +124,7 @@ pub struct OverviewPage {
 
 impl OverviewPage {
     /// Create a new overview page.
-    pub fn new(context: &Context) -> Result<OverviewPage> {
+    pub fn new(context: &mut Context) -> Result<OverviewPage> {
         let mut users: Vec<_> = context
             .database
             .all_users()?
@@ -138,7 +138,9 @@ impl OverviewPage {
             .collect::<Result<_>>()?;
 
         // TODO: We could also do this in the database with a join.
-        // With enough users, this might be a performance issue.
+        //
+        // With enough users, the current implementation might be a performance
+        // issue.
         users.sort_by(|user1, user2| user2.post_count.cmp(&user1.post_count));
 
         Ok(OverviewPage {
@@ -149,7 +151,7 @@ impl OverviewPage {
                 .database
                 .all_reports()?
                 .into_iter()
-                .map(|report| ReportView::new(report.id, &context.database))
+                .map(|report| ReportView::new(report.id, &mut context.database))
                 .collect::<Result<_>>()?,
             boards: context.database.all_boards()?,
             users,
@@ -167,7 +169,7 @@ pub struct LoginPage {
 }
 
 impl LoginPage {
-    pub fn new(context: &Context) -> Result<LoginPage> {
+    pub fn new(context: &mut Context) -> Result<LoginPage> {
         Ok(LoginPage {
             page_info: PageInfo::new("Login", context),
             page_footer: PageFooter::new(context)?,
@@ -186,7 +188,7 @@ pub struct HistoryPage {
 }
 
 impl HistoryPage {
-    pub fn new(context: &Context) -> Result<HistoryPage> {
+    pub fn new(context: &mut Context) -> Result<HistoryPage> {
         Ok(HistoryPage {
             page_info: PageInfo::new("Moderation History", context),
             page_footer: PageFooter::new(context)?,
