@@ -594,20 +594,38 @@ where
     where
         S: AsRef<str>,
     {
-        /*
-        TODO: Convert this to be compatible with Diesel 2.x.x
-
         use crate::schema::post::columns as post_columns;
-        use crate::schema::post::dsl::post;
-
         use crate::schema::thread::columns as thread_columns;
         use crate::schema::thread::dsl::thread;
 
-        use diesel::dsl::sql;
+        // Here, we create two aliases for the post table, because we're going
+        // to use it twice.
+        let (inner_post, outer_post) = alias!(
+            crate::schema::post as inner_post,
+            crate::schema::post as outer_post
+        );
 
-        Ok(post
+        // This SQL statement gets the ID of the first (original) post of a
+        // thread, for each thread.
+        //
+        // It references thread_columns::id, which is possible because of the
+        // inner join below.
+        let first_post_id = {
+            inner_post
+                .select(inner_post.field(post_columns::id))
+                .filter(
+                    inner_post.field(post_columns::id).eq(thread_columns::id),
+                )
+                .order_by(inner_post.field(post_columns::id).asc())
+                .limit(1)
+        };
+
+        // Here, we join the two tables, post (aliased to outer_post), and
+        // thread. This allows us to use the above SQL statement to filter out
+        // only the first posts.
+        Ok(outer_post
             .inner_join(thread)
-            .select((
+            .select(outer_post.fields((
                 post_columns::id,
                 post_columns::time_stamp,
                 post_columns::body,
@@ -619,18 +637,16 @@ where
                 post_columns::board,
                 post_columns::user_id,
                 post_columns::no_bump,
-            ))
-            .filter(post_columns::board.eq(board_name.as_ref()))
-            .filter(sql::<()>("post.id IN (\
-                                 SELECT id FROM post AS inner_post \
-                                  WHERE inner_post.thread = thread.id \
-                                  ORDER BY id ASC \
-                                  LIMIT 1)"))
+            )))
+            .filter(
+                outer_post
+                    .field(post_columns::board)
+                    .eq(board_name.as_ref()),
+            )
+            .filter(outer_post.field(post_columns::id).eq_any(first_post_id))
             .order_by(thread_columns::pinned.desc())
             .then_order_by(thread_columns::bump_date.desc())
             .load(&mut self.inner)?)
-        */
-        unimplemented!()
     }
 
     /// Insert a new thread into the database.
