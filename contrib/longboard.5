@@ -40,8 +40,8 @@ markdown files. Any file you add to this directory will be rendered as HTML and
 added to your site. All of the pages from this directory are shown in the
 footer at the bottom of the page.
 .IP
-Typical uses for this option may be to add a rules page, FAQ page, donation
-page, ...
+Typical uses for this option may include a rules page, FAQ page, donation page,
+etcetera.
 .IP
 The page named \fBhome.md\fR is special and will be displayed on the home page,
 if it exists.
@@ -117,6 +117,24 @@ add to this list.
 .IP
 Like \fBblock_list\fR, these lists are only checked when a user is creating an
 anonymous resource, like a thread, post, or post report.
+.TP
+.B threads_per_page
+How many threads will be displayed per page.
+.TP
+.B preview_limit
+In a board listing, this option sets how many posts will be displayed per
+thread.
+.TP
+.B num_recent_files
+How many recent files will be showed on the home page.
+.TP
+.B num_recent_posts
+How many recent posts will be displayed on the home page.
+.TP
+.B thread_limit
+The maximum number of threads per board. When a thread is made which pushes the
+total number of threads above this amount, the least recently bumped threads
+are trimmed.
 .SH EXTENSIONS
 In addition to the configuration options listed above, longboard also supports
 adding profiles to enable using different configurations for different classes
@@ -152,9 +170,11 @@ block_list
 .IP \[bu]
 dns_block_list
 .PP
-These options are equivalent to the options for the global configuration. Any
-options not set will default to the options you set in the global
-configuration.
+These options are equivalent to the options for the global configuration.
+.PP
+These options, if set, will overwrite the options in the global configuration
+when this extension is being applied. Any options not set will default to the
+options you set in the global configuration.
 .PP
 Longboard will use these extensions if the HTTP header
 \fBX-LONGBOARD-EXTENSION\fR is set. The value of this header is the extension

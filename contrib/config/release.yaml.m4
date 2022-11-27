@@ -112,3 +112,18 @@
 #   of sending or relaying spam, servers that have been hacked and hijacked,
 #   and those with Trojan infestations".
 #  - dnsbl.sorbs.net
+
+## How many threads will be displayed per page.
+# threads_per_page: 6
+
+## How many preview posts will be displayed per thread.
+# preview_limit: 3
+
+## How many recent files will be shown on the home page.
+# num_recent_files: 4
+
+## How many recent posts should be displayed on the home page.
+# num_recent_posts: 6
+
+## The maximum number of threads per board.
+# thread_limit: 36

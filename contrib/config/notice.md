@@ -1,1 +1,1 @@
-What's up bitches!!!
+NOTICE: Let's all love lain!

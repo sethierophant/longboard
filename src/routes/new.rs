@@ -382,6 +382,8 @@ where
         user: User,
         session: Option<Session>,
     ) -> Result<ThreadId> {
+        let thread_limit = conf.thread_limit;
+
         if entries.field("file").is_none() {
             return Err(Error::MissingThreadParam {
                 param: "file".into(),
@@ -411,7 +413,7 @@ where
             session,
         )?;
 
-        self.trim_board(&board_name, crate::DEFAULT_THREAD_LIMIT)?;
+        self.trim_board(&board_name, thread_limit)?;
 
         Ok(new_thread_id)
     }

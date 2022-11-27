@@ -35,12 +35,12 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load global and extension configuraiton from default locaitons.
+    /// Load global and extension configuration from default locations.
     pub fn new() -> Result<Config> {
         Self::load(GlobalConfig::default_path(), ExtensionConfig::default_dir())
     }
 
-    /// Load global and extension configuraiton from the given locaitons.
+    /// Load global and extension configuration from the given locations.
     pub fn load<P1, P2>(config_path: P1, extension_dir: P2) -> Result<Config>
     where
         P1: AsRef<Path>,
@@ -111,6 +111,11 @@ impl Config {
             block_list: self.global_config.block_list.as_ref(),
             dns_block_list: self.global_config.dns_block_list.as_slice(),
             extension_name: None,
+            threads_per_page: self.global_config.threads_per_page,
+            preview_limit: self.global_config.preview_limit,
+            num_recent_files: self.global_config.num_recent_files,
+            num_recent_posts: self.global_config.num_recent_posts,
+            thread_limit: self.global_config.thread_limit,
         }
     }
 
@@ -136,6 +141,11 @@ impl Config {
             upload_dir: self.global_config.upload_dir.as_ref(),
             database_uri: self.global_config.database_uri.as_ref(),
             log_file: self.global_config.log_file.as_deref(),
+            threads_per_page: self.global_config.threads_per_page,
+            preview_limit: self.global_config.preview_limit,
+            num_recent_files: self.global_config.num_recent_files,
+            num_recent_posts: self.global_config.num_recent_posts,
+            thread_limit: self.global_config.thread_limit,
 
             pages_dir: ext_conf
                 .pages_dir
@@ -247,6 +257,16 @@ pub struct GlobalConfig {
     pub block_list: Vec<IpAddr>,
     /// The list of DNSBLs to use.
     pub dns_block_list: Vec<String>,
+    /// How many threads should be displayed per page.
+    pub threads_per_page: u32,
+    /// How many preview posts should be displayed per thread.
+    pub preview_limit: u32,
+    /// How many recent files should be showed on the home page.
+    pub num_recent_files: u32,
+    /// How many recent posts should be displayed on the home page.
+    pub num_recent_posts: u32,
+    /// The maximum number of threads per board.
+    pub thread_limit: u32,
 }
 
 impl GlobalConfig {
@@ -354,6 +374,11 @@ impl Default for GlobalConfig {
                 allow_list: Vec::new(),
                 block_list: Vec::new(),
                 dns_block_list: Vec::new(),
+                threads_per_page: 6,
+                preview_limit: 3,
+                num_recent_files: 4,
+                num_recent_posts: 6,
+                thread_limit: 36,
             }
         } else {
             GlobalConfig {
@@ -385,6 +410,11 @@ impl Default for GlobalConfig {
                 allow_list: Vec::new(),
                 block_list: Vec::new(),
                 dns_block_list: Vec::new(),
+                threads_per_page: 6,
+                preview_limit: 3,
+                num_recent_files: 4,
+                num_recent_posts: 6,
+                thread_limit: 36,
             }
         }
     }
@@ -767,6 +797,16 @@ pub struct Conf<'a> {
     pub dns_block_list: &'a [String],
     /// The extension that is loaded, if any.
     pub extension_name: Option<&'a str>,
+    /// How many threads should be displayed per page.
+    pub threads_per_page: u32,
+    /// How many preview posts should be displayed per thread.
+    pub preview_limit: u32,
+    /// How many recent files should be showed on the home page.
+    pub num_recent_files: u32,
+    /// How many recent posts should be displayed on the home page.
+    pub num_recent_posts: u32,
+    /// The maximum number of threads per board.
+    pub thread_limit: u32,
 }
 
 impl<'a> Conf<'a> {

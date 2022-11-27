@@ -447,16 +447,17 @@ impl DeepThread {
     /// Load a thread and a few of its posts from the database, as a preview.
     fn new_preview(
         thread_id: ThreadId,
-        db: &mut PooledConnection,
+        context: &mut Context,
     ) -> Result<DeepThread> {
-        let thread = ThreadView::new(thread_id, db)?;
-        let posts =
-            db.preview_thread(thread_id, crate::DEFAULT_PREVIEW_LIMIT)?;
+        let thread = ThreadView::new(thread_id, &mut context.database)?;
+        let posts = context
+            .database
+            .preview_thread(thread_id, context.conf.preview_limit)?;
 
         let deep_posts = posts
             .into_iter()
             .map(|post| {
-                let file = db.files_in_post(post.id)?.pop();
+                let file = context.database.files_in_post(post.id)?.pop();
                 Ok(DeepPost(PostView(post), file.map(FileView)))
             })
             .collect::<Result<_>>()?;
@@ -575,11 +576,11 @@ impl HomePage {
             site_description,
             recent_posts: RecentPost::load(
                 &mut context.database,
-                crate::DEFAULT_RECENT_POSTS,
+                context.conf.num_recent_posts,
             )?,
             recent_files: RecentFile::load(
                 &mut context.database,
-                crate::DEFAULT_RECENT_FILES,
+                context.conf.num_recent_files,
             )?,
         })
     }
@@ -672,7 +673,7 @@ impl BoardPage {
         S: AsRef<str>,
     {
         let board_name = board_name.as_ref();
-        let page_width = crate::DEFAULT_PAGE_WIDTH;
+        let page_width = context.conf.threads_per_page;
 
         let threads = context
             .database
@@ -684,9 +685,7 @@ impl BoardPage {
                 },
             )?
             .into_iter()
-            .map(|thread| {
-                DeepThread::new_preview(thread.id, &mut context.database)
-            })
+            .map(|thread| DeepThread::new_preview(thread.id, context))
             .collect::<Result<_>>()?;
 
         let page_count =

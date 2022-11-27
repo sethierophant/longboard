@@ -122,10 +122,3 @@ pub fn new_instance(config: Config) -> Result<Rocket> {
         .attach(Template::fairing())
         .attach(LogFairing))
 }
-
-// TODO convert these to config options
-pub static DEFAULT_PAGE_WIDTH: u32 = 6;
-pub static DEFAULT_PREVIEW_LIMIT: u32 = 3;
-pub static DEFAULT_RECENT_FILES: u32 = 4;
-pub static DEFAULT_RECENT_POSTS: u32 = 6;
-pub static DEFAULT_THREAD_LIMIT: u32 = 36;
