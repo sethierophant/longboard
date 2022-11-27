@@ -108,8 +108,6 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    dbg!("link_parser");
-
     let link_char = || {
         satisfy(|c: char| {
             let special_link_chars = [
@@ -135,7 +133,7 @@ where
     };
 
     attempt(recognize((
-        look_ahead(any()).map(|c| dbg!(c)),
+        look_ahead(any())
         choice((attempt(string("http://")), attempt(string("https://")))),
         many::<String, _, _>(attempt(
             link_char().skip(look_ahead(link_char())),
@@ -161,8 +159,6 @@ where
     Input: Stream<Token = char>,
     Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
-    dbg!("line_text_parser");
-
     let line_char = || {
         choice((
             // Parse any character other than a backslash literally.
