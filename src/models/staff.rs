@@ -355,25 +355,31 @@ where
     /// Get all users and ther total number of posts made, sorted by the post
     /// count.
     pub fn all_users_by_post_count(&mut self) -> Result<Vec<(User, u32)>> {
-        use crate::schema::anon_user::dsl::anon_user;
         use crate::schema::anon_user::columns as user_columns;
+        use crate::schema::anon_user::dsl::anon_user;
         use crate::schema::post::dsl::post;
         use diesel::sql_types::BigInt;
 
-        let data: Vec<(i32, String, Option<DateTime<Utc>>, Option<String>, String, i64)> = 
-            anon_user
-                .left_outer_join(post)
-                .group_by(user_columns::id)
-                .select((
-                    user_columns::id,
-                    user_columns::hash,
-                    user_columns::ban_expires,
-                    user_columns::note,
-                    user_columns::ip,
-                    diesel::dsl::sql::<BigInt>("COUNT (post)")
-                ))
-                .order_by(diesel::dsl::sql::<BigInt>("COUNT (post)"))
-                .load(&mut self.inner)?;
+        let data: Vec<(
+            i32,
+            String,
+            Option<DateTime<Utc>>,
+            Option<String>,
+            String,
+            i64,
+        )> = anon_user
+            .left_outer_join(post)
+            .group_by(user_columns::id)
+            .select((
+                user_columns::id,
+                user_columns::hash,
+                user_columns::ban_expires,
+                user_columns::note,
+                user_columns::ip,
+                diesel::dsl::sql::<BigInt>("COUNT (post)"),
+            ))
+            .order_by(diesel::dsl::sql::<BigInt>("COUNT (post)"))
+            .load(&mut self.inner)?;
 
         Ok(data
             .into_iter()

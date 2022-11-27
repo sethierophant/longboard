@@ -133,7 +133,7 @@ where
     };
 
     attempt(recognize((
-        look_ahead(any())
+        look_ahead(any()),
         choice((attempt(string("http://")), attempt(string("https://")))),
         many::<String, _, _>(attempt(
             link_char().skip(look_ahead(link_char())),
