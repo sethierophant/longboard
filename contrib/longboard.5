@@ -104,6 +104,8 @@ A list of IP addresses to allow for posting. This list overrides both
 .TP
 .B block_list
 A list of IP addresses to block from posting. This list is only checked when users create an anonymous resource like a thread, post, or post report. It is NOT checked for viewing boards or threads or for staff actions.
+.IP
+The loopback address (127.0.0.1 or ::1) is always allowed.
 .TP
 .B dns_block_list
 A list of DNS block lists to use. Each item should be a DNS zone, like
