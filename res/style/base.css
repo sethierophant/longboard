@@ -231,7 +231,7 @@ nav a {
 }
 
 .notice {
-    margin: 1em 0 -1em;
+    margin: 1em 0;
 
     align-self: stretch;
 
@@ -314,10 +314,6 @@ nav a {
 
 .post-author, .post-timestamp::before {
     content: "Posted on ";
-}
-
-.post-author, .post-timestamp {
-    opacity: 0.5;
 }
 
 .post-id {
@@ -693,7 +689,7 @@ form.post-action input[type=submit]:hover {
 }
 
 .user-note {
-    grid-column: 1 / 5;
+    grid-column: 1 / 6;
     font-style: italic;
     margin-top: -0.2em;
     margin-bottom: 0.2em;

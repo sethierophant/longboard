@@ -42,11 +42,17 @@ body {
 }
 
 .notice {
-    border-top: thin dashed hsl(0, 0%, 15%);
+    border-top: thin dashed var(--seperator-color)
+    border-bottom: thin dashed var(--seperator-color);
 }
 
 .thread {
-    border-top: thin dashed hsl(0, 0%, 15%);
+    border-top: thin dashed var(--seperator-color);
+}
+
+.thread:first-of-type {
+    border-top: none;
+    margin-top: -1em;
 }
 
 .thread > header a {
@@ -158,7 +164,7 @@ form.post-action input[type=text] {
 }
 
 .post-preview .body {
-    border-left: solid thick var(--shadow-color);
+    border-left: solid thick var(--preview-border-color);
 }
 
 .user-options-form {
@@ -168,7 +174,7 @@ form.post-action input[type=text] {
 }
 
 .overview-item {
-    border-top: thin dashed var(--border-color);
+    border-top: thin dashed var(--seperator-color);
 }
 
 .table-header {
@@ -187,7 +193,7 @@ form.post-action input[type=text] {
 }
 
 .page-footer {
-    border-top: thin dashed var(--border-color);
+    border-top: thin dashed var(--seperator-color);
     background-color: var(--footer-background-color);
 }
 

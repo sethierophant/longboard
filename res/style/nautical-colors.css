@@ -15,8 +15,10 @@
     --background-color: hsl(190, 50%, 30%);
     --background-color-highlight: hsl(190, 50%, 35%);
     --border-color: black;
+    --preview-border-color: hsl(190, 30%, 30%);
+    --seperator-color: hsl(0, 0%, 60%);
     --shadow-color: hsl(0, 0%, 10%);
     --post-action-color: white;
     --post-action-hover-color: hsl(0, 0%, 80%);
-    --post-action-reason-color: hsl(0, 0%, 80%);
+    --post-action-reason-color: hsl(190, 30%, 50%);
 }

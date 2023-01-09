@@ -13,6 +13,7 @@
     --background-color: hsl(0, 0%, 12%);
     --background-color-highlight: hsl(0, 20%, 24%);
     --border-color: hsl(0, 0%, 22%);
+    --preview-border-color: hsl(0, 0%, 20%);
     --shadow-color: hsl(0, 0%, 8%);
     --footer-background-color: black;
     --background-gradient-start: hsl(10, 10%, 14%);

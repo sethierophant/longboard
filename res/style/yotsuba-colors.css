@@ -12,6 +12,7 @@
     --background-color: #F0E0D6;
     --background-color-highlight: #FFC0A6;
     --border-color: var(--text-color);
+    --preview-border-color: hsl(0, 20%, 80%);
     --shadow-color: #AE4444;
     --background-gradient-start: #FFE;
     --background-gradient-end: #FFFFE0;
