@@ -71,7 +71,7 @@ impl NotFoundPage {
     }
 }
 
-impl_template_responder!(NotFoundPage, "pages/error/500");
+impl_template_responder!(NotFoundPage, "pages/error/404");
 
 /// A page in response to an internal server error.
 #[derive(Debug, Serialize)]
