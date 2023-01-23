@@ -42,15 +42,8 @@ pub enum Error {
     UserNotFound { ip_addr: IpAddr },
     #[display(fmt = "Board '{}' not found", board_name)]
     BoardNotFound { board_name: String },
-    #[display(
-        fmt = "Thread #{} on board '{}' not found",
-        thread_id,
-        board_name
-    )]
-    ThreadNotFound {
-        board_name: String,
-        thread_id: ThreadId,
-    },
+    #[display(fmt = "Thread #{} not found", thread_id)]
+    ThreadNotFound { thread_id: ThreadId },
     #[display(fmt = "Post #{} not found", post_id)]
     PostNotFound { post_id: PostId },
     #[display(fmt = "Custom page {} not found", name)]

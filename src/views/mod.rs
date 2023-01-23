@@ -160,7 +160,7 @@ impl PageHeader {
     /// Create a new `PageHeader`.
     fn new<S>(board_name: S, context: &mut Context) -> Result<PageHeader>
     where
-        S: AsRef<str>,
+        S: Into<String>,
     {
         Ok(PageHeader {
             board: context.database.board(board_name)?,

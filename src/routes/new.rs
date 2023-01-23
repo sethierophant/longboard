@@ -42,7 +42,8 @@ use crate::{config::Conf, Error, Result};
 /// [1]: https://github.com/SergioBenitez/Rocket/issues/842
 /// [2]: https://github.com/SergioBenitez/Rocket/issues/998
 ///
-/// TODO: [Seems like this is now solved?][3] We should be able to remove this.
+/// Update 2023-01-09:
+/// [Seems like this is now solved][3]? It might be possible to remove this.
 ///
 /// [3]: https://github.com/SergioBenitez/Rocket/commit/fa3e0334c1dcbbc91f63375906aaab72e5bafe59
 #[derive(Responder)]
@@ -345,13 +346,6 @@ pub fn new_post(
     session: Option<Session>,
     _not_blocked: NotBlocked,
 ) -> Result<FragmentRedirect> {
-    if db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name,
-            thread_id,
-        });
-    }
-
     let new_post_id = db.create_post(
         board_name.clone(),
         thread_id,
@@ -454,7 +448,6 @@ where
 
         let body_html = body.into_html();
 
-        // TODO is * needed ??
         let limit = *conf.rate_limit_same_content;
         if self.content_rate_limit_exceeded(&body_html, limit)? {
             return Err(Error::ContentRateLimitExceeded);
@@ -557,16 +550,10 @@ where
     ) -> Result<()> {
         let field = entries.field("file").unwrap();
 
-        let content_type = match field.headers.content_type.as_ref() {
-            Some(content_type) => content_type,
+        let content_type: Mime = match field.headers.content_type.as_ref() {
+            Some(content_type) => content_type.to_owned(),
             None => return Err(Error::UploadMissingContentType),
         };
-
-        // This converts from rocket::http::hyper::mime::Mime (re-export of mime
-        // v0.2.6) to mime::Mime (mime v0.3.16).
-        //
-        // TODO: Verify that this comment is still correct.
-        let content_type: Mime = content_type.to_string().parse().unwrap();
 
         if !conf.allow_file_types.contains(&content_type) {
             return Err(Error::UploadBadContentType { content_type });

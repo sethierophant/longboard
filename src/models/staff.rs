@@ -15,8 +15,8 @@ use diesel::{delete, insert_into, update, Insertable, Queryable};
 
 use serde::Serialize;
 
-use crate::models::{Connection, InnerConnection};
-use crate::schema::{anon_user, session, staff, staff_action};
+use crate::models::{Connection, *};
+use crate::schema::{anon_user, report, session, staff, staff_action};
 use crate::{Error, Result};
 
 /// A session for a staff member.
@@ -212,6 +212,33 @@ pub struct NewStaffAction {
     pub done_by: String,
     pub action: String,
     pub reason: String,
+}
+
+/// A report ID.
+pub type ReportId = i32;
+
+/// A report that a user made about a post which breaks the rules.
+#[derive(Debug, Queryable, Serialize)]
+pub struct Report {
+    /// The report ID.
+    pub id: ReportId,
+    /// When the report was made.
+    pub time_stamp: DateTime<Utc>,
+    /// The reason the post should be removed.
+    pub reason: String,
+    /// The post.
+    pub post_id: PostId,
+    /// The user that made the report.
+    pub user_id: UserId,
+}
+
+/// A new report to be inserted in the database.
+#[derive(Debug, Insertable)]
+#[diesel(table_name = report)]
+pub struct NewReport {
+    pub reason: String,
+    pub post: PostId,
+    pub user_id: UserId,
 }
 
 impl<C, M> Connection<C, M>
@@ -520,5 +547,79 @@ where
             .execute(&mut self.inner)?;
 
         Ok(())
+    }
+
+    /// Get a report.
+    pub fn report(&mut self, report_id: ReportId) -> Result<Report> {
+        use crate::schema::report::columns::id;
+        use crate::schema::report::dsl::report;
+
+        Ok(report
+            .filter(id.eq(report_id))
+            .limit(1)
+            .first(&mut self.inner)?)
+    }
+
+    /// Get all post reports.
+    pub fn all_reports(&mut self) -> Result<Vec<Report>> {
+        use crate::schema::report::dsl::report;
+
+        Ok(report.load(&mut self.inner)?)
+    }
+
+    /// Insert a new post report.
+    pub fn insert_report(&mut self, new_report: NewReport) -> Result<()> {
+        use crate::schema::report::dsl::report;
+
+        insert_into(report)
+            .values(&new_report)
+            .execute(&mut self.inner)?;
+
+        Ok(())
+    }
+
+    /// Delete a report.
+    pub fn delete_report(&mut self, report_id: ReportId) -> Result<()> {
+        use crate::schema::report::columns::id;
+        use crate::schema::report::dsl::report;
+
+        delete(report.filter(id.eq(report_id))).execute(&mut self.inner)?;
+
+        Ok(())
+    }
+
+    /// Check if the user has made any posts recently.
+    pub fn user_rate_limit_exceeded(
+        &mut self,
+        user_id: UserId,
+        limit: Duration,
+    ) -> Result<bool> {
+        use crate::schema::post::columns as post_columns;
+        use crate::schema::post::dsl::post;
+
+        let query = post
+            .filter(post_columns::user_id.eq(user_id))
+            .filter(post_columns::time_stamp.gt(Utc::now() - limit));
+
+        Ok(select(exists(query)).get_result(&mut self.inner)?)
+    }
+
+    /// Check if an identical post has been made based on the given content recently.
+    pub fn content_rate_limit_exceeded<S>(
+        &mut self,
+        post_body: S,
+        limit: Duration,
+    ) -> Result<bool>
+    where
+        S: AsRef<str>,
+    {
+        use crate::schema::post::columns as post_columns;
+        use crate::schema::post::dsl::post;
+
+        let query = post
+            .filter(post_columns::body.eq(post_body.as_ref()))
+            .filter(post_columns::time_stamp.gt(Utc::now() - limit));
+
+        Ok(select(exists(query)).get_result(&mut self.inner)?)
     }
 }

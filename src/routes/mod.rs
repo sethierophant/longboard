@@ -301,63 +301,6 @@ pub fn form_help(mut context: Context, conf: Conf) -> Result<Template> {
     Ok(Template::render("pages/form-help", data))
 }
 
-// Helper functions to check if a board, post, or thread exists.
-//
-// TODO: These could probably be moved into a Connection impl, might not need to
-// get the whole object (board, thread, etc...) from the database.
-//
-// I bet there is a way to check if something exists in SQL, which may perform
-// slightly better.
-//
-// Also, we should be checking for
-// Error::DatabaseError(diesel::result::Error::NotFound) here and letting other
-// errors propagate.
-//
-// In fact, we could probably change the DB functions to do this check so we
-// don't have to do it here.
-fn board_exists(board_name: &str, db: &mut PooledConnection) -> Result<()> {
-    if db.board(board_name).is_err() {
-        return Err(Error::BoardNotFound {
-            board_name: board_name.to_string(),
-        });
-    }
-
-    Ok(())
-}
-
-fn thread_exists(
-    board_name: &str,
-    thread_id: ThreadId,
-    db: &mut PooledConnection,
-) -> Result<()> {
-    board_exists(board_name, db)?;
-
-    if db.thread(thread_id).is_err() {
-        return Err(Error::ThreadNotFound {
-            board_name: board_name.to_string(),
-            thread_id,
-        });
-    }
-
-    Ok(())
-}
-
-fn post_exists(
-    board_name: &str,
-    thread_id: ThreadId,
-    post_id: PostId,
-    db: &mut PooledConnection,
-) -> Result<()> {
-    board_exists(board_name, db)?;
-    thread_exists(board_name, thread_id, db)?;
-
-    if db.post(post_id).is_err() {
-        return Err(Error::PostNotFound { post_id });
-    }
-
-    Ok(())
-}
-
 /// Serve a board.
 #[get("/<board_name>?<page>", rank = 2)]
 pub fn board(
@@ -366,7 +309,6 @@ pub fn board(
     mut context: Context,
     _user: User,
 ) -> Result<BoardPage> {
-    board_exists(&board_name, &mut context.database)?;
     BoardPage::new(board_name, page.unwrap_or(1), &mut context)
 }
 
@@ -377,7 +319,6 @@ pub fn board_catalog(
     mut context: Context,
     _user: User,
 ) -> Result<BoardCatalogPage> {
-    board_exists(&board_name, &mut context.database)?;
     BoardCatalogPage::new(board_name, &mut context)
 }
 
@@ -389,34 +330,31 @@ pub fn thread(
     mut context: Context,
     _user: User,
 ) -> Result<ThreadPage> {
-    thread_exists(&board_name, thread_id, &mut context.database)?;
     ThreadPage::new(board_name, thread_id, &mut context)
 }
 
 /// Serve a post preview.
-#[get("/<board_name>/<thread_id>/preview/<post_id>", rank = 2)]
+#[get("/<_board_name>/<_thread_id>/preview/<post_id>", rank = 2)]
 pub fn post_preview(
-    board_name: String,
-    thread_id: ThreadId,
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     mut context: Context,
     _user: User,
 ) -> Result<PostPreview> {
-    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
     PostPreview::new(post_id, &mut context)
 }
 
 /// Report a post.
-#[get("/<board_name>/<thread_id>/report/<post_id>")]
+#[get("/<_board_name>/<_thread_id>/report/<post_id>")]
 pub fn report(
-    board_name: String,
-    thread_id: ThreadId,
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     mut context: Context,
     _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<ReportPage> {
-    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
     ReportPage::new(post_id, &mut context)
 }
 
@@ -427,18 +365,16 @@ pub struct ReportData {
 }
 
 /// Create a new post report.
-#[post("/<board_name>/<thread_id>/report/<post_id>", data = "<report_data>")]
+#[post("/<_board_name>/<_thread_id>/report/<post_id>", data = "<report_data>")]
 pub fn new_report(
-    board_name: String,
-    thread_id: ThreadId,
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     report_data: Form<ReportData>,
     mut context: Context,
     user: User,
     _not_blocked: NotBlocked,
 ) -> Result<ActionSuccessPage> {
-    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
-
     let ReportData { reason } = report_data.into_inner();
 
     if reason.len() > 250 {
@@ -459,17 +395,15 @@ pub fn new_report(
 }
 
 /// Serve a form for deleting a post.
-#[get("/<board_name>/<thread_id>/delete/<post_id>")]
+#[get("/<_board_name>/<_thread_id>/delete/<post_id>")]
 pub fn delete(
-    board_name: String,
-    thread_id: ThreadId,
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     mut context: Context,
     _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<DeletePage> {
-    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
-
     if context.database.is_first_post(post_id)? {
         Ok(DeletePage::Thread(DeleteThreadPage::new(
             post_id,
@@ -491,18 +425,16 @@ pub struct DeleteData {
 }
 
 /// Delete a post.
-#[post("/<board_name>/<thread_id>/delete/<post_id>", data = "<delete_data>")]
+#[post("/<_board_name>/<_thread_id>/delete/<post_id>", data = "<delete_data>")]
 pub fn handle_delete(
-    board_name: String,
-    thread_id: ThreadId,
+    _board_name: String,
+    _thread_id: ThreadId,
     post_id: PostId,
     delete_data: Form<DeleteData>,
     mut context: Context,
     _not_blocked: NotBlocked,
     _user: User,
 ) -> Result<ActionSuccessPage> {
-    post_exists(&board_name, thread_id, post_id, &mut context.database)?;
-
     let post = context.database.post(post_id)?;
 
     let hash = post.delete_hash.ok_or(Error::DeleteInvalidPassword)?;

@@ -430,8 +430,6 @@ pub fn pin(
     mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
-
     let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
@@ -457,8 +455,6 @@ pub fn unpin(
     mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
-
     let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
@@ -484,8 +480,6 @@ pub fn lock(
     mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
-
     let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
@@ -511,8 +505,6 @@ pub fn unlock(
     mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    // FIXME: Check if board and thread exist. See comment in routes/mod.rs
-
     let ReasonData { reason } = reason_data.into_inner();
 
     let uri = uri!(crate::routes::thread: &board_name, thread_id).to_string();
@@ -531,19 +523,17 @@ pub fn unlock(
 
 /// Delete a post without needing a password.
 #[post(
-    "/<board_name>/<thread_id>/staff-delete/<post_id>",
+    "/<_board_name>/<thread_id>/staff-delete/<post_id>",
     data = "<reason_data>"
 )]
 pub fn staff_delete(
-    board_name: String,
+    _board_name: String,
     thread_id: ThreadId,
     post_id: PostId,
     reason_data: Form<ReasonData>,
     mut context: Context,
     session: Session,
 ) -> Result<ActionSuccessPage> {
-    // FIXME: Check if board and thread and post exist. See comment in routes/mod.rs
-
     let ReasonData { reason } = reason_data.into_inner();
 
     let thread = context.database.parent_thread(post_id)?;
