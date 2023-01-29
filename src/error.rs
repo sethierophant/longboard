@@ -38,7 +38,10 @@ pub enum Error {
     UserRateLimitExceeded,
     #[display(fmt = "Rate limit exceeded for post content.")]
     ContentRateLimitExceeded,
-    #[display(fmt = "User with ip {} was not found in the database", ip_addr)]
+    #[display(
+        fmt = "User with IP address {} was not found in the database",
+        ip_addr
+    )]
     UserNotFound { ip_addr: IpAddr },
     #[display(fmt = "Board '{}' not found", board_name)]
     BoardNotFound { board_name: String },
@@ -48,9 +51,9 @@ pub enum Error {
     PostNotFound { post_id: PostId },
     #[display(fmt = "Custom page {} not found", name)]
     CustomPageNotFound { name: String },
-    #[display(fmt = "Missing param '{}' for new thread", param)]
+    #[display(fmt = "Missing parameter '{}' for new thread", param)]
     MissingThreadParam { param: String },
-    #[display(fmt = "Missing param '{}' for new post", param)]
+    #[display(fmt = "Missing parameter '{}' for new post", param)]
     MissingPostParam { param: String },
     #[display(fmt = "Couldn't parse multipart/form-data")]
     FormDataCouldntParse,
@@ -63,13 +66,18 @@ pub enum Error {
         content_type
     )]
     UploadBadContentType { content_type: Mime },
+    #[display(
+        fmt = "Uploaded file exceeded the maximum file size of {}.",
+        "human_size(*size_limit)"
+    )]
+    UploadTooBig { size_limit: u64 },
     #[display(fmt = "Invalid password")]
     DeleteInvalidPassword,
     #[display(fmt = "Deleting files only is not a valid option for threads")]
     CannotDeleteThreadFilesOnly,
     #[display(fmt = "No staff member with username '{}'", staff_name)]
     StaffInvalidUsername { staff_name: String },
-    #[display(fmt = "Invaid password for username '{}'", staff_name)]
+    #[display(fmt = "Invalid password for username '{}'", staff_name)]
     StaffInvalidPassword { staff_name: String },
     #[display(fmt = "Missing session cookie")]
     MissingSessionCookie,
@@ -164,6 +172,21 @@ pub enum Error {
     DurationOutOfRangeError(time::OutOfRangeError),
 }
 
+/// Convert a file size to a human-readable value.
+fn human_size(size: u64) -> String {
+    let size = size as f64;
+
+    if size < 2f64.powi(10) {
+        format!("{:.0} bytes", size)
+    } else if size < 2f64.powi(20) {
+        format!("{:.2} KiB", size / 2f64.powi(10))
+    } else if size < 2f64.powi(30) {
+        format!("{:.2} MiB", size / 2f64.powi(20))
+    } else {
+        format!("{:.2} GiB", size / 2f64.powi(30))
+    }
+}
+
 impl Error {
     /// Convert from an I/O error with an added message.
     ///
@@ -195,16 +218,17 @@ impl Error {
 impl<'r> Responder<'r> for Error {
     fn respond_to(self, req: &Request) -> rocket::response::Result<'r> {
         match self {
-            Error::MissingThreadParam { .. }
-            | Error::MissingPostParam { .. }
-            | Error::ImageError(..)
+            Error::CannotDeleteThreadFilesOnly
             | Error::DeleteInvalidPassword
-            | Error::StaffInvalidUsername { .. }
-            | Error::StaffInvalidPassword { .. }
-            | Error::ReportTooLong
-            | Error::ThreadLocked
             | Error::FileUploadNotAllowed
-            | Error::CannotDeleteThreadFilesOnly => {
+            | Error::ImageError(..)
+            | Error::MissingPostParam { .. }
+            | Error::MissingThreadParam { .. }
+            | Error::ReportTooLong
+            | Error::StaffInvalidPassword { .. }
+            | Error::StaffInvalidUsername { .. }
+            | Error::ThreadLocked
+            | Error::UploadTooBig { .. } => {
                 warn!("{}", &self);
 
                 let mut context = req.guard::<Context>().unwrap();
@@ -239,8 +263,9 @@ impl<'r> Responder<'r> for Error {
             }
 
             Error::UserRateLimitExceeded | Error::ContentRateLimitExceeded => {
-                // Same as for IP being blocked; we don't want to show the exact
-                // error message to the client.
+                // In the same way as when the IP is blocked; we don't want to
+                // show the exact error message to the client when the rate
+                // limit is exceeded.
 
                 warn!("{}", &self);
 

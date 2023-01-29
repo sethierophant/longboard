@@ -209,8 +209,13 @@ pub fn banner(file: PathBuf, conf: Conf) -> Result<NamedFile> {
 /// Serve a user-uploaded file.
 #[get("/file/upload/<file..>", rank = 0)]
 pub fn upload(file: PathBuf, conf: Conf) -> Result<NamedFile> {
-    Ok(NamedFile::open(conf.upload_dir.join(file))
-        .or_else(|_| NamedFile::open(conf.resource_dir.join("deleted.png")))?)
+    let mut upload_path = conf.upload_dir.join(file);
+
+    if !upload_path.exists() {
+        upload_path = conf.resource_dir.join("deleted.png");
+    }
+
+    Ok(NamedFile::open(upload_path)?)
 }
 
 /// Load a admin-created page.

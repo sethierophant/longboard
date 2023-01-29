@@ -158,8 +158,8 @@ impl MultipartEntries {
     }
 }
 
-/// Copy a file from the user's request into the uploads dir. Returns the path
-/// the file was saved under.
+/// Copy a file from the user's request into the uploads directory. Returns the
+/// path the file was saved under.
 fn save_file<P>(
     field: &SavedField,
     content_type: &Mime,
@@ -168,7 +168,8 @@ fn save_file<P>(
 where
     P: AsRef<Path>,
 {
-    let mut mime_ext = match get_mime_extensions(&content_type) {
+    let mime_ext = match get_mime_extensions(&content_type) {
+        Some(&["jpe", ..]) => "jpg",
         Some(&[ext, ..]) => ext,
         _ => {
             return Err(Error::UploadBadContentType {
@@ -176,10 +177,6 @@ where
             })
         }
     };
-
-    if mime_ext == "jpe" {
-        mime_ext = "jpg";
-    }
 
     let epoch = Utc::now().format("%s").to_string();
     let mut num = 0;
