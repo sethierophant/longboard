@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::string::ToString;
@@ -17,7 +17,9 @@ use mime::Mime;
 
 use mime_guess::get_mime_extensions;
 
-use multipart::server::save::{SavedData, SavedField};
+use multipart::server::save::{
+    PartialReason, SaveResult, SavedData, SavedField,
+};
 use multipart::server::{Entries, Multipart};
 
 use rand::{thread_rng, Rng};
@@ -91,15 +93,21 @@ impl data::FromDataSimple for MultipartEntries {
                 }
             };
 
-        let stream = data.open().take(conf.file_size_limit);
-
-        let entries = match Multipart::with_body(stream, boundary)
+        let entries = match Multipart::with_body(data.open(), boundary)
             .save()
+            .size_limit(conf.file_size_limit)
             .temp()
-            .into_entries()
         {
-            Some(entries) => entries,
-            None => {
+            SaveResult::Full(entries) => entries,
+            SaveResult::Partial(_, PartialReason::SizeLimit) => {
+                return Outcome::Failure((
+                    Status::BadRequest,
+                    Error::UploadTooBig {
+                        size_limit: conf.file_size_limit,
+                    },
+                ))
+            }
+            _ => {
                 return Outcome::Failure((
                     Status::BadRequest,
                     Error::FormDataCouldntParse,
@@ -314,13 +322,15 @@ where
 #[post("/<board_name>", data = "<entries>", rank = 1)]
 pub fn new_thread(
     board_name: String,
-    entries: MultipartEntries,
+    entries: Result<MultipartEntries>,
     conf: Conf,
     mut db: PooledConnection,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
 ) -> Result<Redirect> {
+    let entries = entries?;
+
     if db.board(&board_name).is_err() {
         return Err(Error::BoardNotFound { board_name });
     }
@@ -339,13 +349,15 @@ pub fn new_thread(
 pub fn new_post(
     board_name: String,
     thread_id: ThreadId,
-    entries: MultipartEntries,
+    entries: Result<MultipartEntries>,
     conf: Conf,
     mut db: PooledConnection,
     user: User,
     session: Option<Session>,
     _not_blocked: NotBlocked,
 ) -> Result<FragmentRedirect> {
+    let entries = entries?;
+
     let new_post_id = db.create_post(
         board_name.clone(),
         thread_id,
